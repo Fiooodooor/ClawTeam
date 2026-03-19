@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -78,6 +80,107 @@ class WorkspaceManager:
         git.create_worktree(
             self.repo_root, wt_path, branch, base_ref=self.base_branch,
         )
+
+        # --------------------------
+        # 🚀 绝对白名单保护模式 v3.0
+        # --------------------------
+        # 【绝对不能删的白名单】
+        KEEP_ALWAYS = [
+            # 核心命脉
+            "openclaw.json",
+            ".env",
+            ".env.local",
+            
+            # 认知系统
+            "SOUL.md",
+            "AGENTS.md",
+            "TOOLS.md",
+            "MEMORY.md",
+            "HEARTBEAT.md",
+            "IDENTITY.md",
+            "USER.md",
+            
+            # 技能和工具
+            "skills/",
+            "scripts/",
+            ".openclaw/",
+            ".clawhub/",
+            
+            # 环境配置
+            "node_modules/",
+            "venv/",
+            ".venv/",
+            "poetry.lock",
+            "pyproject.toml",
+            "requirements.txt",
+            
+            # git工作树必须保留
+            ".git",
+        ]
+        
+        # 遍历目录删除
+        for item in wt_path.iterdir():
+            # 检查是否在白名单
+            keep = False
+            for pattern in KEEP_ALWAYS:
+                if pattern.endswith("/"):
+                    # 目录匹配
+                    if item.is_dir() and item.name == pattern.rstrip("/"):
+                        keep = True
+                        break
+                else:
+                    # 文件匹配
+                    if item.is_file() and item.name == pattern:
+                        keep = True
+                        break
+            
+            # 不在白名单就删除
+            if not keep:
+                try:
+                    if item.is_file() or item.is_symlink():
+                        item.unlink()
+                    elif item.is_dir():
+                        shutil.rmtree(item)
+                except Exception as e:
+                    logger.warning(f"删除文件失败 {item}: {e}")
+
+        # --------------------------
+        # 🔗 新增：软链接共享依赖（解决依赖断层问题）
+        # --------------------------
+        # 主工作区路径
+        main_workspace = self.repo_root
+        
+        # 需要共享的依赖目录
+        shared_dirs = [
+            "node_modules",
+            ".venv",
+            "venv",
+        ]
+        
+        for dir_name in shared_dirs:
+            main_dir = main_workspace / dir_name
+            target_dir = wt_path / dir_name
+            
+            # 如果主工作区有这个目录，且Worker目录没有，就创建软链接
+            if main_dir.exists() and main_dir.is_dir() and not target_dir.exists():
+                try:
+                    os.symlink(main_dir, target_dir)
+                    logger.info(f"创建软链接成功: {target_dir} -> {main_dir}")
+                except Exception as e:
+                    logger.warning(f"创建软链接失败 {dir_name}: {e}")
+
+        # --------------------------
+        # 🚨 强制自检程序（防呆设计）
+        # --------------------------
+        required_files = [
+            wt_path / "openclaw.json",
+            wt_path / "skills",
+            wt_path / "scripts",
+        ]
+        
+        for f in required_files:
+            if not f.exists():
+                raise RuntimeError(f"瘦身错误：核心文件/目录缺失 {f.name}，请检查白名单配置")
 
         info = WorkspaceInfo(
             agent_name=agent_name,

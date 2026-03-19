@@ -39,6 +39,10 @@ def build_agent_prompt(
             f"- Branch: {workspace_branch}",
             "- This is an isolated git worktree. Your changes do not affect the main branch.",
         ])
+    
+    # 简化收件人名称，直接用 leader（修复Bug2最终版）
+    leader_inbox = "leader"
+    
     lines.extend([
         "",
         "## Task\n",
@@ -49,9 +53,9 @@ def build_agent_prompt(
         f"- Starting a task: `clawteam task update {team_name} <task-id> --status in_progress`",
         f"- Finishing a task: `clawteam task update {team_name} <task-id> --status completed`",
         "- When you finish all tasks, send a summary to the leader:",
-        f'  `clawteam inbox send {team_name} {leader_name} "All tasks completed. <brief summary>"`',
+        f'  `clawteam inbox send {team_name} "{leader_inbox}" "All tasks completed. <brief summary>"`',
         "- If you are blocked or need help, message the leader:",
-        f'  `clawteam inbox send {team_name} {leader_name} "Need help: <description>"`',
+        f'  `clawteam inbox send {team_name} "{leader_inbox}" "Need help: <description>"`',
         f"- After finishing work, report your costs: `clawteam cost report {team_name} --input-tokens <N> --output-tokens <N> --cost-cents <N>`",
         f"- Before finishing, save your session: `clawteam session save {team_name} --session-id <id>`",
         "",
