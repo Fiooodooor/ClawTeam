@@ -1,0 +1,93 @@
+"""Runtime adapters for agent-specific command preparation."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+from clawteam.spawn.command_validation import normalize_spawn_command
+
+
+@dataclass(frozen=True)
+class PreparedCommand:
+    """Prepared native CLI command plus any post-launch prompt injection."""
+
+    normalized_command: list[str]
+    final_command: list[str]
+    post_launch_prompt: str | None = None
+
+
+class NativeCliAdapter:
+    """Adapter for direct CLI runtimes such as claude, codex, gemini, nanobot."""
+
+    def prepare_command(
+        self,
+        command: list[str],
+        *,
+        prompt: str | None = None,
+        cwd: str | None = None,
+        skip_permissions: bool = False,
+        interactive: bool = False,
+    ) -> PreparedCommand:
+        normalized_command = normalize_spawn_command(command)
+        final_command = list(normalized_command)
+        post_launch_prompt = None
+
+        if skip_permissions:
+            if is_claude_command(normalized_command):
+                final_command.append("--dangerously-skip-permissions")
+            elif is_codex_command(normalized_command):
+                final_command.append("--dangerously-bypass-approvals-and-sandbox")
+            elif is_gemini_command(normalized_command):
+                final_command.append("--yolo")
+
+        if is_nanobot_command(normalized_command):
+            if cwd and not command_has_workspace_arg(normalized_command):
+                final_command.extend(["-w", cwd])
+            if prompt:
+                final_command.extend(["-m", prompt])
+        elif prompt:
+            if interactive and is_claude_command(normalized_command):
+                post_launch_prompt = prompt
+            elif is_codex_command(normalized_command):
+                final_command.append(prompt)
+            else:
+                final_command.extend(["-p", prompt])
+
+        return PreparedCommand(
+            normalized_command=normalized_command,
+            final_command=final_command,
+            post_launch_prompt=post_launch_prompt,
+        )
+
+
+def command_basename(command: list[str]) -> str:
+    """Return the normalized executable basename for a command."""
+    if not command:
+        return ""
+    return Path(command[0]).name.lower()
+
+
+def is_claude_command(command: list[str]) -> bool:
+    """Check if the command is a Claude CLI invocation."""
+    return command_basename(command) in ("claude", "claude-code")
+
+
+def is_codex_command(command: list[str]) -> bool:
+    """Check if the command is a Codex CLI invocation."""
+    return command_basename(command) in ("codex", "codex-cli")
+
+
+def is_nanobot_command(command: list[str]) -> bool:
+    """Check if the command is a nanobot CLI invocation."""
+    return command_basename(command) == "nanobot"
+
+
+def is_gemini_command(command: list[str]) -> bool:
+    """Check if the command is a Gemini CLI invocation."""
+    return command_basename(command) == "gemini"
+
+
+def command_has_workspace_arg(command: list[str]) -> bool:
+    """Return True when a command already specifies a workspace."""
+    return "-w" in command or "--workspace" in command

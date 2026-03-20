@@ -57,6 +57,8 @@ def test_subprocess_backend_prepends_current_clawteam_bin_to_path(monkeypatch, t
 
 def test_tmux_backend_exports_spawn_path_for_agent_commands(monkeypatch, tmp_path):
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", "/tmp/clawteam-data")
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "demo-project")
     clawteam_bin = tmp_path / "venv" / "bin" / "clawteam"
     clawteam_bin.parent.mkdir(parents=True)
     clawteam_bin.write_text("#!/bin/sh\n")
@@ -109,6 +111,8 @@ def test_tmux_backend_exports_spawn_path_for_agent_commands(monkeypatch, tmp_pat
     full_cmd = new_session[-1]
     assert f"export PATH={clawteam_bin.parent}:/usr/bin:/bin" in full_cmd
     assert f"export CLAWTEAM_BIN={clawteam_bin}" in full_cmd
+    assert "export CLAWTEAM_DATA_DIR=/tmp/clawteam-data" in full_cmd
+    assert "export GOOGLE_CLOUD_PROJECT=demo-project" in full_cmd
     assert f"{clawteam_bin} lifecycle on-exit --team demo-team --agent worker1" in full_cmd
 
 

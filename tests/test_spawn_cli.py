@@ -66,3 +66,37 @@ def test_launch_cli_passes_skip_permissions_from_config(monkeypatch, tmp_path):
     assert result.exit_code == 0
     assert backend.calls
     assert all(call["skip_permissions"] is True for call in backend.calls)
+
+
+def test_spawn_cli_rejects_removed_acpx_backend(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    TeamManager.create_team(
+        name="demo",
+        leader_name="leader",
+        leader_id="leader001",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["spawn", "acpx", "claude", "--team", "demo", "--agent-name", "alice", "--no-workspace"],
+        env={"CLAWTEAM_DATA_DIR": str(tmp_path)},
+    )
+
+    assert result.exit_code == 1
+    assert "Unknown spawn backend: acpx. Available: subprocess, tmux" in result.output
+
+
+def test_launch_cli_rejects_removed_acpx_backend(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["launch", "hedge-fund", "--backend", "acpx", "--team", "fund1", "--goal", "Analyze AAPL"],
+        env={"CLAWTEAM_DATA_DIR": str(tmp_path)},
+    )
+
+    assert result.exit_code == 1
+    assert "Unknown spawn backend: acpx. Available: subprocess, tmux" in result.output

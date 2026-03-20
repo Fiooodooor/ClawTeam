@@ -50,7 +50,7 @@ def main(
         None, "--data-dir", help="Override data directory (default: ~/.clawteam).",
     ),
     transport: Optional[str] = typer.Option(
-        None, "--transport", help="Transport backend: file, p2p, or acpx.",
+        None, "--transport", help="Transport backend: file or p2p.",
     ),
 ):
     """clawteam - Framework-agnostic multi-agent coordination CLI."""
@@ -116,7 +116,7 @@ def config_show():
 def config_set(
     key: str = typer.Argument(
         ...,
-        help="Config key (e.g. data_dir, user, transport, workspace, default_backend, skip_permissions, gource_path, acpx_path)",
+        help="Config key (e.g. data_dir, user, transport, workspace, default_backend, skip_permissions, gource_path)",
     ),
     value: str = typer.Argument(..., help="Config value"),
 ):
@@ -146,7 +146,7 @@ def config_set(
 def config_get(
     key: str = typer.Argument(
         ...,
-        help="Config key (e.g. data_dir, user, transport, workspace, default_backend, skip_permissions, gource_path, acpx_path)",
+        help="Config key (e.g. data_dir, user, transport, workspace, default_backend, skip_permissions, gource_path)",
     ),
 ):
     """Get the effective value of a config key."""
@@ -1730,7 +1730,7 @@ def lifecycle_on_exit(
 
 @app.command("spawn")
 def spawn_agent(
-    backend: Optional[str] = typer.Argument(None, help="Backend: tmux (default), subprocess, or acpx"),
+    backend: Optional[str] = typer.Argument(None, help="Backend: tmux (default) or subprocess"),
     command: list[str] = typer.Argument(None, help="Command and arguments to run (default: claude)"),
     team: Optional[str] = typer.Option(None, "--team", "-t", help="Team name"),
     agent_name: Optional[str] = typer.Option(None, "--agent-name", "-n", help="Agent name"),
@@ -1748,7 +1748,6 @@ def spawn_agent(
     Backends:
       tmux        - Launch in tmux windows (visual monitoring)
       subprocess  - Launch as background processes
-      acpx        - Launch via ACPX Agent Client Protocol (multi-provider)
     """
     from clawteam.config import get_effective
     from clawteam.spawn import get_backend
@@ -2050,6 +2049,8 @@ def board_gource(
     team: str = typer.Argument(..., help="Team name"),
     export: Optional[str] = typer.Option(None, "--export", help="Export video to file (requires FFmpeg)"),
     log_only: bool = typer.Option(False, "--log-only", help="Output Gource custom log to stdout without launching"),
+    live: bool = typer.Option(False, "--live", help="Stream new activity into Gource in realtime"),
+    interval: float = typer.Option(2.0, "--interval", min=0.2, help="Polling interval in seconds for --live"),
     combine_worktrees: bool = typer.Option(True, "--combine-worktrees/--events-only", help="Combine git worktree logs with event log"),
     repo: Optional[str] = typer.Option(None, "--repo", help="Git repo path for worktree discovery"),
     resolution: Optional[str] = typer.Option(None, "--resolution", "-r", help="Viewport resolution (e.g. 1920x1080)"),
@@ -2061,14 +2062,24 @@ def board_gource(
     optionally combines git history from all agent worktrees into a unified
     Gource animation showing parallel collaboration.
     """
+    import tempfile
+
     from clawteam.board.gource import (
+        append_log_lines,
+        collect_live_log_lines,
+        find_gource,
         generate_combined_log,
         generate_event_log,
-        generate_git_log,
-        find_gource,
         launch_gource,
+        stream_gource_live,
     )
-    import tempfile
+
+    if live and export:
+        _output(
+            {"error": "--live cannot be used with --export"},
+            lambda d: console.print(f"[red]{d['error']}[/red]"),
+        )
+        raise typer.Exit(1)
 
     # Generate log lines
     if combine_worktrees:
@@ -2106,11 +2117,12 @@ def board_gource(
     try:
         title = f"ClawTeam: {team}"
         proc = launch_gource(
-            log_file=log_path,
+            log_file=None if live else log_path,
             title=title,
             resolution=resolution or "",
             seconds_per_day=seconds_per_day or 0,
             export_path=export,
+            live_stream=live,
         )
         if proc is None:
             _output(
@@ -2123,6 +2135,36 @@ def board_gource(
             console.print(f"Exporting Gource visualization to [cyan]{export}[/cyan]...")
             proc.wait()
             console.print(f"[green]OK[/green] Video saved to {export}")
+        elif live:
+            if proc.stdin is None:
+                console.print("[red]Failed to open live Gource stream.[/red]")
+                raise typer.Exit(1)
+            console.print(
+                f"Gource live stream launched for team [cyan]{team}[/cyan]. "
+                "Close the window or press Ctrl+C to stop."
+            )
+            seed_lines = collect_live_log_lines(
+                set(),
+                team,
+                combine_worktrees=combine_worktrees,
+                repo_path=repo,
+            )
+            append_log_lines(proc.stdin, seed_lines)
+            try:
+                stream_gource_live(
+                    proc,
+                    team,
+                    combine_worktrees=combine_worktrees,
+                    repo_path=repo,
+                    poll_interval=interval,
+                )
+            except KeyboardInterrupt:
+                if proc.poll() is None:
+                    proc.terminate()
+            finally:
+                if proc.stdin is not None:
+                    proc.stdin.close()
+                proc.wait()
         else:
             console.print(f"Gource launched for team [cyan]{team}[/cyan]. Close the window to exit.")
             proc.wait()
