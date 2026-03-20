@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 
 from clawteam.team.models import TeamConfig, TeamMember, get_data_dir
+from clawteam.team.plan import referenced_legacy_plan_paths, team_plans_path
 
 
 def _teams_root() -> Path:
@@ -27,8 +28,11 @@ def _load_config(team_name: str) -> TeamConfig | None:
     path = _config_path(team_name)
     if not path.exists():
         return None
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return TeamConfig.model_validate(data)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return TeamConfig.model_validate(data)
+    except (json.JSONDecodeError, Exception):
+        return None
 
 
 def _save_config(config: TeamConfig) -> None:
@@ -43,6 +47,25 @@ def _save_config(config: TeamConfig) -> None:
 
 class TeamManager:
     """Manages team lifecycle operations."""
+
+    @staticmethod
+    def get_member(
+        team_name: str,
+        member_name: str,
+        user: str = "",
+    ) -> TeamMember | None:
+        """Return a member by logical name, optionally scoped by user."""
+        config = _load_config(team_name)
+        if not config:
+            return None
+        if user:
+            for member in config.members:
+                if member.name == member_name and member.user == user:
+                    return member
+        matches = [member for member in config.members if member.name == member_name]
+        if len(matches) == 1:
+            return matches[0]
+        return None
 
     @staticmethod
     def create_team(
@@ -159,22 +182,24 @@ class TeamManager:
         except Exception:
             pass
 
+        legacy_plan_paths = referenced_legacy_plan_paths(team_name)
         team_dir = _team_dir(team_name)
         tasks_dir = get_data_dir() / "tasks" / team_name
         costs_dir = get_data_dir() / "costs" / team_name
         sessions_dir = get_data_dir() / "sessions" / team_name
-        plans_dir = get_data_dir() / "plans"
+        plans_dir = team_plans_path(team_name)
         cleaned = False
-        for d in (team_dir, tasks_dir, costs_dir, sessions_dir):
+        for d in (team_dir, tasks_dir, costs_dir, sessions_dir, plans_dir):
             if d.exists():
                 shutil.rmtree(d)
                 cleaned = True
-        if plans_dir.exists():
-            for f in plans_dir.glob("*.md"):
-                try:
-                    f.unlink()
-                except OSError:
-                    pass
+        for path in legacy_plan_paths:
+            try:
+                if path.exists():
+                    path.unlink()
+                    cleaned = True
+            except OSError:
+                pass
         return cleaned
 
     @staticmethod
@@ -186,6 +211,14 @@ class TeamManager:
     def inbox_name_for(member: TeamMember) -> str:
         """Return the inbox directory name for a member."""
         return f"{member.user}_{member.name}" if member.user else member.name
+
+    @staticmethod
+    def resolve_inbox(team_name: str, recipient: str, user: str = "") -> str:
+        """Resolve a logical agent name to its on-disk inbox directory."""
+        member = TeamManager.get_member(team_name, recipient, user=user)
+        if member:
+            return TeamManager.inbox_name_for(member)
+        return recipient
 
     @staticmethod
     def get_leader_inbox(team_name: str) -> str | None:

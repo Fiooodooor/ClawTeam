@@ -37,8 +37,12 @@ class FileTransport(Transport):
         filename = f"msg-{ts}-{uid}.json"
         tmp = inbox / f".tmp-{uid}.json"
         target = inbox / filename
-        tmp.write_bytes(data)
-        tmp.rename(target)
+        try:
+            tmp.write_bytes(data)
+            tmp.replace(target)
+        except Exception:
+            tmp.unlink(missing_ok=True)
+            raise
 
     def fetch(self, agent_name: str, limit: int = 10, consume: bool = True) -> list[bytes]:
         inbox = _inbox_dir(self.team_name, agent_name)
@@ -46,16 +50,20 @@ class FileTransport(Transport):
         messages: list[bytes] = []
         for f in files[:limit]:
             try:
-                raw = f.read_bytes()
-                messages.append(raw)
                 if consume:
-                    f.unlink()
-            except Exception:
-                if consume:
+                    consumed = f.with_suffix(".consumed")
                     try:
-                        f.unlink()
+                        f.rename(consumed)
                     except OSError:
-                        pass
+                        continue
+                    try:
+                        messages.append(consumed.read_bytes())
+                    finally:
+                        consumed.unlink(missing_ok=True)
+                else:
+                    messages.append(f.read_bytes())
+            except Exception:
+                continue
         return messages
 
     def count(self, agent_name: str) -> int:

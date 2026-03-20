@@ -6,7 +6,6 @@ import json
 
 from clawteam.team.mailbox import MailboxManager
 from clawteam.team.manager import TeamManager
-from clawteam.team.models import TaskStatus
 from clawteam.team.tasks import TaskStore
 
 

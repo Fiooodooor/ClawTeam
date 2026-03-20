@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from pathlib import Path
 
 from clawteam.team.models import MessageType, TeamMessage, get_data_dir
 from clawteam.transport.base import Transport
@@ -90,6 +89,9 @@ class MailboxManager:
         last_task: str | None = None,
         status: str | None = None,
     ) -> TeamMessage:
+        from clawteam.team.manager import TeamManager
+
+        delivery_target = TeamManager.resolve_inbox(self.team_name, to)
         msg = TeamMessage(
             type=msg_type,
             from_agent=from_agent,
@@ -111,7 +113,7 @@ class MailboxManager:
             status=status,
         )
         data = msg.model_dump_json(indent=2, by_alias=True, exclude_none=True).encode("utf-8")
-        self._transport.deliver(to, data)
+        self._transport.deliver(delivery_target, data)
         self._log_event(msg)
         return msg
 
@@ -123,11 +125,17 @@ class MailboxManager:
         key: str | None = None,
         exclude: list[str] | None = None,
     ) -> list[TeamMessage]:
+        from clawteam.team.manager import TeamManager
+
         exclude_set = set(exclude or [])
         exclude_set.add(from_agent)
+        exclude_inboxes: set[str] = set()
+        for name in exclude_set:
+            exclude_inboxes.add(name)
+            exclude_inboxes.add(TeamManager.resolve_inbox(self.team_name, name))
         messages = []
         for recipient in self._transport.list_recipients():
-            if recipient not in exclude_set:
+            if recipient not in exclude_inboxes:
                 msg = TeamMessage(
                     type=msg_type,
                     from_agent=from_agent,
@@ -143,15 +151,25 @@ class MailboxManager:
                 messages.append(msg)
         return messages
 
+    @staticmethod
+    def _parse_messages(raw: list[bytes]) -> list[TeamMessage]:
+        result: list[TeamMessage] = []
+        for item in raw:
+            try:
+                result.append(TeamMessage.model_validate(json.loads(item)))
+            except Exception:
+                continue
+        return result
+
     def receive(self, agent_name: str, limit: int = 10) -> list[TeamMessage]:
         """Receive and delete messages from an agent's inbox (FIFO)."""
         raw = self._transport.fetch(agent_name, limit=limit, consume=True)
-        return [TeamMessage.model_validate(json.loads(r)) for r in raw]
+        return self._parse_messages(raw)
 
     def peek(self, agent_name: str) -> list[TeamMessage]:
         """Return pending messages without consuming them."""
         raw = self._transport.fetch(agent_name, consume=False)
-        return [TeamMessage.model_validate(json.loads(r)) for r in raw]
+        return self._parse_messages(raw)
 
     def peek_count(self, agent_name: str) -> int:
         return self._transport.count(agent_name)

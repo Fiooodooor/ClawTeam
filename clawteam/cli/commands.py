@@ -91,11 +91,9 @@ app.add_typer(config_app, name="config")
 @config_app.command("show")
 def config_show():
     """Show all configuration settings and their sources."""
-    from clawteam.config import get_effective
+    from clawteam.config import ClawTeamConfig, get_effective
 
-    keys = ["data_dir", "user", "default_team", "transport", "default_backend",
-            "gource_path", "gource_resolution", "gource_seconds_per_day",
-            "acpx_path", "acpx_default_format", "acpx_approve_mode"]
+    keys = list(ClawTeamConfig.model_fields.keys())
     data = {}
     for k in keys:
         val, source = get_effective(k)
@@ -107,7 +105,8 @@ def config_show():
         table.add_column("Value")
         table.add_column("Source", style="dim")
         for k in keys:
-            table.add_row(k, d[k]["value"] or "(empty)", d[k]["source"])
+            v = d[k]["value"]
+            table.add_row(k, str(v) if v != "" else "(empty)", d[k]["source"])
         console.print(table)
 
     _output(data, _human)
@@ -115,21 +114,26 @@ def config_show():
 
 @config_app.command("set")
 def config_set(
-    key: str = typer.Argument(..., help="Config key"),
+    key: str = typer.Argument(
+        ...,
+        help="Config key (e.g. data_dir, user, transport, workspace, default_backend, skip_permissions, gource_path, acpx_path)",
+    ),
     value: str = typer.Argument(..., help="Config value"),
 ):
     """Persistently set a configuration value."""
-    from clawteam.config import load_config, save_config
+    from clawteam.config import ClawTeamConfig, load_config, save_config
 
-    valid_keys = {"data_dir", "user", "default_team", "transport", "default_backend",
-                  "gource_path", "gource_resolution", "gource_seconds_per_day",
-                  "acpx_path", "acpx_default_format", "acpx_approve_mode"}
+    valid_keys = set(ClawTeamConfig.model_fields.keys())
     if key not in valid_keys:
         console.print(f"[red]Invalid key '{key}'. Valid: {', '.join(sorted(valid_keys))}[/red]")
         raise typer.Exit(1)
 
     cfg = load_config()
-    setattr(cfg, key, value)
+    field_info = ClawTeamConfig.model_fields[key]
+    if field_info.annotation is bool:
+        setattr(cfg, key, value.lower() in ("true", "1", "yes"))
+    else:
+        setattr(cfg, key, value)
     save_config(cfg)
 
     _output(
@@ -140,14 +144,15 @@ def config_set(
 
 @config_app.command("get")
 def config_get(
-    key: str = typer.Argument(..., help="Config key"),
+    key: str = typer.Argument(
+        ...,
+        help="Config key (e.g. data_dir, user, transport, workspace, default_backend, skip_permissions, gource_path, acpx_path)",
+    ),
 ):
     """Get the effective value of a config key."""
-    from clawteam.config import get_effective
+    from clawteam.config import ClawTeamConfig, get_effective
 
-    valid_keys = {"data_dir", "user", "default_team", "transport", "default_backend",
-                  "gource_path", "gource_resolution", "gource_seconds_per_day",
-                  "acpx_path", "acpx_default_format", "acpx_approve_mode"}
+    valid_keys = set(ClawTeamConfig.model_fields.keys())
     if key not in valid_keys:
         console.print(f"[red]Invalid key '{key}'. Valid: {', '.join(sorted(valid_keys))}[/red]")
         raise typer.Exit(1)
@@ -251,7 +256,7 @@ def team_spawn_team(
     leader_name = agent_name or identity.agent_name
 
     try:
-        config = TeamManager.create_team(
+        TeamManager.create_team(
             name=name,
             leader_name=leader_name,
             leader_id=leader_id,
@@ -313,7 +318,7 @@ def team_request_join(
     from clawteam.team.manager import TeamManager
     from clawteam.team.models import MessageType
 
-    identity = AgentIdentity.from_env()
+    AgentIdentity.from_env()
     config = TeamManager.get_team(team)
     if not config:
         _output({"error": f"Team '{team}' not found"}, lambda d: console.print(f"[red]{d['error']}[/red]"))
@@ -397,7 +402,14 @@ def team_approve_join(
             join_req = msg
             break
 
-    proposed_name = join_req.proposed_name if join_req else f"agent-{request_id[:6]}"
+    if join_req is None:
+        _output(
+            {"error": f"No join request found with id '{request_id}'"},
+            lambda d: console.print(f"[red]Error: {d['error']}[/red]"),
+        )
+        raise typer.Exit(1)
+
+    proposed_name = join_req.proposed_name
     final_name = assigned_name or proposed_name
     new_agent_id = uuid.uuid4().hex[:12]
 
@@ -535,6 +547,126 @@ def team_status(
     _output(data, _human)
 
 
+@team_app.command("snapshot")
+def team_snapshot(
+    team: str = typer.Argument(..., help="Team name"),
+    tag: str = typer.Option("", "--tag", "-t", help="Label for this snapshot"),
+):
+    """Save a snapshot of the entire team state (config, tasks, events, sessions, costs)."""
+    from clawteam.team.snapshot import SnapshotManager
+
+    try:
+        meta = SnapshotManager(team).create(tag=tag)
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+    data = json.loads(meta.model_dump_json(by_alias=True))
+
+    def _human(d):
+        console.print(f"[green]OK[/green] Snapshot [cyan]{d['id']}[/cyan] created")
+        console.print(
+            f"  {d['taskCount']} tasks, {d['eventCount']} events, "
+            f"{d['sessionCount']} sessions, {d['costEventCount']} cost events"
+        )
+
+    _output(data, _human)
+
+
+@team_app.command("snapshots")
+def team_snapshots(
+    team: str = typer.Argument(..., help="Team name"),
+):
+    """List available snapshots for a team."""
+    from clawteam.team.snapshot import SnapshotManager
+
+    snaps = SnapshotManager(team).list_snapshots()
+    data = [json.loads(s.model_dump_json(by_alias=True)) for s in snaps]
+
+    def _human(items):
+        if not items:
+            console.print("[dim]No snapshots found[/dim]")
+            return
+        table = Table(title=f"Snapshots for {team}")
+        table.add_column("ID", style="cyan")
+        table.add_column("Tag")
+        table.add_column("Members", justify="right")
+        table.add_column("Tasks", justify="right")
+        table.add_column("Events", justify="right")
+        table.add_column("Created", style="dim")
+        for s in items:
+            table.add_row(
+                s["id"],
+                s.get("tag", ""),
+                str(s["memberCount"]),
+                str(s["taskCount"]),
+                str(s["eventCount"]),
+                s["createdAt"][:19],
+            )
+        console.print(table)
+
+    _output(data, _human)
+
+
+@team_app.command("restore")
+def team_restore(
+    team: str = typer.Argument(..., help="Team name"),
+    snapshot_id: str = typer.Argument(..., help="Snapshot ID to restore"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview without writing"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+):
+    """Restore team state from a snapshot."""
+    from clawteam.team.snapshot import SnapshotManager
+
+    mgr = SnapshotManager(team)
+
+    try:
+        summary = mgr.restore(snapshot_id, dry_run=True)
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(1)
+
+    if dry_run:
+        _output(summary, lambda d: console.print(
+            f"[yellow]Dry run[/yellow] Would restore: "
+            f"{d['tasks']} tasks, {d['events']} events, "
+            f"{d['sessions']} sessions, {d['costs']} costs, "
+            f"{d['inboxes']} inbox messages"
+        ))
+        return
+
+    if not force and not _json_output:
+        console.print(
+            f"Will restore: {summary['tasks']} tasks, {summary['events']} events, "
+            f"{summary['sessions']} sessions, {summary['costs']} costs"
+        )
+        if not typer.confirm("Proceed?"):
+            raise typer.Abort()
+
+    result = mgr.restore(snapshot_id)
+    _output(result, lambda d: console.print(
+        f"[green]OK[/green] Restored from snapshot [cyan]{snapshot_id}[/cyan]"
+    ))
+
+
+@team_app.command("snapshot-delete")
+def team_snapshot_delete(
+    team: str = typer.Argument(..., help="Team name"),
+    snapshot_id: str = typer.Argument(..., help="Snapshot ID to delete"),
+):
+    """Delete a snapshot."""
+    from clawteam.team.snapshot import SnapshotManager
+
+    if SnapshotManager(team).delete(snapshot_id):
+        _output(
+            {"status": "deleted", "id": snapshot_id},
+            lambda d: console.print(f"[green]OK[/green] Snapshot '{snapshot_id}' deleted"),
+        )
+    else:
+        console.print(f"[yellow]Snapshot '{snapshot_id}' not found[/yellow]")
+        raise typer.Exit(1)
+
+
 # ============================================================================
 # Inbox Commands
 # ============================================================================
@@ -577,17 +709,18 @@ def inbox_broadcast(
     content: str = typer.Argument(..., help="Message content"),
     key: Optional[str] = typer.Option(None, "--key", "-k", help="Optional routing key"),
     msg_type: str = typer.Option("broadcast", "--type", help="Message type"),
+    from_agent: Optional[str] = typer.Option(None, "--from", "-f", help="Override sender name (default: from env identity)"),
 ):
     """Broadcast a message to all team members (broadcast)."""
     from clawteam.identity import AgentIdentity
     from clawteam.team.mailbox import MailboxManager
     from clawteam.team.models import MessageType
 
-    identity = AgentIdentity.from_env()
+    sender = from_agent or AgentIdentity.from_env().agent_name
     mailbox = MailboxManager(team)
     mt = MessageType(msg_type)
     messages = mailbox.broadcast(
-        from_agent=identity.agent_name,
+        from_agent=sender,
         content=content,
         msg_type=mt,
         key=key,
@@ -605,9 +738,10 @@ def inbox_receive(
     """Receive and consume messages from inbox."""
     from clawteam.identity import AgentIdentity
     from clawteam.team.mailbox import MailboxManager
+    from clawteam.team.manager import TeamManager
 
     identity = AgentIdentity.from_env()
-    agent_name = agent or identity.agent_name
+    agent_name = TeamManager.resolve_inbox(team, agent or identity.agent_name, identity.user)
     mailbox = MailboxManager(team)
     messages = mailbox.receive(agent_name, limit=limit)
 
@@ -635,9 +769,10 @@ def inbox_peek(
     """Peek at messages without consuming them."""
     from clawteam.identity import AgentIdentity
     from clawteam.team.mailbox import MailboxManager
+    from clawteam.team.manager import TeamManager
 
     identity = AgentIdentity.from_env()
-    agent_name = agent or identity.agent_name
+    agent_name = TeamManager.resolve_inbox(team, agent or identity.agent_name, identity.user)
     mailbox = MailboxManager(team)
     messages = mailbox.peek(agent_name)
 
@@ -703,10 +838,11 @@ def inbox_watch(
     """
     from clawteam.identity import AgentIdentity
     from clawteam.team.mailbox import MailboxManager
+    from clawteam.team.manager import TeamManager
     from clawteam.team.watcher import InboxWatcher
 
     identity = AgentIdentity.from_env()
-    agent_name = agent or identity.agent_name
+    agent_name = TeamManager.resolve_inbox(team, agent or identity.agent_name, identity.user)
     mailbox = MailboxManager(team)
 
     if not _json_output:
@@ -739,20 +875,23 @@ def task_create(
     subject: str = typer.Argument(..., help="Task subject"),
     description: str = typer.Option("", "--description", "-d", help="Task description"),
     owner: Optional[str] = typer.Option(None, "--owner", "-o", help="Owner agent name"),
+    priority: str = typer.Option("medium", "--priority", "-p", help="Task priority: low, medium, high, urgent"),
     blocks: Optional[str] = typer.Option(None, "--blocks", help="Comma-separated task IDs this blocks"),
     blocked_by: Optional[str] = typer.Option(None, "--blocked-by", help="Comma-separated task IDs this is blocked by"),
 ):
     """Create a new task (TaskCreate)."""
+    from clawteam.team.models import TaskPriority
     from clawteam.team.tasks import TaskStore
 
     store = TaskStore(team)
-    blocks_list = [b.strip() for b in blocks.split(",")] if blocks else []
-    blocked_by_list = [b.strip() for b in blocked_by.split(",")] if blocked_by else []
+    blocks_list = [b.strip() for b in blocks.split(",") if b.strip()] if blocks else []
+    blocked_by_list = [b.strip() for b in blocked_by.split(",") if b.strip()] if blocked_by else []
 
     task = store.create(
         subject=subject,
         description=description,
         owner=owner or "",
+        priority=TaskPriority(priority),
         blocks=blocks_list,
         blocked_by=blocked_by_list,
     )
@@ -762,6 +901,7 @@ def task_create(
         console.print(f"[green]OK[/green] Task created: {d['id']}"),
         console.print(f"  Subject: {d['subject']}"),
         console.print(f"  Status: {d['status']}"),
+        console.print(f"  Priority: {d.get('priority', 'medium')}"),
         console.print(f"  Owner: {d.get('owner', '')}") if d.get('owner') else None,
     ))
 
@@ -786,6 +926,7 @@ def task_get(
         console.print(f"Task: [cyan]{d['id']}[/cyan]")
         console.print(f"  Subject: {d['subject']}")
         console.print(f"  Status: {d['status']}")
+        console.print(f"  Priority: {d.get('priority', 'medium')}")
         if d.get('owner'):
             console.print(f"  Owner: {d['owner']}")
         if d.get('lockedBy'):
@@ -808,19 +949,21 @@ def task_update(
     owner: Optional[str] = typer.Option(None, "--owner", "-o", help="New owner"),
     subject: Optional[str] = typer.Option(None, "--subject", help="New subject"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="New description"),
+    priority: Optional[str] = typer.Option(None, "--priority", "-p", help="New priority: low, medium, high, urgent"),
     add_blocks: Optional[str] = typer.Option(None, "--add-blocks", help="Comma-separated task IDs this blocks"),
     add_blocked_by: Optional[str] = typer.Option(None, "--add-blocked-by", help="Comma-separated task IDs blocking this"),
     force: bool = typer.Option(False, "--force", "-f", help="Force override task lock"),
 ):
     """Update a task (TaskUpdate)."""
     from clawteam.identity import AgentIdentity
-    from clawteam.team.models import TaskStatus
+    from clawteam.team.models import TaskPriority, TaskStatus
     from clawteam.team.tasks import TaskLockError, TaskStore
 
     store = TaskStore(team)
     ts = TaskStatus(status) if status else None
-    blocks_list = [b.strip() for b in add_blocks.split(",")] if add_blocks else None
-    blocked_by_list = [b.strip() for b in add_blocked_by.split(",")] if add_blocked_by else None
+    tp = TaskPriority(priority) if priority else None
+    blocks_list = [b.strip() for b in add_blocks.split(",") if b.strip()] if add_blocks else None
+    blocked_by_list = [b.strip() for b in add_blocked_by.split(",") if b.strip()] if add_blocked_by else None
 
     caller = AgentIdentity.from_env().agent_name
 
@@ -831,6 +974,7 @@ def task_update(
             owner=owner,
             subject=subject,
             description=description,
+            priority=tp,
             add_blocks=blocks_list,
             add_blocked_by=blocked_by_list,
             caller=caller,
@@ -853,14 +997,17 @@ def task_list(
     team: str = typer.Argument(..., help="Team name"),
     status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
     owner: Optional[str] = typer.Option(None, "--owner", "-o", help="Filter by owner"),
+    priority: Optional[str] = typer.Option(None, "--priority", "-p", help="Filter by priority: low, medium, high, urgent"),
+    sort_priority: bool = typer.Option(False, "--sort-priority", help="Sort by priority (urgent first)"),
 ):
     """List tasks for a team (TaskList)."""
-    from clawteam.team.models import TaskStatus
+    from clawteam.team.models import TaskPriority, TaskStatus
     from clawteam.team.tasks import TaskStore
 
     store = TaskStore(team)
     ts = TaskStatus(status) if status else None
-    tasks = store.list_tasks(status=ts, owner=owner)
+    tp = TaskPriority(priority) if priority else None
+    tasks = store.list_tasks(status=ts, owner=owner, priority=tp, sort_by_priority=sort_priority)
 
     data = [_dump(t) for t in tasks]
 
@@ -872,16 +1019,25 @@ def task_list(
         table.add_column("ID", style="dim")
         table.add_column("Subject", style="cyan")
         table.add_column("Status")
+        table.add_column("Priority")
         table.add_column("Owner")
         table.add_column("Lock", style="yellow")
         table.add_column("Blocked By", style="dim")
         for t in items:
             st = t.get("status", "")
             style = {"pending": "white", "in_progress": "yellow", "completed": "green", "blocked": "red"}.get(st, "")
+            priority_value = t.get("priority", "medium")
+            priority_style = {
+                "urgent": "red bold",
+                "high": "yellow",
+                "medium": "white",
+                "low": "dim",
+            }.get(priority_value, "")
             table.add_row(
                 t["id"],
                 t["subject"],
                 f"[{style}]{st}[/{style}]" if style else st,
+                f"[{priority_style}]{priority_value}[/{priority_style}]" if priority_style else priority_value,
                 t.get("owner") or "",
                 t.get("lockedBy") or "",
                 ", ".join(t.get("blockedBy", [])),
@@ -889,6 +1045,42 @@ def task_list(
         console.print(table)
 
     _output(data, _human)
+
+
+@task_app.command("stats")
+def task_stats(
+    team: str = typer.Argument(..., help="Team name"),
+):
+    """Show task timing statistics for a team."""
+    from clawteam.team.tasks import TaskStore
+
+    store = TaskStore(team)
+    stats = store.get_stats()
+
+    def _human(d):
+        table = Table(title=f"Task Stats - {team}")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", justify="right")
+        table.add_row("Total tasks", str(d["total"]))
+        table.add_row("Completed", str(d["completed"]))
+        table.add_row("In progress", str(d["in_progress"]))
+        table.add_row("Pending", str(d["pending"]))
+        table.add_row("Blocked", str(d["blocked"]))
+        table.add_row("With timing data", str(d["timed_completed"]))
+        avg = d["avg_duration_seconds"]
+        if avg > 0:
+            # Show in a readable format
+            if avg < 60:
+                table.add_row("Avg completion time", f"{avg:.1f}s")
+            elif avg < 3600:
+                table.add_row("Avg completion time", f"{avg / 60:.1f}m")
+            else:
+                table.add_row("Avg completion time", f"{avg / 3600:.1f}h")
+        else:
+            table.add_row("Avg completion time", "-")
+        console.print(table)
+
+    _output(stats, _human)
 
 
 # ============================================================================
@@ -1049,10 +1241,15 @@ def task_wait(
     # Resolve agent name for inbox monitoring
     agent_name = agent
     if not agent_name:
-        agent_name = TeamManager.get_leader_name(team)
+        agent_name = TeamManager.get_leader_inbox(team)
     if not agent_name:
         from clawteam.identity import AgentIdentity
-        agent_name = AgentIdentity.from_env().agent_name
+        identity = AgentIdentity.from_env()
+        agent_name = TeamManager.resolve_inbox(team, identity.agent_name, identity.user)
+    elif agent:
+        from clawteam.identity import AgentIdentity
+        identity = AgentIdentity.from_env()
+        agent_name = TeamManager.resolve_inbox(team, agent_name, identity.user)
 
     mailbox = MailboxManager(team)
     store = TaskStore(team)
@@ -1582,6 +1779,7 @@ def spawn_agent(
     cwd = None
     ws_branch = ""
     ws_mode = ""
+    ws_mgr = None
     if workspace is None:
         ws_mode, _ = get_effective("workspace")
         ws_mode = ws_mode or "auto"
@@ -1639,15 +1837,18 @@ def spawn_agent(
 
     # Auto-register agent as team member
     import os as _os2
-    from clawteam.team.manager import TeamManager as _TM
+
+    from clawteam.team.manager import TeamManager
+    member_added = False
     try:
-        _TM.add_member(
+        TeamManager.add_member(
             team_name=_team,
             member_name=_name,
             agent_id=_id,
             agent_type=agent_type,
             user=_os2.environ.get("CLAWTEAM_USER", ""),
         )
+        member_added = True
     except ValueError:
         pass  # already a member, ignore
 
@@ -1661,6 +1862,17 @@ def spawn_agent(
         cwd=cwd,
         skip_permissions=skip_permissions,
     )
+
+    if result.startswith("Error"):
+        if member_added:
+            TeamManager.remove_member(_team, _name)
+        if ws_mgr is not None and cwd:
+            try:
+                ws_mgr.cleanup_workspace(_team, _name, auto_checkpoint=False)
+            except Exception:
+                pass
+        _output({"error": result}, lambda d: console.print(f"[red]{d['error']}[/red]"))
+        raise typer.Exit(1)
 
     _output(
         {"status": "spawned", "backend": backend, "agentName": _name, "agentId": _id, "message": result},
@@ -2054,8 +2266,7 @@ def workspace_status(
     repo: Optional[str] = typer.Option(None, "--repo", help="Git repo path"),
 ):
     """Show git diff stat for an agent's workspace."""
-    from clawteam.workspace import get_workspace_manager
-    from clawteam.workspace import git
+    from clawteam.workspace import get_workspace_manager, git
 
     ws_mgr = get_workspace_manager(repo)
     if ws_mgr is None:
@@ -2303,7 +2514,7 @@ def launch_team(
     template: str = typer.Argument(..., help="Template name (e.g., hedge-fund)"),
     goal: str = typer.Option("", "--goal", "-g", help="Project goal injected into agent prompts"),
     backend: Optional[str] = typer.Option(None, "--backend", "-b", help="Override backend"),
-    team_name: Optional[str] = typer.Option(None, "--team-name", "-t", help="Override team name"),
+    team_name: Optional[str] = typer.Option(None, "--team-name", "--team", "-t", help="Override team name"),
     workspace: bool = typer.Option(False, "--workspace/--no-workspace", "-w"),
     repo: Optional[str] = typer.Option(None, "--repo", help="Git repo path"),
     command_override: Optional[list[str]] = typer.Option(None, "--command", help="Override agent command"),
@@ -2311,6 +2522,7 @@ def launch_team(
     """Launch a full agent team from a template with one command."""
     import os as _os
 
+    from clawteam.config import get_effective
     from clawteam.spawn import get_backend
     from clawteam.spawn.prompt import build_agent_prompt
     from clawteam.team.manager import TeamManager
@@ -2372,6 +2584,11 @@ def launch_team(
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(1)
 
+    # Match `spawn` behavior: honor configured permission skipping for
+    # template-launched agents as well.
+    sp_val, _ = get_effective("skip_permissions")
+    skip_permissions = str(sp_val).lower() not in ("false", "0", "no", "")
+
     # 7. Workspace setup (optional)
     ws_mgr = None
     if workspace:
@@ -2428,6 +2645,7 @@ def launch_team(
             team_name=t_name,
             prompt=prompt,
             cwd=cwd,
+            skip_permissions=skip_permissions,
         )
         spawned.append({"name": agent.name, "id": a_id, "type": agent.type, "result": result})
 

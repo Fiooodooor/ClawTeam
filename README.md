@@ -25,11 +25,7 @@
 
 Human provides the goal. The Agent Team orchestrates everything else.
 
-Full compatibility with [Claude Code](https://claude.ai/claude-code), [Codex](https://openai.com/codex), [OpenClaw](https://github.com/nicepkg/OpenClaw), [nanobot](https://github.com/AbanteAI/nanobot), [Cursor](https://cursor.com), and any CLI agent.&nbsp;&nbsp;[**中文文档**](README_CN.md) | [**한국어**](README_KR.md)
-
-<p align="center">
-  <img src="assets/teaser.png" alt="ClawTeam - AI agents orchestrating themselves" width="800">
-</p>
+Full compatibility with [Claude Code](https://claude.ai/claude-code), [Codex](https://openai.com/codex), [OpenClaw](https://github.com/openclaw/openclaw), [nanobot](https://github.com/HKUDS/nanobot), [Cursor](https://cursor.com), and any CLI agent.&nbsp;&nbsp;[**中文文档**](README_CN.md) | [**한국어**](README_KR.md)
 
 ---
 
@@ -118,11 +114,17 @@ Full compatibility with [Claude Code](https://claude.ai/claude-code), [Codex](ht
 
 ---
 
-https://github.com/user-attachments/assets/f6f0b220-9a5e-4d0a-a25d-f80753d3639b
+
+https://github.com/user-attachments/assets/7e2f0ecd-8fe3-4970-90ac-5c9669ff060c
+
 
 ☝️ Intelligent leader agent orchestrates 8 specialized sub-agents across 8 H100 GPUs, autonomously designing experiments and dynamically reallocating resources based on real-time performance.
 
 🧠 The system synthesizes breakthroughs across teams and evolves strategies independently — achieving full research automation without human intervention.
+
+<p align="center">
+  <img src="assets/teaser.png" alt="ClawTeam - AI agents orchestrating themselves" width="800">
+</p>
 
 ---
 
@@ -345,11 +347,36 @@ pip install -e .
 pip install -e ".[p2p]"
 ```
 
-Requires **Python 3.10+**. Dependencies: `typer`, `pydantic`, `rich`.
+Requires **Python 3.10+**, **tmux**, and a CLI coding agent (e.g. `claude`, `codex`). Python dependencies: `typer`, `pydantic`, `rich`.
+
+All `spawn` examples assume the agent CLI you name is already installed and available on `PATH`.
 
 ---
 
 ## 🚀 Quick Start
+
+If you're new to ClawTeam, follow this order:
+
+1. Make sure `tmux` and your agent CLI run standalone on this machine.
+2. Pick one path below: let an agent drive, or drive it manually.
+3. Use the supported-agent table to choose the right `spawn` command.
+4. If you're integrating a new agent, check the adapter notes before debugging.
+
+### ✅ Before You Start
+
+Run these checks first:
+
+```bash
+tmux -V
+clawteam --help
+
+# Replace claude with the agent you actually want to use:
+claude --version
+codex --version
+nanobot --help
+```
+
+If the agent CLI does not run correctly by itself, `clawteam spawn` will not fix it.
 
 ### ⚡ Option 1: Let the Agent Drive (Recommended)
 
@@ -381,16 +408,59 @@ clawteam spawn --team my-team --agent-name bob   --task "Write unit tests for au
 clawteam board attach my-team
 ```
 
+### 🧭 Which Spawn Command Should I Use?
+
+Use `clawteam spawn [backend] [command] ...` with the command that already works on
+your machine:
+
+```bash
+# Claude Code
+clawteam spawn tmux claude --team my-team --agent-name alice --task "Implement OAuth2"
+
+# Codex
+clawteam spawn tmux codex --team my-team --agent-name bob --task "Write frontend tests"
+
+# nanobot
+clawteam spawn tmux nanobot --team my-team --agent-name carol --task "Build the API"
+```
+
+Notes:
+
+- `tmux` is the default backend and is the best choice when you want to watch interactive agent UIs.
+- `subprocess` is better for one-shot tools or non-interactive scripts.
+- `nanobot` is normalized internally to `nanobot agent`, so the command above is the correct ClawTeam entrypoint.
+- Claude Code and Codex trust prompts in fresh worktrees are auto-confirmed by the tmux backend.
+
+### 🔌 Adding a Different Agent
+
+ClawTeam can work with agents beyond Claude Code, Codex, and nanobot, but the CLI
+must satisfy a small compatibility contract:
+
+1. The command must exist on `PATH` and launch successfully outside ClawTeam.
+2. The agent must be able to run inside a specific working directory or git worktree.
+3. The agent must accept an initial task, either by command-line argument or interactive input.
+4. The process must stay alive in `tmux` if it is meant to be interactive.
+
+If you're unsure, test the agent standalone first, then wrap it with:
+
+```bash
+clawteam spawn subprocess <your-agent> --team my-team --agent-name test --task "Say OK"
+```
+
+If that works, switch to `tmux` for interactive monitoring.
+
 ### 🤖 Supported Agents
 
 ClawTeam works with **any CLI agent** that can execute shell commands:
+
+All examples below assume the corresponding CLI already runs standalone on your machine.
 
 | Agent | Spawn Command | Status |
 |-------|--------------|--------|
 | [Claude Code](https://claude.ai/claude-code) | `clawteam spawn tmux claude --team ...` | ✅ Full support |
 | [Codex](https://openai.com/codex) | `clawteam spawn tmux codex --team ...` | ✅ Full support |
-| [OpenClaw](https://github.com/nicepkg/OpenClaw) | `clawteam spawn tmux openclaw --team ...` | ✅ Full support |
-| [nanobot](https://github.com/AbanteAI/nanobot) | `clawteam spawn tmux nanobot --team ...` | ✅ Full support |
+| [OpenClaw](https://github.com/openclaw/openclaw) | `clawteam spawn tmux openclaw --team ...` | ✅ Full support |
+| [nanobot](https://github.com/HKUDS/nanobot) | `clawteam spawn tmux nanobot --team ...` | ✅ Full support |
 | [Cursor](https://cursor.com) | `clawteam spawn subprocess cursor --team ...` | 🔮 Experimental |
 | Custom scripts | `clawteam spawn subprocess python --team ...` | ✅ Full support |
 
@@ -649,6 +719,16 @@ We welcome contributions! ClawTeam is designed to be extensible:
 ## ⭐ Star History
 
 If you find ClawTeam helpful, please consider to give us a star! ⭐
+
+<div align="center">
+  <a href="https://star-history.com/#HKUDS/ClawTeam&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=HKUDS/ClawTeam&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=HKUDS/ClawTeam&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=HKUDS/ClawTeam&type=Date" />
+    </picture>
+  </a>
+</div>
 
 ## 📄 License
 

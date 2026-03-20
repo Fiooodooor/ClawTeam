@@ -82,7 +82,8 @@ def get_effective(key: str) -> tuple[str, str]:
             return env_val, "env"
 
     file_val = getattr(cfg, key, "")
-    if file_val:
-        return file_val, "file"
+    default_val = getattr(defaults, key, "")
+    if file_val != default_val:
+        return str(file_val), "file"
 
-    return getattr(defaults, key, ""), "default"
+    return str(default_val), "default"

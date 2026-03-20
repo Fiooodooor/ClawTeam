@@ -40,6 +40,13 @@ class TaskStatus(str, Enum):
     blocked = "blocked"
 
 
+class TaskPriority(str, Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+    urgent = "urgent"
+
+
 class MessageType(str, Enum):
     message = "message"
     join_request = "join_request"
@@ -123,11 +130,13 @@ class TaskItem(BaseModel):
     subject: str
     description: str = ""
     status: TaskStatus = TaskStatus.pending
+    priority: TaskPriority = TaskPriority.medium
     owner: str = ""
     locked_by: str = Field(default="", alias="lockedBy")
     locked_at: str = Field(default="", alias="lockedAt")
     blocks: list[str] = Field(default_factory=list)
     blocked_by: list[str] = Field(default_factory=list, alias="blockedBy")
+    started_at: str = Field(default="", alias="startedAt")
     created_at: str = Field(default_factory=_now_iso, alias="createdAt")
     updated_at: str = Field(default_factory=_now_iso, alias="updatedAt")
     metadata: dict[str, Any] = Field(default_factory=dict)
