@@ -265,6 +265,7 @@ class TaskStore:
             "total": len(tasks),
             "completed": len(completed),
             "in_progress": sum(1 for t in tasks if t.status == TaskStatus.in_progress),
+            "review": sum(1 for t in tasks if t.status == TaskStatus.review),
             "pending": sum(1 for t in tasks if t.status == TaskStatus.pending),
             "blocked": sum(1 for t in tasks if t.status == TaskStatus.blocked),
             "timed_completed": len(durations),
