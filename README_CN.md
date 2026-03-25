@@ -407,6 +407,10 @@ clawteam preset show moonshot-cn
 # 从 preset 生成可复用的 runtime profile
 clawteam preset generate-profile moonshot-cn claude --name claude-kimi
 
+# MiniMax（M2.7）— 国际或国内端点
+clawteam preset generate-profile minimax-global claude --name claude-minimax
+clawteam preset generate-profile minimax-cn claude --name claude-minimax-cn
+
 # 或使用交互式 TUI
 clawteam profile wizard
 
@@ -415,6 +419,7 @@ clawteam profile doctor claude
 
 # 在真正 spawn 之前先做 smoke test
 MOONSHOT_API_KEY=... clawteam profile test claude-kimi
+MINIMAX_API_KEY=... clawteam profile test claude-minimax
 ```
 
 可以这样理解：
@@ -481,7 +486,7 @@ clawteam spawn subprocess <your-agent> --team my-team --agent-name test --task "
 | [Cursor](https://cursor.com) | `clawteam spawn subprocess cursor --team ...` | 🔮 实验性 |
 | 自定义脚本 | `clawteam spawn subprocess python --team ...` | ✅ 完全支持 |
 
-像 “Claude Code 走 Moonshot Kimi” 或 “Gemini 走 Vertex” 这类 provider-aware 场景，
+像 “Claude Code 走 Moonshot Kimi”、”Claude Code 走 MiniMax” 或 “Gemini 走 Vertex” 这类 provider-aware 场景，
 推荐先用 `profile` + `preset` 配好，再通过 `--profile` 启动。
 
 ---

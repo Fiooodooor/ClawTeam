@@ -459,6 +459,10 @@ clawteam preset show moonshot-cn
 # Generate a reusable runtime profile from a preset
 clawteam preset generate-profile moonshot-cn claude --name claude-kimi
 
+# MiniMax (M2.7) — global or China endpoint
+clawteam preset generate-profile minimax-global claude --name claude-minimax
+clawteam preset generate-profile minimax-cn claude --name claude-minimax-cn
+
 # Or use the interactive TUI
 clawteam profile wizard
 
@@ -467,6 +471,7 @@ clawteam profile doctor claude
 
 # Smoke-test the profile before spawning workers
 MOONSHOT_API_KEY=... clawteam profile test claude-kimi
+MINIMAX_API_KEY=... clawteam profile test claude-minimax
 ```
 
 Rules of thumb:
@@ -537,7 +542,7 @@ All examples below assume the corresponding CLI already runs standalone on your 
 | [Cursor](https://cursor.com) | `clawteam spawn subprocess cursor --team ...` | 🔮 Experimental |
 | Custom scripts | `clawteam spawn subprocess python --team ...` | ✅ Full support |
 
-For provider-aware setups such as Claude Code via Moonshot Kimi or Gemini via
+For provider-aware setups such as Claude Code via Moonshot Kimi, MiniMax, or Gemini via
 Vertex, use `profile` + `preset` and then spawn with `--profile`.
 
 ---

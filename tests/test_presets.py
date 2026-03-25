@@ -31,6 +31,42 @@ def test_generate_profile_from_openrouter_preset_for_multiple_clients():
     assert gemini_profile.model == "google/gemini-2.5-pro"
 
 
+def test_generate_profile_from_minimax_global_preset():
+    name, profile = generate_profile_from_preset("minimax-global", "claude")
+
+    assert name == "claude-minimax-global"
+    assert profile.agent == "claude"
+    assert profile.model == "MiniMax-M2.7"
+    assert profile.base_url == "https://api.minimax.io/anthropic"
+    assert profile.api_key_env == "MINIMAX_API_KEY"
+    assert profile.env["ANTHROPIC_MODEL"] == "MiniMax-M2.7"
+    assert profile.env["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "MiniMax-M2.7"
+    assert profile.env["API_TIMEOUT_MS"] == "3000000"
+    assert profile.env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] == "1"
+
+
+def test_generate_profile_from_minimax_cn_preset():
+    name, profile = generate_profile_from_preset("minimax-cn", "claude")
+
+    assert name == "claude-minimax-cn"
+    assert profile.agent == "claude"
+    assert profile.model == "MiniMax-M2.7"
+    assert profile.base_url == "https://api.minimaxi.com/anthropic"
+    assert profile.api_key_env == "MINIMAX_API_KEY"
+    assert profile.env["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "MiniMax-M2.7"
+    assert profile.env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] == "MiniMax-M2.7"
+
+
+def test_minimax_presets_in_builtin_list():
+    presets = list_presets()
+    assert "minimax-cn" in presets
+    assert "minimax-global" in presets
+    _, source_cn = presets["minimax-cn"]
+    _, source_global = presets["minimax-global"]
+    assert source_cn == "builtin"
+    assert source_global == "builtin"
+
+
 def test_generate_profile_from_google_ai_studio_preset():
     name, profile = generate_profile_from_preset("google-ai-studio", "gemini")
 
