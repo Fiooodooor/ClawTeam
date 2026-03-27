@@ -1,0 +1,559 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "NIC Porting — Phase 7: Multi-OS Extension (TDD + Living Risk Register)"
+  mode: workflow
+  icon: "🌐"
+  icon_type: emoji
+  icon_background: "#FAF5FF"
+  description: >
+    Phase 7: Concurrent multi-OS extension validation and Magentic living risk register.
+    os-extension-validator proves seams extend to >= 2 additional OS targets without
+    core rewrites. risk-auditor maintains a living risk register updated after every step.
+    TDD gate: extension_valid=true, core_rewrite_count=0, risk_register non-empty.
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    viewport: {x: 0, y: 0, zoom: 0.8}
+    nodes:
+
+      # ── INPUT ──────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: {x: 30, y: 320}
+        data:
+          type: start
+          title: "Phase 7 Inputs"
+          variables:
+            - variable: driver_name
+              label: "Driver Name"
+              type: text-input
+              required: true
+              default: "ixgbe"
+            - variable: primary_target_os
+              label: "Primary Ported OS (already done)"
+              type: select
+              required: true
+              options:
+                - value: FreeBSD
+                  label: "FreeBSD"
+                - value: Windows
+                  label: "Windows"
+                - value: DPDK
+                  label: "DPDK"
+              default: FreeBSD
+            - variable: extension_targets
+              label: "Extension OS Targets (comma-separated, >= 2)"
+              type: text-input
+              required: true
+              default: "Windows,DPDK"
+            - variable: seam_headers
+              label: "OAL Seam Headers JSON (from Phase 2)"
+              type: paragraph
+              required: true
+            - variable: api_mappings
+              label: "API Mappings JSON (from Phase 1)"
+              type: paragraph
+              required: true
+            - variable: phase5_gate_results
+              label: "Phase 5 Gate Results JSON"
+              type: paragraph
+              required: true
+            - variable: phase6_merge_results
+              label: "Phase 6 Merge Results JSON"
+              type: paragraph
+              required: true
+
+      # ── TDD EXTENSION SPEC ─────────────────────────────────────────────────
+      - id: tdd_extension_spec
+        type: custom
+        position: {x: 330, y: 200}
+        data:
+          type: llm
+          title: "TDD Extension Spec — Define Multi-OS Acceptance Criteria"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 3000
+          prompt_template:
+            - role: system
+              text: |
+                Generate TDD acceptance criteria for multi-OS OAL seam extension.
+                Must prove: same seam headers work for >= 2 additional OS targets,
+                zero core rewrites, zero cross-OS leakage, overhead <= primary target.
+                Return JSON criteria.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Primary OS: {{#start.primary_target_os#}}
+                Extension targets: {{#start.extension_targets#}}
+                Seam headers: {{#start.seam_headers#}}
+
+                Output:
+                {
+                  "min_extension_targets": 2,
+                  "zero_core_rewrites_required": true,
+                  "seam_reuse_threshold": 95.0,
+                  "per_os_checks": ["build standalone", "run TDD tests", "overhead <= primary"],
+                  "risk_categories": ["portability", "performance", "maintenance", "security"],
+                  "criteria_clear": true
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── CONCURRENT: OS-EXTENSION-VALIDATOR ────────────────────────────────
+      - id: os_extension_validator
+        type: custom
+        position: {x: 730, y: 120}
+        data:
+          type: llm
+          title: "os-extension-validator — Validate Seam Reuse Across OS Targets"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 8000
+          prompt_template:
+            - role: system
+              text: |
+                You are the os-extension-validator agent. Prove that the OAL seam layer
+                designed for the primary OS can be extended to >= 2 additional OS targets
+                WITHOUT any core driver rewrites.
+                For each extension OS: simulate compilation, TDD test coverage, API mapping.
+                REJECT if any extension requires touching nic_core/*.c (only nic_oal/*.h allowed).
+                Return JSON validation report.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Primary OS: {{#start.primary_target_os#}} (already ported successfully)
+                Extension targets: {{#start.extension_targets#}}
+                Extension TDD spec: {{#tdd_extension_spec.text#}}
+                OAL seam headers: {{#start.seam_headers#}}
+                API mappings: {{#start.api_mappings#}}
+                Phase 5 gate results: {{#start.phase5_gate_results#}}
+
+                Return:
+                {
+                  "extension_targets_validated": ["list of OS names proven"],
+                  "per_os_results": [
+                    {
+                      "target_os": "Windows",
+                      "seam_headers_reused": ["nic_oal_mem.h", "..."],
+                      "new_headers_required": [],
+                      "core_rewrites_required": false,
+                      "core_files_touched": [],
+                      "build_passes": true,
+                      "tdd_tests_pass": true,
+                      "overhead_vs_primary": "same|better|worse",
+                      "portability_score": 0.0,
+                      "extension_valid": true
+                    }
+                  ],
+                  "total_extension_targets": 0,
+                  "all_extensions_valid": true,
+                  "core_rewrite_count": 0,
+                  "seam_reuse_pct": 0.0,
+                  "extension_valid": true
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── CONCURRENT: RISK-AUDITOR (Magentic Living Risk Register) ──────────
+      - id: risk_auditor
+        type: custom
+        position: {x: 730, y: 520}
+        data:
+          type: llm
+          title: "risk-auditor — Magentic Living Risk Register"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 8000
+          prompt_template:
+            - role: system
+              text: |
+                You are the risk-auditor agent using the Magentic pattern (living risk register).
+                Maintain and update the risk register across all phases (0-6) and now Phase 7.
+                For each risk: assign ID, category, severity (critical/high/medium/low),
+                current status (open/mitigated/accepted), mitigation action, and phase when raised.
+                Always classify: portability risks, performance risks, maintenance risks, security risks.
+                Return complete updated risk register JSON.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Primary OS: {{#start.primary_target_os#}}
+                Extension targets: {{#start.extension_targets#}}
+                Extension TDD spec: {{#tdd_extension_spec.text#}}
+                Phase 5 gate results: {{#start.phase5_gate_results#}}
+                Phase 6 merge results: {{#start.phase6_merge_results#}}
+                OS extension validator results: {{#os_extension_validator.text#}}
+
+                Return updated living risk register:
+                {
+                  "risk_register": [
+                    {
+                      "risk_id": "RISK-001",
+                      "phase_raised": "phase-0",
+                      "category": "portability|performance|maintenance|security",
+                      "description": "risk description",
+                      "severity": "critical|high|medium|low",
+                      "status": "open|mitigated|accepted",
+                      "mitigation_action": "action taken or planned",
+                      "mitigation_phase": "phase-N",
+                      "residual_risk": "low|negligible"
+                    }
+                  ],
+                  "open_risks": 0,
+                  "critical_open": 0,
+                  "mitigated_risks": 0,
+                  "risk_register_valid": true,
+                  "overall_risk_level": "critical|high|medium|low|negligible",
+                  "project_safe_to_ship": false
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── TDD MULTI-OS GATE ─────────────────────────────────────────────────
+      - id: tdd_multios_gate
+        type: custom
+        position: {x: 1130, y: 320}
+        data:
+          type: code
+          title: "TDD Multi-OS Extension Gate — Extension + Risk Register"
+          code_language: python3
+          code: |
+            import json
+
+            MIN_EXTENSION_TARGETS = 2
+            MAX_OPEN_CRITICAL = 0
+
+            def main(extension_json: str, risk_json: str, spec_json: str) -> dict:
+                results = []
+                passed = 0
+                failed = 0
+
+                def check(tid, ok, detail=""):
+                    nonlocal passed, failed
+                    s = "PASS" if ok else "FAIL"
+                    if ok: passed += 1
+                    else: failed += 1
+                    results.append({"test_id": tid, "status": s, "detail": str(detail)[:180]})
+
+                try:
+                    ext = json.loads(extension_json)
+                except Exception as e:
+                    return _fail(f"extension JSON: {e}")
+                try:
+                    risk = json.loads(risk_json)
+                except Exception as e:
+                    return _fail(f"risk JSON: {e}")
+
+                per_os = ext.get("per_os_results") or []
+                register = risk.get("risk_register") or []
+
+                # T01: extension_valid at top level
+                check("T01-extension-valid", ext.get("extension_valid") is True)
+
+                # T02: All extensions valid per-OS
+                invalid_os = [r["target_os"] for r in per_os if not r.get("extension_valid")]
+                check("T02-all-os-valid", len(invalid_os) == 0, f"invalid={invalid_os}")
+
+                # T03: Zero core rewrites
+                core_rewrite_count = int(ext.get("core_rewrite_count", 1))
+                check("T03-zero-core-rewrites", core_rewrite_count == 0,
+                      f"core_rewrites={core_rewrite_count}")
+
+                # T04: Min extension targets met
+                total_ext = int(ext.get("total_extension_targets", 0))
+                check("T04-min-extension-targets", total_ext >= MIN_EXTENSION_TARGETS,
+                      f"validated={total_ext}, min={MIN_EXTENSION_TARGETS}")
+
+                # T05: Seam reuse >= 95%
+                reuse_pct = float(ext.get("seam_reuse_pct", 0.0))
+                check("T05-seam-reuse-gte95", reuse_pct >= 95.0, f"reuse={reuse_pct}%")
+
+                # T06: Risk register is non-empty and valid
+                check("T06-risk-register-valid",
+                      risk.get("risk_register_valid") is True and len(register) > 0,
+                      f"entries={len(register)}")
+
+                # T07: No critical open risks
+                critical_open = int(risk.get("critical_open", 1))
+                check("T07-no-critical-open-risks", critical_open == MAX_OPEN_CRITICAL,
+                      f"critical_open={critical_open}")
+
+                # T08: All extensions build and pass TDD
+                failed_builds = [r["target_os"] for r in per_os if not r.get("build_passes")]
+                check("T08-all-builds-pass", len(failed_builds) == 0, f"failed={failed_builds}")
+
+                failed_tdd = [r["target_os"] for r in per_os if not r.get("tdd_tests_pass")]
+                # T09: All extensions pass TDD
+                check("T09-all-tdd-pass", len(failed_tdd) == 0, f"failed={failed_tdd}")
+
+                # T10: Overall risk level is not critical
+                risk_level = risk.get("overall_risk_level", "critical")
+                check("T10-risk-not-critical", risk_level != "critical", f"level={risk_level}")
+
+                total = passed + failed
+                gate_score = round((passed / total) * 100, 1) if total else 0.0
+                fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
+                open_risks = int(risk.get("open_risks", 0))
+                project_safe = bool(risk.get("project_safe_to_ship", False))
+
+                return {
+                    "all_passed": failed == 0,
+                    "passed_count": passed,
+                    "failed_count": failed,
+                    "gate_score": gate_score,
+                    "test_results": json.dumps(results),
+                    "fail_summary": "; ".join(fail_ids),
+                    "extension_targets_validated": int(ext.get("total_extension_targets", 0)),
+                    "core_rewrite_count": core_rewrite_count,
+                    "seam_reuse_pct": reuse_pct,
+                    "risk_register_entries": len(register),
+                    "open_risks": open_risks,
+                    "critical_open": critical_open,
+                    "overall_risk_level": risk.get("overall_risk_level", "unknown"),
+                    "project_safe_to_ship": project_safe,
+                }
+
+            def _fail(reason):
+                return {
+                    "all_passed": False, "passed_count": 0, "failed_count": 1,
+                    "gate_score": 0.0,
+                    "test_results": json.dumps([{"test_id": "parse", "status": "FAIL", "detail": reason}]),
+                    "fail_summary": reason, "extension_targets_validated": 0,
+                    "core_rewrite_count": -1, "seam_reuse_pct": 0.0,
+                    "risk_register_entries": 0, "open_risks": -1, "critical_open": -1,
+                    "overall_risk_level": "unknown", "project_safe_to_ship": False
+                }
+          variables:
+            - variable: extension_json
+              value_selector: [os_extension_validator, text]
+            - variable: risk_json
+              value_selector: [risk_auditor, text]
+            - variable: spec_json
+              value_selector: [tdd_extension_spec, text]
+          outputs:
+            all_passed: {type: boolean}
+            passed_count: {type: number}
+            failed_count: {type: number}
+            gate_score: {type: number}
+            test_results: {type: string}
+            fail_summary: {type: string}
+            extension_targets_validated: {type: number}
+            core_rewrite_count: {type: number}
+            seam_reuse_pct: {type: number}
+            risk_register_entries: {type: number}
+            open_risks: {type: number}
+            critical_open: {type: number}
+            overall_risk_level: {type: string}
+            project_safe_to_ship: {type: boolean}
+
+      # ── BRANCH ─────────────────────────────────────────────────────────────
+      - id: gate_branch
+        type: custom
+        position: {x: 1430, y: 320}
+        data:
+          type: if-else
+          title: "Multi-OS Extension Gate Passed?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [tdd_multios_gate, all_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-multiOS-pass
+
+      # ── SUCCESS ────────────────────────────────────────────────────────────
+      - id: end_success
+        type: custom
+        position: {x: 1730, y: 100}
+        data:
+          type: end
+          title: "Phase 7 PASSED ✅ — Multi-OS Seams Validated, Risk Register OK"
+          outputs:
+            - variable: gate_score
+              value_type: number
+              value_selector: [tdd_multios_gate, gate_score]
+            - variable: extension_targets_validated
+              value_type: number
+              value_selector: [tdd_multios_gate, extension_targets_validated]
+            - variable: seam_reuse_pct
+              value_type: number
+              value_selector: [tdd_multios_gate, seam_reuse_pct]
+            - variable: risk_register_entries
+              value_type: number
+              value_selector: [tdd_multios_gate, risk_register_entries]
+            - variable: overall_risk_level
+              value_type: string
+              value_selector: [tdd_multios_gate, overall_risk_level]
+            - variable: project_safe_to_ship
+              value_type: boolean
+              value_selector: [tdd_multios_gate, project_safe_to_ship]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_multios_gate, test_results]
+
+      # ── REMEDIATION ────────────────────────────────────────────────────────
+      - id: remediation_llm
+        type: custom
+        position: {x: 1730, y: 550}
+        data:
+          type: llm
+          title: "Multi-OS Remediation — Fix Extension Failures & Open Risks"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.3
+              max_tokens: 8000
+          prompt_template:
+            - role: system
+              text: |
+                The Phase 7 multi-OS extension gate failed. Remediate:
+                1. Core rewrite found → refactor into seam layer (never touch nic_core/)
+                2. Build failures per OS → find correct native API
+                3. TDD failures per OS → implement missing seam stubs
+                4. Critical open risks → propose concrete mitigations
+                5. Seam reuse < 95% → consolidate shared seam header logic
+                Produce actionable JSON remediation plan.
+            - role: user
+              text: |
+                Gate fail summary: {{#tdd_multios_gate.fail_summary#}}
+                Core rewrite count: {{#tdd_multios_gate.core_rewrite_count#}}
+                Extension targets validated: {{#tdd_multios_gate.extension_targets_validated#}}
+                Seam reuse: {{#tdd_multios_gate.seam_reuse_pct#}}%
+                Open risks: {{#tdd_multios_gate.open_risks#}}
+                Critical open: {{#tdd_multios_gate.critical_open#}}
+                Overall risk level: {{#tdd_multios_gate.overall_risk_level#}}
+                Extension results: {{#os_extension_validator.text#}}
+                Risk register: {{#risk_auditor.text#}}
+                Test results: {{#tdd_multios_gate.test_results#}}
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── FAIL OUTPUT ────────────────────────────────────────────────────────
+      - id: end_fail
+        type: custom
+        position: {x: 2030, y: 550}
+        data:
+          type: end
+          title: "Phase 7 FAILED ❌ — Remediation Required"
+          outputs:
+            - variable: remediation_plan
+              value_type: string
+              value_selector: [remediation_llm, text]
+            - variable: fail_summary
+              value_type: string
+              value_selector: [tdd_multios_gate, fail_summary]
+            - variable: core_rewrite_count
+              value_type: number
+              value_selector: [tdd_multios_gate, core_rewrite_count]
+            - variable: overall_risk_level
+              value_type: string
+              value_selector: [tdd_multios_gate, overall_risk_level]
+
+    edges:
+      - id: e-start-spec
+        source: start
+        target: tdd_extension_spec
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-spec-validator
+        source: tdd_extension_spec
+        target: os_extension_validator
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-spec-risk
+        source: tdd_extension_spec
+        target: risk_auditor
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-validator-gate
+        source: os_extension_validator
+        target: tdd_multios_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-risk-gate
+        source: risk_auditor
+        target: tdd_multios_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-gate-branch
+        source: tdd_multios_gate
+        target: gate_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-success
+        source: gate_branch
+        target: end_success
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-fail
+        source: gate_branch
+        target: remediation_llm
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+
+      - id: e-remediation-fail
+        source: remediation_llm
+        target: end_fail
+        sourceHandle: source
+        targetHandle: target
+        type: custom

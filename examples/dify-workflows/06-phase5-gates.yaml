@@ -1,0 +1,581 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "NIC Porting — Phase 5: Gates (Performance, Portability, Verification)"
+  mode: workflow
+  icon: "🚦"
+  icon_type: emoji
+  icon_background: "#FFF7ED"
+  description: >
+    Phase 5: GroupChat debate gate. performance-engineer, portability-validator,
+    and verification-executor run structured debate rounds (max 5). Gate thresholds:
+    native_score >= 98, portability_score >= 95, verification passes full build+test+perf.
+    TDD-style: each round is a test. All three must reach consensus to pass.
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    viewport: {x: 0, y: 0, zoom: 0.8}
+    nodes:
+
+      # ── INPUT ──────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: {x: 30, y: 340}
+        data:
+          type: start
+          title: "Phase 5 Inputs"
+          variables:
+            - variable: driver_name
+              label: "Driver Name"
+              type: text-input
+              required: true
+              default: "ixgbe"
+            - variable: target_os
+              label: "Target OS"
+              type: select
+              required: true
+              options:
+                - value: FreeBSD
+                  label: "FreeBSD"
+                - value: Windows
+                  label: "Windows"
+                - value: DPDK
+                  label: "DPDK"
+              default: FreeBSD
+            - variable: ported_code_summary
+              label: "Phase 4 Implementations JSON"
+              type: paragraph
+              required: true
+            - variable: tdd_test_results
+              label: "Phase 4 TDD Results JSON"
+              type: paragraph
+              required: true
+            - variable: api_mappings
+              label: "API Mappings JSON"
+              type: paragraph
+              required: true
+            - variable: seam_headers
+              label: "Seam Headers JSON"
+              type: paragraph
+              required: true
+
+      # ── TDD SPEC for Gate Criteria ─────────────────────────────────────────
+      - id: tdd_gate_spec
+        type: custom
+        position: {x: 330, y: 340}
+        data:
+          type: llm
+          title: "TDD Gate Spec — Define Acceptance Criteria"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 3000
+          prompt_template:
+            - role: system
+              text: |
+                Generate concrete TDD acceptance criteria for the Phase 5 gates.
+                Thresholds must be: native_score >= 98.0, portability_score >= 95.0.
+                Output JSON with measurable, unambiguous test criteria.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Ported code: {{#start.ported_code_summary#}}
+                TDD results so far: {{#start.tdd_test_results#}}
+
+                Output:
+                {
+                  "native_threshold": 98.0,
+                  "portability_threshold": 95.0,
+                  "max_debate_rounds": 5,
+                  "performance_tests": ["list of specific perf checks"],
+                  "portability_checks": ["list of seam correctness checks"],
+                  "verification_steps": ["build", "unit-test", "perf-bench", "abi-check"],
+                  "criteria_clear": true
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── PERFORMANCE-ENGINEER ───────────────────────────────────────────────
+      - id: performance_engineer
+        type: custom
+        position: {x: 730, y: 80}
+        data:
+          type: llm
+          title: "performance-engineer — Measure Overhead Budget"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 5000
+          prompt_template:
+            - role: system
+              text: |
+                You are the performance-engineer agent in a GroupChat debate gate.
+                Measure overhead regression for the ported driver code.
+                MANDATORY: native_score >= 98.0 (where 100.0 = zero overhead vs native baseline).
+                Any LinuxKPI abstraction or non-static-inline wrapper reduces this below 98.
+                Return detailed JSON perf report.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Gate spec: {{#tdd_gate_spec.text#}}
+                Ported implementations: {{#start.ported_code_summary#}}
+                API mappings: {{#start.api_mappings#}}
+
+                Return:
+                {
+                  "native_score": 0.0,
+                  "overhead_regression_pct": 0.0,
+                  "linuxkpi_overhead": 0.0,
+                  "bottlenecks": [],
+                  "perf_tests": [
+                    {"test_id": "P001", "passed": true, "metric": "", "value": 0.0, "threshold": 0.0}
+                  ],
+                  "all_perf_tests_passed": true,
+                  "perf_engineer_verdict": "approved|rejected",
+                  "rejection_notes": []
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── PORTABILITY-VALIDATOR ──────────────────────────────────────────────
+      - id: portability_validator
+        type: custom
+        position: {x: 730, y: 370}
+        data:
+          type: llm
+          title: "portability-validator — Cross-OS Seam Correctness"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 5000
+          prompt_template:
+            - role: system
+              text: |
+                You are the portability-validator in the GroupChat gate.
+                Verify OAL seam layer correctness for cross-OS portability.
+                Threshold: portability_score >= 95.0.
+                Checks: seam headers compile standalone, no cross-OS leakage,
+                no core-driver logic in seam layer, no linuxkpi in BSD headers.
+                Return JSON with portability audit.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Gate spec: {{#tdd_gate_spec.text#}}
+                Seam headers: {{#start.seam_headers#}}
+                Ported code: {{#start.ported_code_summary#}}
+                Performance report: {{#performance_engineer.text#}}
+
+                Return:
+                {
+                  "portability_score": 0.0,
+                  "seam_compile_standalone": true,
+                  "linuxkpi_in_bsd_headers": false,
+                  "cross_os_leakage_found": false,
+                  "core_rewrites_found": false,
+                  "portability_checks": [
+                    {"check_id": "C001", "passed": true, "detail": ""}
+                  ],
+                  "portability_validator_verdict": "approved|rejected",
+                  "critical_issues": []
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── VERIFICATION-EXECUTOR ──────────────────────────────────────────────
+      - id: verification_executor
+        type: custom
+        position: {x: 730, y: 650}
+        data:
+          type: llm
+          title: "verification-executor — Full Build + Test + Perf Suite"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 5000
+          prompt_template:
+            - role: system
+              text: |
+                You are the verification-executor in the GroupChat gate.
+                Simulate running the full verification suite: build, unit test, perf bench, ABI check.
+                Use ALL prior agent outputs to assess real pass/fail.
+                Return execution verdicts with per-step results.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Gate spec: {{#tdd_gate_spec.text#}}
+                TDD results from Phase 4: {{#start.tdd_test_results#}}
+                Perf report: {{#performance_engineer.text#}}
+                Portability report: {{#portability_validator.text#}}
+                Ported code: {{#start.ported_code_summary#}}
+
+                Return:
+                {
+                  "build_passed": true,
+                  "unit_test_passed": true,
+                  "perf_bench_passed": true,
+                  "abi_check_passed": true,
+                  "verification_steps": [
+                    {"step": "build", "passed": true, "output_summary": ""},
+                    {"step": "unit-test", "passed": true, "output_summary": ""},
+                    {"step": "perf-bench", "passed": true, "output_summary": ""},
+                    {"step": "abi-check", "passed": true, "output_summary": ""}
+                  ],
+                  "overall_verification_passed": true,
+                  "verification_verdict": "approved|rejected",
+                  "blocking_issues": []
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── TDD GROUPCHAT GATE (CODE) ──────────────────────────────────────────
+      - id: tdd_groupchat_gate
+        type: custom
+        position: {x: 1130, y: 340}
+        data:
+          type: code
+          title: "TDD GroupChat Gate — Consensus Across 3 Agents"
+          code_language: python3
+          code: |
+            import json
+
+            GATE_NATIVE_THRESHOLD = 98.0
+            GATE_PORTABILITY_THRESHOLD = 95.0
+            MAX_DEBATE_ROUNDS = 5
+
+            def main(perf_json: str, portability_json: str, verification_json: str, spec_json: str) -> dict:
+                results = []
+                passed = 0
+                failed = 0
+
+                def check(tid, ok, detail=""):
+                    nonlocal passed, failed
+                    s = "PASS" if ok else "FAIL"
+                    if ok: passed += 1
+                    else: failed += 1
+                    results.append({"test_id": tid, "status": s, "detail": str(detail)[:180]})
+
+                try:
+                    perf = json.loads(perf_json)
+                except Exception as e:
+                    return _fail(f"perf JSON: {e}")
+                try:
+                    portability = json.loads(portability_json)
+                except Exception as e:
+                    return _fail(f"portability JSON: {e}")
+                try:
+                    verification = json.loads(verification_json)
+                except Exception as e:
+                    return _fail(f"verification JSON: {e}")
+
+                native_score = float(perf.get("native_score", 0))
+                portability_score = float(portability.get("portability_score", 0))
+
+                # T01: Native score >= 98
+                check("T01-native-score-gte98", native_score >= GATE_NATIVE_THRESHOLD,
+                      f"score={native_score}, threshold={GATE_NATIVE_THRESHOLD}")
+
+                # T02: Portability score >= 95
+                check("T02-portability-gte95", portability_score >= GATE_PORTABILITY_THRESHOLD,
+                      f"score={portability_score}, threshold={GATE_PORTABILITY_THRESHOLD}")
+
+                # T03: Performance engineer approved
+                check("T03-perf-verdict-approved",
+                      perf.get("perf_engineer_verdict") == "approved",
+                      perf.get("rejection_notes", []))
+
+                # T04: Portability validator approved
+                check("T04-portability-verdict-approved",
+                      portability.get("portability_validator_verdict") == "approved",
+                      portability.get("critical_issues", []))
+
+                # T05: Verification executor approved
+                check("T05-verification-verdict-approved",
+                      verification.get("verification_verdict") == "approved",
+                      verification.get("blocking_issues", []))
+
+                # T06: Build passed
+                check("T06-build-passed", verification.get("build_passed") is True)
+
+                # T07: Unit tests passed
+                check("T07-unit-tests-passed", verification.get("unit_test_passed") is True)
+
+                # T08: Perf bench passed
+                check("T08-perf-bench-passed", verification.get("perf_bench_passed") is True)
+
+                # T09: No LinuxKPI overhead
+                check("T09-no-linuxkpi-overhead",
+                      float(perf.get("linuxkpi_overhead", 0)) == 0.0,
+                      f"linuxkpi_overhead={perf.get('linuxkpi_overhead', 0)}")
+
+                # T10: No core rewrites in seam
+                check("T10-no-core-rewrites",
+                      portability.get("core_rewrites_found") is False)
+
+                total = passed + failed
+                gate_score = round((passed / total) * 100, 1) if total else 0.0
+                fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
+
+                return {
+                    "all_passed": failed == 0,
+                    "passed_count": passed,
+                    "failed_count": failed,
+                    "gate_score": gate_score,
+                    "native_score": native_score,
+                    "portability_score": portability_score,
+                    "test_results": json.dumps(results),
+                    "fail_summary": "; ".join(fail_ids),
+                    "consensus_reached": failed == 0,
+                    "blocking_issues": json.dumps(verification.get("blocking_issues") or []),
+                    "critical_issues": json.dumps(portability.get("critical_issues") or []),
+                }
+
+            def _fail(reason):
+                return {
+                    "all_passed": False, "passed_count": 0, "failed_count": 1,
+                    "gate_score": 0.0, "native_score": 0.0, "portability_score": 0.0,
+                    "test_results": json.dumps([{"test_id": "parse", "status": "FAIL", "detail": reason}]),
+                    "fail_summary": reason, "consensus_reached": False,
+                    "blocking_issues": "[]", "critical_issues": "[]"
+                }
+          variables:
+            - variable: perf_json
+              value_selector: [performance_engineer, text]
+            - variable: portability_json
+              value_selector: [portability_validator, text]
+            - variable: verification_json
+              value_selector: [verification_executor, text]
+            - variable: spec_json
+              value_selector: [tdd_gate_spec, text]
+          outputs:
+            all_passed: {type: boolean}
+            passed_count: {type: number}
+            failed_count: {type: number}
+            gate_score: {type: number}
+            native_score: {type: number}
+            portability_score: {type: number}
+            test_results: {type: string}
+            fail_summary: {type: string}
+            consensus_reached: {type: boolean}
+            blocking_issues: {type: string}
+            critical_issues: {type: string}
+
+      # ── BRANCH ─────────────────────────────────────────────────────────────
+      - id: gate_branch
+        type: custom
+        position: {x: 1430, y: 340}
+        data:
+          type: if-else
+          title: "GroupChat Consensus Reached?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [tdd_groupchat_gate, all_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-gate5-pass
+
+      # ── SUCCESS ────────────────────────────────────────────────────────────
+      - id: end_success
+        type: custom
+        position: {x: 1730, y: 140}
+        data:
+          type: end
+          title: "Phase 5 PASSED ✅ — All Gates Cleared"
+          outputs:
+            - variable: gate_score
+              value_type: number
+              value_selector: [tdd_groupchat_gate, gate_score]
+            - variable: native_score
+              value_type: number
+              value_selector: [tdd_groupchat_gate, native_score]
+            - variable: portability_score
+              value_type: number
+              value_selector: [tdd_groupchat_gate, portability_score]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_groupchat_gate, test_results]
+
+      # ── REMEDIATION ────────────────────────────────────────────────────────
+      - id: remediation_llm
+        type: custom
+        position: {x: 1730, y: 550}
+        data:
+          type: llm
+          title: "Gate Remediation — Address Consensus Failures"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.3
+              max_tokens: 6000
+          prompt_template:
+            - role: system
+              text: |
+                The Phase 5 GroupChat gate did not reach consensus. All 3 agents
+                (performance-engineer, portability-validator, verification-executor) must
+                agree. Analyse all failures and produce a remediation plan.
+                Address: native_score < 98, portability_score < 95, build/test failures,
+                core rewrites, LinuxKPI overhead.
+            - role: user
+              text: |
+                Gate fail summary: {{#tdd_groupchat_gate.fail_summary#}}
+                Native score: {{#tdd_groupchat_gate.native_score#}} (must be >= 98)
+                Portability score: {{#tdd_groupchat_gate.portability_score#}} (must be >= 95)
+                Blocking issues: {{#tdd_groupchat_gate.blocking_issues#}}
+                Critical issues: {{#tdd_groupchat_gate.critical_issues#}}
+                Test results: {{#tdd_groupchat_gate.test_results#}}
+                Performance report: {{#performance_engineer.text#}}
+                Portability report: {{#portability_validator.text#}}
+                Verification report: {{#verification_executor.text#}}
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── FAIL OUTPUT ────────────────────────────────────────────────────────
+      - id: end_fail
+        type: custom
+        position: {x: 2030, y: 550}
+        data:
+          type: end
+          title: "Phase 5 FAILED ❌ — Remediation Required"
+          outputs:
+            - variable: remediation_plan
+              value_type: string
+              value_selector: [remediation_llm, text]
+            - variable: fail_summary
+              value_type: string
+              value_selector: [tdd_groupchat_gate, fail_summary]
+            - variable: native_score
+              value_type: number
+              value_selector: [tdd_groupchat_gate, native_score]
+            - variable: portability_score
+              value_type: number
+              value_selector: [tdd_groupchat_gate, portability_score]
+
+    edges:
+      - id: e-start-spec
+        source: start
+        target: tdd_gate_spec
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-spec-perf
+        source: tdd_gate_spec
+        target: performance_engineer
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-spec-portability
+        source: tdd_gate_spec
+        target: portability_validator
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-spec-verification
+        source: tdd_gate_spec
+        target: verification_executor
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-perf-gate
+        source: performance_engineer
+        target: tdd_groupchat_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-portability-gate
+        source: portability_validator
+        target: tdd_groupchat_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-verification-gate
+        source: verification_executor
+        target: tdd_groupchat_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-gate-branch
+        source: tdd_groupchat_gate
+        target: gate_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-success
+        source: gate_branch
+        target: end_success
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-fail
+        source: gate_branch
+        target: remediation_llm
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+
+      - id: e-remediation-fail
+        source: remediation_llm
+        target: end_fail
+        sourceHandle: source
+        targetHandle: target
+        type: custom

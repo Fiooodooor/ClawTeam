@@ -1,0 +1,480 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "NIC Porting — Phase 0: Scope & Baseline"
+  mode: workflow
+  icon: "🔍"
+  icon_type: emoji
+  icon_background: "#FEF3C7"
+  description: >
+    Phase 0: Freeze baseline commit, define hard constraints, map Linux kernel API surface,
+    produce acceptance gates. TDD focus: validate all constraints and APIs are captured
+    before any porting work begins. Gate: scope_approved=true AND gate_score≥80.
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    viewport: {x: 0, y: 0, zoom: 1}
+    nodes:
+
+      # ── INPUT ──────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: {x: 30, y: 282}
+        data:
+          type: start
+          title: "Phase 0 Inputs"
+          variables:
+            - variable: driver_name
+              label: "Linux Driver Name"
+              type: text-input
+              required: true
+              default: "ixgbe"
+            - variable: goal
+              label: "Porting Goal"
+              type: paragraph
+              required: true
+            - variable: linux_driver_path
+              label: "Linux Driver Subpath"
+              type: text-input
+              required: true
+              default: "drivers/net/ethernet/intel/ixgbe"
+            - variable: freebsd_target_path
+              label: "FreeBSD Target Subpath"
+              type: text-input
+              required: true
+              default: "sys/dev/ixgbe"
+
+      # ── TDD: Generate test cases for scope validation ───────────────────────
+      - id: tdd_spec_gen
+        type: custom
+        position: {x: 330, y: 120}
+        data:
+          type: llm
+          title: "TDD — Generate Scope Test Specifications"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 2048
+          prompt_template:
+            - role: system
+              text: |
+                You are a TDD specification generator for NIC driver porting projects.
+                Generate a JSON array of test specifications that MUST pass before Phase 0
+                is considered complete. Each test spec: {test_id, description, check_type, expected}.
+                check_type values: "exists", "non_empty_array", "boolean_true", "score_gte_80"
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Goal: {{#start.goal#}}
+
+                Generate scope acceptance test specifications covering:
+                1. Baseline commit identification
+                2. Hard constraints list completeness
+                3. Acceptance gates definition
+                4. Critical kernel API enumeration
+                5. Risk register initialization
+                6. Constraint: no LinuxKPI calls
+                7. Constraint: zero overhead
+                8. Constraint: minimal-touch policy
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── ANALYST LLM ────────────────────────────────────────────────────────
+      - id: linux_analyst
+        type: custom
+        position: {x: 330, y: 444}
+        data:
+          type: llm
+          title: "linux-analyst — Scope Baseline Analysis"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.1
+              max_tokens: 6144
+          prompt_template:
+            - role: system
+              text: |
+                You are a senior Linux kernel and NIC driver expert (linux-analyst role).
+                Perform Phase 0 scope and baseline analysis. Produce ONLY valid JSON.
+
+                Hard rules for this porting project:
+                - NO LinuxKPI calls anywhere in ported code
+                - ZERO runtime overhead vs native BSD implementation
+                - Minimal-touch: preserve upstream structure as much as possible
+                - Every ported subsystem needs TDD tests before implementation
+
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Goal: {{#start.goal#}}
+                Linux path: {{#start.linux_driver_path#}}
+                FreeBSD target: {{#start.freebsd_target_path#}}
+
+                Produce JSON with ALL of these keys:
+                {
+                  "baseline_commit": "string — git tag or commit SHA",
+                  "baseline_date": "string — ISO date",
+                  "hard_constraints": ["array of absolute constraints, e.g. no LinuxKPI"],
+                  "acceptance_gates": ["array of measurable acceptance criteria"],
+                  "critical_kernel_apis": [
+                    {"api": "name", "linux_header": "include/...", "usage_count": 0, "bsd_equivalent": "or null"}
+                  ],
+                  "subsystems": ["list of driver subsystem names to port"],
+                  "risk_items": [
+                    {"severity": "critical|high|medium|low", "description": "string", "mitigation": "string"}
+                  ],
+                  "tdd_strategy": "string describing the test-first approach for this driver",
+                  "scope_approved": true,
+                  "gate_score": 0
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── TDD GATE: RUN SPEC TESTS AGAINST ANALYSIS ──────────────────────────
+      - id: tdd_gate
+        type: custom
+        position: {x: 630, y: 282}
+        data:
+          type: code
+          title: "TDD Gate — Run Scope Test Suite"
+          code_language: python3
+          code: |
+            import json
+
+            def main(analysis_json: str, test_specs_json: str) -> dict:
+                results = []
+                passed_count = 0
+                failed_count = 0
+
+                try:
+                    data = json.loads(analysis_json)
+                except Exception as e:
+                    return {
+                        "all_passed": False,
+                        "passed_count": 0,
+                        "failed_count": 1,
+                        "test_results": json.dumps([{"test_id": "parse", "status": "FAIL", "reason": str(e)}]),
+                        "gate_score": 0.0,
+                        "baseline_commit": "",
+                        "hard_constraints": "[]",
+                        "acceptance_gates": "[]",
+                        "critical_kernel_apis": "[]",
+                        "subsystems": "[]",
+                        "risk_items": "[]",
+                        "tdd_strategy": "",
+                        "fail_summary": f"JSON parse error: {e}"
+                    }
+
+                try:
+                    specs = json.loads(test_specs_json)
+                except Exception:
+                    specs = []
+
+                # Run structural tests
+                checks = [
+                    ("T01-baseline-commit", data.get("baseline_commit"), "non_empty"),
+                    ("T02-hard-constraints", data.get("hard_constraints"), "non_empty_list"),
+                    ("T03-acceptance-gates", data.get("acceptance_gates"), "non_empty_list"),
+                    ("T04-critical-apis", data.get("critical_kernel_apis"), "non_empty_list"),
+                    ("T05-subsystems", data.get("subsystems"), "non_empty_list"),
+                    ("T06-risk-items", data.get("risk_items"), "non_empty_list"),
+                    ("T07-tdd-strategy", data.get("tdd_strategy"), "non_empty"),
+                    ("T08-scope-approved", data.get("scope_approved"), "is_true"),
+                ]
+
+                # Semantic checks
+                constraints = [str(c).lower() for c in (data.get("hard_constraints") or [])]
+                checks.append(("T09-no-linuxkpi-constraint",
+                    any("linuxkpi" in c for c in constraints), "is_true"))
+                checks.append(("T10-zero-overhead-constraint",
+                    any("overhead" in c for c in constraints), "is_true"))
+
+                for tid, value, check in checks:
+                    if check == "non_empty":
+                        ok = bool(value and str(value).strip())
+                    elif check == "non_empty_list":
+                        ok = isinstance(value, list) and len(value) > 0
+                    elif check == "is_true":
+                        ok = value is True or value == "true"
+                    else:
+                        ok = value is not None
+
+                    status = "PASS" if ok else "FAIL"
+                    if ok:
+                        passed_count += 1
+                    else:
+                        failed_count += 1
+                    results.append({"test_id": tid, "status": status,
+                                    "value_preview": str(value)[:80] if value else "None"})
+
+                total = passed_count + failed_count
+                gate_score = round((passed_count / total) * 100, 1) if total > 0 else 0.0
+                all_passed = failed_count == 0
+
+                failed = [r for r in results if r["status"] == "FAIL"]
+                fail_summary = "; ".join(r["test_id"] for r in failed) if failed else ""
+
+                return {
+                    "all_passed": all_passed,
+                    "passed_count": passed_count,
+                    "failed_count": failed_count,
+                    "test_results": json.dumps(results),
+                    "gate_score": gate_score,
+                    "baseline_commit": str(data.get("baseline_commit", "")),
+                    "hard_constraints": json.dumps(data.get("hard_constraints", [])),
+                    "acceptance_gates": json.dumps(data.get("acceptance_gates", [])),
+                    "critical_kernel_apis": json.dumps(data.get("critical_kernel_apis", [])),
+                    "subsystems": json.dumps(data.get("subsystems", [])),
+                    "risk_items": json.dumps(data.get("risk_items", [])),
+                    "tdd_strategy": str(data.get("tdd_strategy", "")),
+                    "fail_summary": fail_summary
+                }
+          variables:
+            - variable: analysis_json
+              value_selector: [linux_analyst, text]
+            - variable: test_specs_json
+              value_selector: [tdd_spec_gen, text]
+          outputs:
+            all_passed: {type: boolean}
+            passed_count: {type: number}
+            failed_count: {type: number}
+            test_results: {type: string}
+            gate_score: {type: number}
+            baseline_commit: {type: string}
+            hard_constraints: {type: string}
+            acceptance_gates: {type: string}
+            critical_kernel_apis: {type: string}
+            subsystems: {type: string}
+            risk_items: {type: string}
+            tdd_strategy: {type: string}
+            fail_summary: {type: string}
+
+      # ── GATE BRANCH ────────────────────────────────────────────────────────
+      - id: gate_branch
+        type: custom
+        position: {x: 930, y: 282}
+        data:
+          type: if-else
+          title: "TDD Gate — All Tests Pass?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [tdd_gate, all_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-all-pass
+
+      # ── REMEDIATION LLM (on gate fail) ─────────────────────────────────────
+      - id: remediation_llm
+        type: custom
+        position: {x: 1230, y: 500}
+        data:
+          type: llm
+          title: "Remediation — Fix Scope Gaps"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.2
+              max_tokens: 3000
+          prompt_template:
+            - role: system
+              text: |
+                You are a NIC porting remediation assistant.
+                The scope analysis has FAILED TDD gate checks. Fix the analysis gaps.
+                Return a valid corrected JSON with the same shape as the original analysis.
+            - role: user
+              text: |
+                Original analysis (incomplete): {{#linux_analyst.text#}}
+                Failed tests: {{#tdd_gate.fail_summary#}}
+                Test detail: {{#tdd_gate.test_results#}}
+
+                Produce a corrected, complete JSON that passes ALL failed checks.
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── REMEDIATION GATE ───────────────────────────────────────────────────
+      - id: remediation_gate
+        type: custom
+        position: {x: 1530, y: 500}
+        data:
+          type: code
+          title: "Remediation Gate — Recheck After Fix"
+          code_language: python3
+          code: |
+            import json
+            def main(fixed_json: str) -> dict:
+                try:
+                    data = json.loads(fixed_json)
+                except Exception as e:
+                    return {"passed": False, "score": 0.0, "reason": str(e)}
+
+                required_keys = ["baseline_commit","hard_constraints","acceptance_gates",
+                                 "critical_kernel_apis","subsystems","risk_items",
+                                 "tdd_strategy","scope_approved"]
+                missing = [k for k in required_keys if not data.get(k)]
+                constraints = [str(c).lower() for c in (data.get("hard_constraints") or [])]
+                if not any("linuxkpi" in c for c in constraints):
+                    missing.append("linuxkpi-constraint")
+                if not any("overhead" in c for c in constraints):
+                    missing.append("zero-overhead-constraint")
+
+                passed = len(missing) == 0 and data.get("scope_approved") is True
+                score = round(100 * (1 - len(missing) / 10), 1)
+                return {"passed": passed, "score": score, "reason": f"Missing: {missing}" if missing else ""}
+          variables:
+            - variable: fixed_json
+              value_selector: [remediation_llm, text]
+          outputs:
+            passed: {type: boolean}
+            score: {type: number}
+            reason: {type: string}
+
+      # ── SUCCESS OUTPUT ─────────────────────────────────────────────────────
+      - id: end_success
+        type: custom
+        position: {x: 1230, y: 120}
+        data:
+          type: end
+          title: "Phase 0 PASSED ✅"
+          outputs:
+            - variable: gate_score
+              value_type: number
+              value_selector: [tdd_gate, gate_score]
+            - variable: baseline_commit
+              value_type: string
+              value_selector: [tdd_gate, baseline_commit]
+            - variable: hard_constraints
+              value_type: string
+              value_selector: [tdd_gate, hard_constraints]
+            - variable: acceptance_gates
+              value_type: string
+              value_selector: [tdd_gate, acceptance_gates]
+            - variable: critical_kernel_apis
+              value_type: string
+              value_selector: [tdd_gate, critical_kernel_apis]
+            - variable: subsystems
+              value_type: string
+              value_selector: [tdd_gate, subsystems]
+            - variable: risk_items
+              value_type: string
+              value_selector: [tdd_gate, risk_items]
+            - variable: tdd_strategy
+              value_type: string
+              value_selector: [tdd_gate, tdd_strategy]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_gate, test_results]
+
+      # ── FAIL OUTPUT (after remediation) ────────────────────────────────────
+      - id: end_fail
+        type: custom
+        position: {x: 1830, y: 500}
+        data:
+          type: end
+          title: "Phase 0 FAILED ❌ — Manual Intervention Required"
+          outputs:
+            - variable: reason
+              value_type: string
+              value_selector: [remediation_gate, reason]
+            - variable: original_test_results
+              value_type: string
+              value_selector: [tdd_gate, test_results]
+
+    edges:
+      - id: e-start-tdd
+        source: start
+        target: tdd_spec_gen
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-start-analyst
+        source: start
+        target: linux_analyst
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-tdd-gate
+        source: tdd_spec_gen
+        target: tdd_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-analyst-gate
+        source: linux_analyst
+        target: tdd_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-gate-branch
+        source: tdd_gate
+        target: gate_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-success
+        source: gate_branch
+        target: end_success
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-remediation
+        source: gate_branch
+        target: remediation_llm
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+
+      - id: e-remediation-gate
+        source: remediation_llm
+        target: remediation_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-remediation-fail
+        source: remediation_gate
+        target: end_fail
+        sourceHandle: source
+        targetHandle: target
+        type: custom

@@ -1,0 +1,590 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "NIC Porting — Phase 4: Incremental Porting (TDD Micro-Slice)"
+  mode: workflow
+  icon: "⚙️"
+  icon_type: emoji
+  icon_background: "#F0FDF4"
+  description: >
+    Phase 4: Incremental porting execution via micro-slices. Each micro-slice:
+    TDD (failing test) → coder implements → native-validator rejects LinuxKPI →
+    code-reviewer approves quality → gate. Concurrent GroupChat between coder,
+    native-validator, code-reviewer. Loop continues until all slices pass TDD.
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    viewport: {x: 0, y: 0, zoom: 0.8}
+    nodes:
+
+      # ── INPUT ──────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: {x: 30, y: 282}
+        data:
+          type: start
+          title: "Phase 4 Inputs"
+          variables:
+            - variable: driver_name
+              label: "Driver Name"
+              type: text-input
+              required: true
+              default: "ixgbe"
+            - variable: porting_tests_json
+              label: "Failing TDD Tests JSON (from Phase 3)"
+              type: paragraph
+              required: true
+            - variable: seam_headers
+              label: "Seam Headers JSON (from Phase 2)"
+              type: paragraph
+              required: true
+            - variable: api_mappings
+              label: "API Mappings JSON (from Phase 1)"
+              type: paragraph
+              required: true
+            - variable: target_os
+              label: "Target OS"
+              type: select
+              required: true
+              options:
+                - value: FreeBSD
+                  label: "FreeBSD"
+                - value: Windows
+                  label: "Windows"
+                - value: DPDK
+                  label: "DPDK"
+              default: FreeBSD
+            - variable: slice_focus
+              label: "Micro-slice Subsystem to Port"
+              type: text-input
+              required: true
+              default: "memory-allocation"
+
+      # ── SLICE PLANNER ──────────────────────────────────────────────────────
+      - id: slice_planner
+        type: custom
+        position: {x: 330, y: 282}
+        data:
+          type: llm
+          title: "Micro-Slice Planner — Decompose Slice into Tasks"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 3000
+          prompt_template:
+            - role: system
+              text: |
+                Decompose the given micro-slice into ordered implementation tasks.
+                Each task must have a specific failing TDD test that will be made to pass.
+                Output JSON. Be specific about what code to write.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Micro-slice: {{#start.slice_focus#}}
+                Failing tests to pass: {{#start.porting_tests_json#}}
+                Available seams: {{#start.seam_headers#}}
+
+                Output:
+                {
+                  "slice_id": "string",
+                  "slice_description": "string",
+                  "tasks": [
+                    {
+                      "task_id": "string",
+                      "failing_test_id": "T-PORT-XXX",
+                      "description": "what to implement",
+                      "seam_header": "nic_oal_xxx.h",
+                      "linux_api": "original linux API",
+                      "native_api": "target OS API to use"
+                    }
+                  ],
+                  "estimated_lines_of_change": 0,
+                  "zero_overhead_guarantee": true
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── CONCURRENT: coder ──────────────────────────────────────────────────
+      - id: coder
+        type: custom
+        position: {x: 730, y: 80}
+        data:
+          type: llm
+          title: "coder — Implement Native OAL Code"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.2
+              max_tokens: 10000
+          prompt_template:
+            - role: system
+              text: |
+                You are the coder agent. Implement native code to make failing TDD tests pass.
+                ABSOLUTE RULES:
+                1. NEVER use LinuxKPI (no sys/linuxkpi, no linux/*.h)
+                2. ALL code is static inline or native {{#start.target_os#}} APIs
+                3. Follow exact seam header signatures
+                4. Minimal touch — change only what the seam requires
+                5. Each implementation makes EXACTLY ONE failing test pass (micro-slice)
+                Return JSON with implementation details.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Slice tasks: {{#slice_planner.text#}}
+                Seam headers to implement: {{#start.seam_headers#}}
+                API mappings (native APIs to use): {{#start.api_mappings#}}
+
+                Produce JSON:
+                {
+                  "implementations": [
+                    {
+                      "task_id": "string",
+                      "file": "nic_oal/nic_oal_xxx.h",
+                      "diff_lines": 0,
+                      "uses_linuxkpi": false,
+                      "is_static_inline": true,
+                      "code_fragment": "static inline ... { ... }",
+                      "makes_test_pass": "T-PORT-XXX",
+                      "overhead": "zero"
+                    }
+                  ],
+                  "total_diff_lines": 0,
+                  "linuxkpi_used": false,
+                  "all_implementations_complete": true
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── CONCURRENT: native-validator (checker) ─────────────────────────────
+      - id: native_validator
+        type: custom
+        position: {x: 730, y: 370}
+        data:
+          type: llm
+          title: "native-validator — Reject LinuxKPI/Non-Native Code"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 4096
+          prompt_template:
+            - role: system
+              text: |
+                You are the native-validator agent (checker role). STRICTLY reject any
+                LinuxKPI usage, compat shims, or non-native code.
+                You are the safety gate — be strict, reject aggressively.
+                Return JSON validation report.
+            - role: user
+              text: |
+                Target OS: {{#start.target_os#}}
+                Coder implementations: {{#coder.text#}}
+                API mappings (approved native APIs): {{#start.api_mappings#}}
+
+                Validate each implementation. Return:
+                {
+                  "validations": [
+                    {
+                      "task_id": "string",
+                      "status": "approved|rejected",
+                      "linuxkpi_found": false,
+                      "non_native_apis": [],
+                      "rejection_reason": null,
+                      "overhead_check": "zero|suspect|violation"
+                    }
+                  ],
+                  "total_approved": 0,
+                  "total_rejected": 0,
+                  "validator_passed": true,
+                  "critical_violations": []
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── CONCURRENT: code-reviewer (checker) ────────────────────────────────
+      - id: code_reviewer
+        type: custom
+        position: {x: 730, y: 600}
+        data:
+          type: llm
+          title: "code-reviewer — Quality & Minimal-Touch Review"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 4096
+          prompt_template:
+            - role: system
+              text: |
+                You are the code-reviewer agent (checker). Review ported code for:
+                1. Code quality (clear, readable, documented)
+                2. Minimal-touch compliance (changes only what is required)
+                3. Style consistency with native OS idioms
+                4. No dead code, no unused variables
+                5. Correct error handling for native APIs
+                Return JSON review report.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Code implementations: {{#coder.text#}}
+                Native validator report: {{#native_validator.text#}}
+
+                Return:
+                {
+                  "reviews": [
+                    {
+                      "task_id": "string",
+                      "quality_score": 0,
+                      "minimal_touch": true,
+                      "issues": [],
+                      "approved": true
+                    }
+                  ],
+                  "overall_quality": 0.0,
+                  "approved_count": 0,
+                  "rejected_count": 0,
+                  "reviewer_passed": true,
+                  "style_notes": []
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── TDD MICRO-SLICE GATE ───────────────────────────────────────────────
+      - id: tdd_slice_gate
+        type: custom
+        position: {x: 1130, y: 282}
+        data:
+          type: code
+          title: "TDD Micro-Slice Gate — GroupChat Consensus"
+          code_language: python3
+          code: |
+            import json
+
+            def main(coder_json: str, validator_json: str, reviewer_json: str) -> dict:
+                results = []
+                passed = 0
+                failed = 0
+
+                def check(tid, ok, detail=""):
+                    nonlocal passed, failed
+                    status = "PASS" if ok else "FAIL"
+                    if ok: passed += 1
+                    else: failed += 1
+                    results.append({"test_id": tid, "status": status, "detail": str(detail)[:150]})
+
+                try:
+                    coder = json.loads(coder_json)
+                except Exception as e:
+                    return _fail(f"coder JSON: {e}")
+                try:
+                    validator = json.loads(validator_json)
+                except Exception as e:
+                    return _fail(f"validator JSON: {e}")
+                try:
+                    reviewer = json.loads(reviewer_json)
+                except Exception as e:
+                    return _fail(f"reviewer JSON: {e}")
+
+                impls = coder.get("implementations") or []
+                validations = validator.get("validations") or []
+                reviews = reviewer.get("reviews") or []
+
+                # T01: Coder has implementations
+                check("T01-impls-exist", len(impls) > 0, f"count={len(impls)}")
+
+                # T02: No LinuxKPI used
+                check("T02-no-linuxkpi", not coder.get("linuxkpi_used", False))
+
+                # T03: All implementations complete
+                check("T03-all-complete", coder.get("all_implementations_complete") is True)
+
+                # T04: Validator passed
+                check("T04-validator-passed", validator.get("validator_passed") is True,
+                      f"rejected={validator.get('total_rejected', 0)}")
+
+                # T05: Zero critical violations
+                crits = validator.get("critical_violations") or []
+                check("T05-zero-critical-violations", len(crits) == 0, f"crits={crits}")
+
+                # T06: All implementations approved by validator
+                rejected = [v["task_id"] for v in validations if v.get("status") == "rejected"]
+                check("T06-all-validator-approved", len(rejected) == 0, f"rejected={rejected}")
+
+                # T07: Reviewer passed
+                check("T07-reviewer-passed", reviewer.get("reviewer_passed") is True)
+
+                # T08: Overall quality >= 75
+                quality = float(reviewer.get("overall_quality", 0))
+                check("T08-quality-gte75", quality >= 75.0, f"quality={quality}")
+
+                # T09: All reviewer approved
+                rev_rejected = [r["task_id"] for r in reviews if not r.get("approved")]
+                check("T09-all-reviewer-approved", len(rev_rejected) == 0, f"rejected={rev_rejected}")
+
+                # T10: All static_inline (zero overhead)
+                non_inline = [i["task_id"] for i in impls if not i.get("is_static_inline")]
+                check("T10-all-static-inline", len(non_inline) == 0, f"not-inline={non_inline}")
+
+                total = passed + failed
+                gate_score = round((passed / total) * 100, 1) if total else 0.0
+                fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
+                tests_made_pass = [i.get("makes_test_pass", "") for i in impls]
+
+                return {
+                    "all_passed": failed == 0,
+                    "passed_count": passed,
+                    "failed_count": failed,
+                    "gate_score": gate_score,
+                    "test_results": json.dumps(results),
+                    "fail_summary": "; ".join(fail_ids),
+                    "implementations_count": len(impls),
+                    "total_diff_lines": int(coder.get("total_diff_lines", 0)),
+                    "overall_quality": quality,
+                    "tests_made_pass": json.dumps(tests_made_pass),
+                    "critical_violations": json.dumps(crits),
+                }
+
+            def _fail(reason):
+                return {
+                    "all_passed": False, "passed_count": 0, "failed_count": 1,
+                    "gate_score": 0.0, "test_results": json.dumps([{"test_id": "parse", "status": "FAIL", "detail": reason}]),
+                    "fail_summary": reason, "implementations_count": 0, "total_diff_lines": 0,
+                    "overall_quality": 0.0, "tests_made_pass": "[]", "critical_violations": "[]"
+                }
+          variables:
+            - variable: coder_json
+              value_selector: [coder, text]
+            - variable: validator_json
+              value_selector: [native_validator, text]
+            - variable: reviewer_json
+              value_selector: [code_reviewer, text]
+          outputs:
+            all_passed: {type: boolean}
+            passed_count: {type: number}
+            failed_count: {type: number}
+            gate_score: {type: number}
+            test_results: {type: string}
+            fail_summary: {type: string}
+            implementations_count: {type: number}
+            total_diff_lines: {type: number}
+            overall_quality: {type: number}
+            tests_made_pass: {type: string}
+            critical_violations: {type: string}
+
+      # ── BRANCH ─────────────────────────────────────────────────────────────
+      - id: gate_branch
+        type: custom
+        position: {x: 1430, y: 282}
+        data:
+          type: if-else
+          title: "Micro-Slice GroupChat Gate Pass?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [tdd_slice_gate, all_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-slice-pass
+
+      # ── SUCCESS ────────────────────────────────────────────────────────────
+      - id: end_success
+        type: custom
+        position: {x: 1730, y: 120}
+        data:
+          type: end
+          title: "Phase 4 Slice PASSED ✅ — TDD Tests Now Green"
+          outputs:
+            - variable: gate_score
+              value_type: number
+              value_selector: [tdd_slice_gate, gate_score]
+            - variable: tests_made_pass
+              value_type: string
+              value_selector: [tdd_slice_gate, tests_made_pass]
+            - variable: implementations_count
+              value_type: number
+              value_selector: [tdd_slice_gate, implementations_count]
+            - variable: total_diff_lines
+              value_type: number
+              value_selector: [tdd_slice_gate, total_diff_lines]
+            - variable: overall_quality
+              value_type: number
+              value_selector: [tdd_slice_gate, overall_quality]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_slice_gate, test_results]
+
+      # ── DEBATE / REMEDIATION (GroupChat fail) ──────────────────────────────
+      - id: debate_remediation
+        type: custom
+        position: {x: 1730, y: 500}
+        data:
+          type: llm
+          title: "GroupChat Debate — Resolve Rejection"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.3
+              max_tokens: 8000
+          prompt_template:
+            - role: system
+              text: |
+                The GroupChat gate (coder + native-validator + code-reviewer) did not reach
+                consensus. Act as mediator and produce a corrected implementation that:
+                1. Eliminates all LinuxKPI usage
+                2. Uses only native {{#start.target_os#}} APIs from the approved mapping
+                3. Passes native-validator strictness check
+                4. Meets code-reviewer quality standards (score >= 75)
+                Return corrected coder JSON with same schema.
+            - role: user
+              text: |
+                Original coder output: {{#coder.text#}}
+                Validator rejections: {{#native_validator.text#}}
+                Reviewer issues: {{#code_reviewer.text#}}
+                Gate fail summary: {{#tdd_slice_gate.fail_summary#}}
+                Critical violations: {{#tdd_slice_gate.critical_violations#}}
+                Approved API mappings: {{#start.api_mappings#}}
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── FAIL OUTPUT ────────────────────────────────────────────────────────
+      - id: end_fail
+        type: custom
+        position: {x: 2030, y: 500}
+        data:
+          type: end
+          title: "Phase 4 Slice FAILED ❌ — Debated Remediation"
+          outputs:
+            - variable: debated_implementation
+              value_type: string
+              value_selector: [debate_remediation, text]
+            - variable: fail_summary
+              value_type: string
+              value_selector: [tdd_slice_gate, fail_summary]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_slice_gate, test_results]
+
+    edges:
+      - id: e-start-planner
+        source: start
+        target: slice_planner
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-planner-coder
+        source: slice_planner
+        target: coder
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-planner-validator
+        source: slice_planner
+        target: native_validator
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-planner-reviewer
+        source: slice_planner
+        target: code_reviewer
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-coder-gate
+        source: coder
+        target: tdd_slice_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-validator-gate
+        source: native_validator
+        target: tdd_slice_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-reviewer-gate
+        source: code_reviewer
+        target: tdd_slice_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-gate-branch
+        source: tdd_slice_gate
+        target: gate_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-success
+        source: gate_branch
+        target: end_success
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-fail
+        source: gate_branch
+        target: debate_remediation
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+
+      - id: e-debate-fail
+        source: debate_remediation
+        target: end_fail
+        sourceHandle: source
+        targetHandle: target
+        type: custom

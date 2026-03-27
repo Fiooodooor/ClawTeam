@@ -1,0 +1,306 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "NIC Porting — Master Orchestrator"
+  mode: workflow
+  icon: "🔧"
+  icon_type: emoji
+  icon_background: "#E0F2FE"
+  description: >
+    Top-level orchestrator that stages all 8 NIC porting phases sequentially,
+    evaluating gate scores between phases and branching on failure. Each phase
+    is delegated to a sub-workflow via HTTP-request calls with JSON handoff.
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables:
+    - id: env-clawteam-api
+      name: clawteam_api_url
+      value: ""
+      value_type: string
+      description: "Base URL of the ClawTeam REST API (if used)"
+      selector:
+        - environment
+        - clawteam_api_url
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7
+    nodes:
+
+      # ── INPUT ──────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: {x: 30, y: 282}
+        data:
+          type: start
+          title: "Porting Mission Input"
+          variables:
+            - variable: driver_name
+              label: "Driver Name (e.g. ixgbe)"
+              type: text-input
+              required: true
+              default: "ixgbe"
+            - variable: goal
+              label: "Porting Goal"
+              type: paragraph
+              required: true
+              default: "Native OAL data-plane port: Linux ixgbe → FreeBSD"
+            - variable: driver_repo
+              label: "Driver Repo Path"
+              type: text-input
+              required: true
+              default: "/workspace/driver"
+            - variable: linux_driver_path
+              label: "Linux Driver Subpath"
+              type: text-input
+              required: true
+              default: "drivers/net/ethernet/intel/ixgbe"
+            - variable: freebsd_target_path
+              label: "FreeBSD Target Subpath"
+              type: text-input
+              required: true
+              default: "sys/dev/ixgbe"
+            - variable: team_name
+              label: "ClawTeam Team Name"
+              type: text-input
+              required: true
+              default: "nic-port-v2"
+
+      # ── PHASE 0 ────────────────────────────────────────────────────────────
+      - id: phase0_llm
+        type: custom
+        position: {x: 330, y: 282}
+        data:
+          type: llm
+          title: "Phase 0 — Scope & Baseline Analysis"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.1
+              max_tokens: 4096
+          prompt_template:
+            - role: system
+              text: |
+                You are a senior Linux driver analyst performing Phase 0 of a NIC porting project.
+                Your job: scope baseline analysis for driver "{{#start.driver_name#}}".
+                Produce ONLY valid JSON — no prose.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Goal: {{#start.goal#}}
+                Linux path: {{#start.linux_driver_path#}}
+                FreeBSD target: {{#start.freebsd_target_path#}}
+
+                Produce a JSON object with keys:
+                  - "baseline_commit": estimated git tag/hash string
+                  - "hard_constraints": array of strings (e.g., "no LinuxKPI", "zero overhead")
+                  - "acceptance_gates": array of acceptance criteria strings
+                  - "critical_kernel_apis": array of Linux kernel API names used
+                  - "risk_items": array of {severity, description} objects
+                  - "scope_approved": boolean (true if scope is well-defined)
+                  - "gate_score": number 0-100
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── PHASE 0 GATE ───────────────────────────────────────────────────────
+      - id: gate0
+        type: custom
+        position: {x: 630, y: 282}
+        data:
+          type: code
+          title: "Gate 0 — Scope Approval Check"
+          code_language: python3
+          code: |
+            import json
+            def main(llm_output: str) -> dict:
+                try:
+                    data = json.loads(llm_output)
+                except Exception:
+                    return {"passed": False, "score": 0, "reason": "Invalid JSON from Phase 0 LLM"}
+                score = float(data.get("gate_score", 0))
+                approved = data.get("scope_approved", False)
+                passed = approved and score >= 80
+                return {
+                    "passed": passed,
+                    "score": score,
+                    "baseline_commit": data.get("baseline_commit", ""),
+                    "hard_constraints": json.dumps(data.get("hard_constraints", [])),
+                    "acceptance_gates": json.dumps(data.get("acceptance_gates", [])),
+                    "critical_kernel_apis": json.dumps(data.get("critical_kernel_apis", [])),
+                    "reason": "" if passed else f"scope_approved={approved}, score={score}"
+                }
+          variables:
+            - variable: llm_output
+              value_selector: [phase0_llm, text]
+          outputs:
+            passed: {type: boolean}
+            score: {type: number}
+            baseline_commit: {type: string}
+            hard_constraints: {type: string}
+            acceptance_gates: {type: string}
+            critical_kernel_apis: {type: string}
+            reason: {type: string}
+
+      # ── GATE 0 BRANCH ──────────────────────────────────────────────────────
+      - id: gate0_branch
+        type: custom
+        position: {x: 930, y: 282}
+        data:
+          type: if-else
+          title: "Gate 0 Passed?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [gate0, passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-gate0
+
+      # ── PHASE 0 FAIL ───────────────────────────────────────────────────────
+      - id: gate0_fail
+        type: custom
+        position: {x: 930, y: 500}
+        data:
+          type: end
+          title: "Gate 0 FAILED — Abort"
+          outputs:
+            - variable: result
+              value_type: string
+              value_selector: [gate0, reason]
+
+      # ── PHASE 1–7 DELEGATION LLM ───────────────────────────────────────────
+      - id: phase1_7_orchestrator
+        type: custom
+        position: {x: 1230, y: 282}
+        data:
+          type: llm
+          title: "Phase 1–7 — Sequential Phase Orchestrator"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 8192
+          prompt_template:
+            - role: system
+              text: |
+                You are the master NIC porting orchestrator. Phase 0 has approved scope.
+                Now plan the execution summary for Phases 1–7.
+
+                CONTEXT:
+                  Driver: {{#start.driver_name#}}
+                  Goal: {{#start.goal#}}
+                  Baseline commit: {{#gate0.baseline_commit#}}
+                  Hard constraints: {{#gate0.hard_constraints#}}
+                  Acceptance gates: {{#gate0.acceptance_gates#}}
+                  Critical Linux APIs: {{#gate0.critical_kernel_apis#}}
+
+                Phases to plan:
+                  1. Dependency and API Mapping (CONCURRENT — api-mapper + kpi-auditor)
+                  2. OAL Seam Layer Design (SEQUENTIAL — seam-architect)
+                  3. TDD Harness Setup (SEQUENTIAL — tdd-writer)
+                  4. Incremental Porting (CONCURRENT — coder + native-validator + code-reviewer)
+                  5. Build/Test/Perf Gates (GROUPCHAT — performance-engineer + portability-validator + verification-executor)
+                  6. Merge and Upstream Sync (SEQUENTIAL — merge-strategist)
+                  7. Multi-OS Extension Validation (CONCURRENT — os-extension-validator + risk-auditor)
+
+                Produce a JSON object with:
+                  - "phase_plans": array of {phase_id, key, title, worker_roles, objective, tdd_tests_required, gate_criteria} for phases 1–7
+                  - "spawn_commands": array of ClawTeam spawn command templates
+                  - "risk_register": array of {severity, description, phase_id, mitigation}
+                  - "overall_tdd_strategy": string describing the full TDD approach
+                  - "estimated_slices": number of porting micro-slices
+              text: ""
+            - role: user
+              text: "Generate the full phase 1–7 execution plan now."
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── FINAL OUTPUT ───────────────────────────────────────────────────────
+      - id: end
+        type: custom
+        position: {x: 1530, y: 282}
+        data:
+          type: end
+          title: "Orchestration Plan Ready"
+          outputs:
+            - variable: execution_plan
+              value_type: string
+              value_selector: [phase1_7_orchestrator, text]
+            - variable: baseline_commit
+              value_type: string
+              value_selector: [gate0, baseline_commit]
+            - variable: gate0_score
+              value_type: number
+              value_selector: [gate0, score]
+
+    edges:
+      - id: e-start-phase0
+        source: start
+        target: phase0_llm
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-phase0-gate0
+        source: phase0_llm
+        target: gate0
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-gate0-branch
+        source: gate0
+        target: gate0_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-gate0-true
+        source: gate0_branch
+        target: phase1_7_orchestrator
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+
+      - id: e-gate0-false
+        source: gate0_branch
+        target: gate0_fail
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+
+      - id: e-phase17-end
+        source: phase1_7_orchestrator
+        target: end
+        sourceHandle: source
+        targetHandle: target
+        type: custom
