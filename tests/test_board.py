@@ -3,8 +3,10 @@ from __future__ import annotations
 import io
 from pathlib import Path
 
+import pytest
+
 from clawteam.board.collector import BoardCollector
-from clawteam.board.server import BoardHandler
+from clawteam.board.server import BoardHandler, _fetch_proxy_content, _normalize_proxy_target
 from clawteam.team.mailbox import MailboxManager
 from clawteam.team.manager import TeamManager
 
@@ -282,3 +284,56 @@ def test_serve_sse_uses_shared_team_snapshot_cache(monkeypatch):
     handler._serve_sse("demo")
 
     assert calls["count"] == 1
+
+
+def test_proxy_rejects_non_github_targets():
+    with pytest.raises(ValueError, match="GitHub-hosted"):
+        _normalize_proxy_target("https://example.com/secret")
+
+
+def test_proxy_rejects_localhost_targets():
+    with pytest.raises(ValueError, match="not allowed"):
+        _normalize_proxy_target("https://127.0.0.1/admin")
+
+
+def test_proxy_fetches_allowed_github_content(monkeypatch):
+    seen = {}
+
+    class FakeResponse:
+        def __init__(self, url: str, payload: bytes):
+            self._url = url
+            self._payload = payload
+
+        def geturl(self):
+            return self._url
+
+        def read(self):
+            return self._payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeOpener:
+        def open(self, req, timeout=10):
+            seen["url"] = req.full_url
+            return FakeResponse(req.full_url, b"ok")
+
+    monkeypatch.setattr("clawteam.board.server.urllib.request.build_opener", lambda *_: FakeOpener())
+
+    assert _fetch_proxy_content("https://raw.githubusercontent.com/org/repo/main/README.md") == b"ok"
+    assert seen["url"] == "https://raw.githubusercontent.com/org/repo/main/README.md"
+
+
+def test_board_ui_escapes_attacker_controlled_fields():
+    html = Path("clawteam/board/static/index.html").read_text(encoding="utf-8")
+
+    assert "escapeHtml(m.name)" in html
+    assert "escapeHtml(m.agentType || 'Agent')" in html
+    assert "escapeHtml(m.fromLabel || m.from || 'SYS')" in html
+    assert "escapeHtml(m.toLabel || m.to || 'ALL')" in html
+    assert "escapeHtml(t.owner || 'Unassigned')" in html
+    assert "t.blockedBy.map(v => escapeHtml(v)).join(', ')" in html
+    assert "option.textContent =" in html

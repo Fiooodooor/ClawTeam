@@ -6,6 +6,8 @@ import socket
 import time
 from pathlib import Path
 
+import pytest
+
 from clawteam.team.mailbox import MailboxManager
 from clawteam.team.manager import TeamManager
 from clawteam.team.models import MessageType, get_data_dir
@@ -89,6 +91,11 @@ class TestSendReceive:
         msgs = mb.receive("leader")
         assert msgs[0].type == MessageType.join_request
         assert msgs[0].proposed_name == "worker-1"
+
+    def test_send_rejects_path_traversal_recipient(self, team_name):
+        mb = _make_mailbox(team_name)
+        with pytest.raises(ValueError, match="Invalid recipient name"):
+            mb.send(from_agent="alice", to="../bob", content="nope")
 
 
 class TestPeek:

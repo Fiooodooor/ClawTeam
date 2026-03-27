@@ -15,6 +15,7 @@ else:
     LOCK_EX = fcntl.LOCK_EX
     LOCK_NB = fcntl.LOCK_NB
 
+from clawteam.paths import ensure_within_root, validate_identifier
 from clawteam.team.models import get_data_dir
 from clawteam.transport.base import Transport
 from clawteam.transport.claimed import ClaimedMessage
@@ -50,13 +51,23 @@ def _teams_root() -> Path:
 
 
 def _inbox_dir(team_name: str, agent_name: str) -> Path:
-    d = _teams_root() / team_name / "inboxes" / agent_name
+    d = ensure_within_root(
+        _teams_root(),
+        validate_identifier(team_name, "team name"),
+        "inboxes",
+        validate_identifier(agent_name, "inbox name"),
+    )
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def _dead_letter_dir(team_name: str, agent_name: str) -> Path:
-    d = _teams_root() / team_name / "dead_letters" / agent_name
+    d = ensure_within_root(
+        _teams_root(),
+        validate_identifier(team_name, "team name"),
+        "dead_letters",
+        validate_identifier(agent_name, "inbox name"),
+    )
     d.mkdir(parents=True, exist_ok=True)
     return d
 
