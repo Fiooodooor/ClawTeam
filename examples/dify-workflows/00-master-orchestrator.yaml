@@ -9,7 +9,8 @@ app:
   description: >
     Top-level orchestrator that stages all 8 NIC porting phases sequentially,
     evaluating gate scores between phases and branching on failure. Each phase
-    is delegated to a sub-workflow via HTTP-request calls with JSON handoff.
+    is planned with explicit worker dependencies, checker roles, and replan
+    policy so downstream sub-workflows can follow the same best-known methods.
   use_icon_as_answer_icon: false
 dependencies: []
 workflow:
@@ -212,6 +213,13 @@ workflow:
                 You are the master NIC porting orchestrator. Phase 0 has approved scope.
                 Now plan the execution summary for Phases 1–7.
 
+                WORK METHOD:
+                1. Decompose the mission into phase-local objectives and gate criteria.
+                2. Identify maker roles, checker roles, and explicit worker dependencies.
+                3. Define the TDD artifact for each phase before implementation work.
+                4. Define replan triggers for any gate failure or critical risk.
+                5. Return only valid JSON, optimized for downstream workflow handoff.
+
                 CONTEXT:
                   Driver: {{#start.driver_name#}}
                   Goal: {{#start.goal#}}
@@ -230,9 +238,12 @@ workflow:
                   7. Multi-OS Extension Validation (CONCURRENT — os-extension-validator + risk-auditor)
 
                 Produce a JSON object with:
-                  - "phase_plans": array of {phase_id, key, title, worker_roles, objective, tdd_tests_required, gate_criteria} for phases 1–7
+                  - "phase_plans": array of {phase_id, key, title, worker_roles, checker_roles, depends_on, objective, tdd_tests_required, gate_criteria, replan_policy} for phases 1–7
+                  - "phase_dependency_dag": array of {phase_id, depends_on}
                   - "spawn_commands": array of ClawTeam spawn command templates
+                  - "handoff_plan": array of {from_role, to_role, trigger, payload_fields}
                   - "risk_register": array of {severity, description, phase_id, mitigation}
+                  - "gate_thresholds": object with native_score, portability_score, test_pass_rate, critical_risks
                   - "overall_tdd_strategy": string describing the full TDD approach
                   - "estimated_slices": number of porting micro-slices
               text: ""

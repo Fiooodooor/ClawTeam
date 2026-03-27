@@ -240,6 +240,8 @@ workflow:
                 You are the verification-executor in the GroupChat gate.
                 Simulate running the full verification suite: build, unit test, perf bench, ABI check.
                 Use ALL prior agent outputs to assess real pass/fail.
+                Work in order: verify buildability, verify test integrity, verify perf claims,
+                verify ABI safety, then emit only structured JSON.
                 Return execution verdicts with per-step results.
             - role: user
               text: |
@@ -273,13 +275,59 @@ workflow:
           vision:
             enabled: false
 
+      # ── INTEGRATION-TESTER ────────────────────────────────────────────────
+      - id: integration_tester
+        type: custom
+        position: {x: 1130, y: 650}
+        data:
+          type: llm
+          title: "integration-tester — End-to-End Smoke Validation"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 5000
+          prompt_template:
+            - role: system
+              text: |
+                You are the integration-tester. Build an end-to-end smoke verdict across
+                the ported driver path using prior gate evidence.
+                Check TX, RX, interrupts, offloads, and control-plane visibility.
+                Return only valid JSON.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Ported code summary: {{#start.ported_code_summary#}}
+                Performance report: {{#performance_engineer.text#}}
+                Portability report: {{#portability_validator.text#}}
+                Verification report: {{#verification_executor.text#}}
+
+                Return:
+                {
+                  "integration_passed": true,
+                  "coverage_pct": 0.0,
+                  "subsystems_covered": ["tx", "rx", "interrupts", "offloads"],
+                  "smoke_suite": [
+                    {"test_id": "I001", "subsystem": "tx", "passed": true, "detail": ""}
+                  ],
+                  "integration_failures": []
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
       # ── TDD GROUPCHAT GATE (CODE) ──────────────────────────────────────────
       - id: tdd_groupchat_gate
         type: custom
         position: {x: 1130, y: 340}
         data:
           type: code
-          title: "TDD GroupChat Gate — Consensus Across 3 Agents"
+          title: "TDD GroupChat Gate — Consensus Across 4 Checks"
           code_language: python3
           code: |
             import json
@@ -288,7 +336,7 @@ workflow:
             GATE_PORTABILITY_THRESHOLD = 95.0
             MAX_DEBATE_ROUNDS = 5
 
-            def main(perf_json: str, portability_json: str, verification_json: str, spec_json: str) -> dict:
+            def main(perf_json: str, portability_json: str, verification_json: str, integration_json: str, spec_json: str) -> dict:
                 results = []
                 passed = 0
                 failed = 0
@@ -312,9 +360,14 @@ workflow:
                     verification = json.loads(verification_json)
                 except Exception as e:
                     return _fail(f"verification JSON: {e}")
+                try:
+                  integration = json.loads(integration_json)
+                except Exception as e:
+                  return _fail(f"integration JSON: {e}")
 
                 native_score = float(perf.get("native_score", 0))
                 portability_score = float(portability.get("portability_score", 0))
+                integration_passed = integration.get("integration_passed") is True
 
                 # T01: Native score >= 98
                 check("T01-native-score-gte98", native_score >= GATE_NATIVE_THRESHOLD,
@@ -357,6 +410,20 @@ workflow:
                 check("T10-no-core-rewrites",
                       portability.get("core_rewrites_found") is False)
 
+                    # T11: Integration smoke validation passed
+                    check("T11-integration-passed", integration_passed,
+                      integration.get("integration_failures", []))
+
+                    # T12: Integration coverage >= 90
+                    integration_coverage = float(integration.get("coverage_pct", 0))
+                    check("T12-integration-coverage-gte90", integration_coverage >= 90.0,
+                      f"coverage={integration_coverage}")
+
+                    # T13: Smoke suite is non-empty
+                    smoke_suite = integration.get("smoke_suite") or []
+                    check("T13-smoke-suite-exists", len(smoke_suite) > 0,
+                      f"count={len(smoke_suite)}")
+
                 total = passed + failed
                 gate_score = round((passed / total) * 100, 1) if total else 0.0
                 fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
@@ -373,6 +440,8 @@ workflow:
                     "consensus_reached": failed == 0,
                     "blocking_issues": json.dumps(verification.get("blocking_issues") or []),
                     "critical_issues": json.dumps(portability.get("critical_issues") or []),
+                    "integration_passed": integration_passed,
+                    "replan_recommended": failed != 0 or native_score < GATE_NATIVE_THRESHOLD or portability_score < GATE_PORTABILITY_THRESHOLD or not integration_passed,
                 }
 
             def _fail(reason):
@@ -381,7 +450,8 @@ workflow:
                     "gate_score": 0.0, "native_score": 0.0, "portability_score": 0.0,
                     "test_results": json.dumps([{"test_id": "parse", "status": "FAIL", "detail": reason}]),
                     "fail_summary": reason, "consensus_reached": False,
-                    "blocking_issues": "[]", "critical_issues": "[]"
+                    "blocking_issues": "[]", "critical_issues": "[]",
+                    "integration_passed": False, "replan_recommended": True
                 }
           variables:
             - variable: perf_json
@@ -390,6 +460,8 @@ workflow:
               value_selector: [portability_validator, text]
             - variable: verification_json
               value_selector: [verification_executor, text]
+            - variable: integration_json
+              value_selector: [integration_tester, text]
             - variable: spec_json
               value_selector: [tdd_gate_spec, text]
           outputs:
@@ -404,6 +476,8 @@ workflow:
             consensus_reached: {type: boolean}
             blocking_issues: {type: string}
             critical_issues: {type: string}
+            integration_passed: {type: boolean}
+            replan_recommended: {type: boolean}
 
       # ── BRANCH ─────────────────────────────────────────────────────────────
       - id: gate_branch
@@ -441,6 +515,9 @@ workflow:
             - variable: test_results
               value_type: string
               value_selector: [tdd_groupchat_gate, test_results]
+            - variable: integration_passed
+              value_type: boolean
+              value_selector: [tdd_groupchat_gate, integration_passed]
 
       # ── REMEDIATION ────────────────────────────────────────────────────────
       - id: remediation_llm
@@ -475,6 +552,7 @@ workflow:
                 Performance report: {{#performance_engineer.text#}}
                 Portability report: {{#portability_validator.text#}}
                 Verification report: {{#verification_executor.text#}}
+                Integration report: {{#integration_tester.text#}}
           context:
             enabled: false
             variable_selector: []
@@ -501,6 +579,9 @@ workflow:
             - variable: portability_score
               value_type: number
               value_selector: [tdd_groupchat_gate, portability_score]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_groupchat_gate, replan_recommended]
 
     edges:
       - id: e-start-spec
@@ -531,6 +612,34 @@ workflow:
         targetHandle: target
         type: custom
 
+      - id: e-spec-integration
+        source: tdd_gate_spec
+        target: integration_tester
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-perf-integration
+        source: performance_engineer
+        target: integration_tester
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-portability-integration
+        source: portability_validator
+        target: integration_tester
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-verification-integration
+        source: verification_executor
+        target: integration_tester
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
       - id: e-perf-gate
         source: performance_engineer
         target: tdd_groupchat_gate
@@ -547,6 +656,13 @@ workflow:
 
       - id: e-verification-gate
         source: verification_executor
+        target: tdd_groupchat_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-integration-gate
+        source: integration_tester
         target: tdd_groupchat_gate
         sourceHandle: source
         targetHandle: target

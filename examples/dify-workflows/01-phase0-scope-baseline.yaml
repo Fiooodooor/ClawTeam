@@ -190,6 +190,7 @@ workflow:
                         "critical_kernel_apis": "[]",
                         "subsystems": "[]",
                         "risk_items": "[]",
+                      "updated_risk_register": "[]",
                         "tdd_strategy": "",
                         "fail_summary": f"JSON parse error: {e}"
                     }
@@ -239,6 +240,19 @@ workflow:
                 total = passed_count + failed_count
                 gate_score = round((passed_count / total) * 100, 1) if total > 0 else 0.0
                 all_passed = failed_count == 0
+                initial_risk_register = []
+                for index, item in enumerate(data.get("risk_items") or [], start=1):
+                  initial_risk_register.append({
+                    "risk_id": f"RISK-{index:03d}",
+                    "phase_raised": "phase-0",
+                    "category": "portability",
+                    "description": item.get("description", "unspecified phase-0 risk"),
+                    "severity": item.get("severity", "medium"),
+                    "status": "open",
+                    "mitigation_action": item.get("mitigation", "review required"),
+                    "mitigation_phase": "phase-0",
+                    "residual_risk": "unknown"
+                  })
 
                 failed = [r for r in results if r["status"] == "FAIL"]
                 fail_summary = "; ".join(r["test_id"] for r in failed) if failed else ""
@@ -255,6 +269,7 @@ workflow:
                     "critical_kernel_apis": json.dumps(data.get("critical_kernel_apis", [])),
                     "subsystems": json.dumps(data.get("subsystems", [])),
                     "risk_items": json.dumps(data.get("risk_items", [])),
+                    "updated_risk_register": json.dumps(initial_risk_register),
                     "tdd_strategy": str(data.get("tdd_strategy", "")),
                     "fail_summary": fail_summary
                 }
@@ -275,6 +290,7 @@ workflow:
             critical_kernel_apis: {type: string}
             subsystems: {type: string}
             risk_items: {type: string}
+            updated_risk_register: {type: string}
             tdd_strategy: {type: string}
             fail_summary: {type: string}
 
@@ -393,6 +409,9 @@ workflow:
             - variable: risk_items
               value_type: string
               value_selector: [tdd_gate, risk_items]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_gate, updated_risk_register]
             - variable: tdd_strategy
               value_type: string
               value_selector: [tdd_gate, tdd_strategy]
@@ -414,6 +433,9 @@ workflow:
             - variable: original_test_results
               value_type: string
               value_selector: [tdd_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_gate, updated_risk_register]
 
     edges:
       - id: e-start-tdd

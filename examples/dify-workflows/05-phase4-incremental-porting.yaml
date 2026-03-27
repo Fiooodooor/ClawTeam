@@ -77,6 +77,10 @@ workflow:
               type: text-input
               required: true
               default: "memory-allocation"
+            - variable: risk_register
+              label: "Risk Register JSON (shared across phases)"
+              type: paragraph
+              required: false
 
       # ── SLICE PLANNER ──────────────────────────────────────────────────────
       - id: slice_planner
@@ -97,6 +101,11 @@ workflow:
               text: |
                 Decompose the given micro-slice into ordered implementation tasks.
                 Each task must have a specific failing TDD test that will be made to pass.
+                Work step by step:
+                1. Identify the exact failing test and target seam.
+                2. Isolate the smallest native implementation slice.
+                3. Bind each task to one native API and one expected green test.
+                4. Prefer reversible, low-diff changes.
                 Output JSON. Be specific about what code to write.
             - role: user
               text: |
@@ -153,6 +162,8 @@ workflow:
                 3. Follow exact seam header signatures
                 4. Minimal touch — change only what the seam requires
                 5. Each implementation makes EXACTLY ONE failing test pass (micro-slice)
+                 6. Think in this order: classify task, select native primitive, sketch seam wrapper,
+                   prove zero-overhead path, emit final code fragment.
                 Return JSON with implementation details.
             - role: user
               text: |
@@ -301,10 +312,16 @@ workflow:
           code: |
             import json
 
-            def main(coder_json: str, validator_json: str, reviewer_json: str) -> dict:
+            def main(coder_json: str, validator_json: str, reviewer_json: str, risk_register_json: str = "[]") -> dict:
                 results = []
                 passed = 0
                 failed = 0
+              try:
+                risk_register = json.loads(risk_register_json) if risk_register_json else []
+                if not isinstance(risk_register, list):
+                  risk_register = []
+              except Exception:
+                risk_register = []
 
                 def check(tid, ok, detail=""):
                     nonlocal passed, failed
@@ -370,6 +387,19 @@ workflow:
                 gate_score = round((passed / total) * 100, 1) if total else 0.0
                 fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
                 tests_made_pass = [i.get("makes_test_pass", "") for i in impls]
+                updated_risk_register = list(risk_register)
+                if failed != 0 or len(crits) > 0:
+                  updated_risk_register.append({
+                    "risk_id": f"RISK-{len(updated_risk_register) + 1:03d}",
+                    "phase_raised": "phase-4",
+                    "category": "performance",
+                    "description": f"Phase 4 micro-slice issues: {'; '.join(fail_ids) or 'critical violations detected'}",
+                    "severity": "high" if len(crits) > 0 else "medium",
+                    "status": "open",
+                    "mitigation_action": "Resolve checker violations and restore zero-overhead native implementation",
+                    "mitigation_phase": "phase-4",
+                    "residual_risk": "medium"
+                  })
 
                 return {
                     "all_passed": failed == 0,
@@ -383,6 +413,8 @@ workflow:
                     "overall_quality": quality,
                     "tests_made_pass": json.dumps(tests_made_pass),
                     "critical_violations": json.dumps(crits),
+                    "updated_risk_register": json.dumps(updated_risk_register),
+                    "replan_recommended": failed != 0 or len(crits) > 0 or quality < 75.0,
                 }
 
             def _fail(reason):
@@ -390,7 +422,9 @@ workflow:
                     "all_passed": False, "passed_count": 0, "failed_count": 1,
                     "gate_score": 0.0, "test_results": json.dumps([{"test_id": "parse", "status": "FAIL", "detail": reason}]),
                     "fail_summary": reason, "implementations_count": 0, "total_diff_lines": 0,
-                    "overall_quality": 0.0, "tests_made_pass": "[]", "critical_violations": "[]"
+                    "overall_quality": 0.0, "tests_made_pass": "[]", "critical_violations": "[]",
+                    "updated_risk_register": risk_register_json if risk_register_json else "[]",
+                    "replan_recommended": True
                 }
           variables:
             - variable: coder_json
@@ -399,6 +433,8 @@ workflow:
               value_selector: [native_validator, text]
             - variable: reviewer_json
               value_selector: [code_reviewer, text]
+            - variable: risk_register_json
+              value_selector: [start, risk_register]
           outputs:
             all_passed: {type: boolean}
             passed_count: {type: number}
@@ -411,6 +447,8 @@ workflow:
             overall_quality: {type: number}
             tests_made_pass: {type: string}
             critical_violations: {type: string}
+            updated_risk_register: {type: string}
+            replan_recommended: {type: boolean}
 
       # ── BRANCH ─────────────────────────────────────────────────────────────
       - id: gate_branch
@@ -454,6 +492,15 @@ workflow:
             - variable: test_results
               value_type: string
               value_selector: [tdd_slice_gate, test_results]
+            - variable: ported_code_summary
+              value_type: string
+              value_selector: [coder, text]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_slice_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_slice_gate, replan_recommended]
 
       # ── DEBATE / REMEDIATION (GroupChat fail) ──────────────────────────────
       - id: debate_remediation
@@ -510,6 +557,12 @@ workflow:
             - variable: test_results
               value_type: string
               value_selector: [tdd_slice_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_slice_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_slice_gate, replan_recommended]
 
     edges:
       - id: e-start-planner

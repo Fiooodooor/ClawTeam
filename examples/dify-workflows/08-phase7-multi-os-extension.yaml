@@ -81,6 +81,10 @@ workflow:
               label: "Phase 6 Merge Results JSON"
               type: paragraph
               required: true
+            - variable: risk_register
+              label: "Risk Register JSON (shared across phases)"
+              type: paragraph
+              required: false
 
       # ── TDD EXTENSION SPEC ─────────────────────────────────────────────────
       - id: tdd_extension_spec
@@ -145,6 +149,11 @@ workflow:
                 You are the os-extension-validator agent. Prove that the OAL seam layer
                 designed for the primary OS can be extended to >= 2 additional OS targets
                 WITHOUT any core driver rewrites.
+                Work in this order:
+                1. Enumerate extension targets.
+                2. For each target, map seam reuse vs new wrapper requirements.
+                3. Verify buildability, TDD viability, and overhead delta.
+                4. Reject any plan that touches nic_core/*.c.
                 For each extension OS: simulate compilation, TDD test coverage, API mapping.
                 REJECT if any extension requires touching nic_core/*.c (only nic_oal/*.h allowed).
                 Return JSON validation report.
@@ -209,6 +218,11 @@ workflow:
                 For each risk: assign ID, category, severity (critical/high/medium/low),
                 current status (open/mitigated/accepted), mitigation action, and phase when raised.
                 Always classify: portability risks, performance risks, maintenance risks, security risks.
+                Update the register deterministically:
+                1. Carry forward prior open risks.
+                2. Add new Phase 7 risks.
+                3. Mark mitigated risks with explicit residual risk.
+                4. Recommend the next replan focus if shipping is unsafe.
                 Return complete updated risk register JSON.
             - role: user
               text: |
@@ -216,6 +230,7 @@ workflow:
                 Primary OS: {{#start.primary_target_os#}}
                 Extension targets: {{#start.extension_targets#}}
                 Extension TDD spec: {{#tdd_extension_spec.text#}}
+                Current shared risk register: {{#start.risk_register#}}
                 Phase 5 gate results: {{#start.phase5_gate_results#}}
                 Phase 6 merge results: {{#start.phase6_merge_results#}}
                 OS extension validator results: {{#os_extension_validator.text#}}
@@ -240,7 +255,8 @@ workflow:
                   "mitigated_risks": 0,
                   "risk_register_valid": true,
                   "overall_risk_level": "critical|high|medium|low|negligible",
-                  "project_safe_to_ship": false
+                  "project_safe_to_ship": false,
+                  "next_replan_focus": "string"
                 }
           context:
             enabled: false
@@ -350,6 +366,8 @@ workflow:
                     "critical_open": critical_open,
                     "overall_risk_level": risk.get("overall_risk_level", "unknown"),
                     "project_safe_to_ship": project_safe,
+                    "updated_risk_register": json.dumps(register),
+                    "replan_recommended": failed != 0 or critical_open > 0 or not project_safe,
                 }
 
             def _fail(reason):
@@ -360,7 +378,9 @@ workflow:
                     "fail_summary": reason, "extension_targets_validated": 0,
                     "core_rewrite_count": -1, "seam_reuse_pct": 0.0,
                     "risk_register_entries": 0, "open_risks": -1, "critical_open": -1,
-                    "overall_risk_level": "unknown", "project_safe_to_ship": False
+                  "overall_risk_level": "unknown", "project_safe_to_ship": False,
+                    "updated_risk_register": risk_json if risk_json else "[]",
+                  "replan_recommended": True
                 }
           variables:
             - variable: extension_json
@@ -384,6 +404,8 @@ workflow:
             critical_open: {type: number}
             overall_risk_level: {type: string}
             project_safe_to_ship: {type: boolean}
+            updated_risk_register: {type: string}
+            replan_recommended: {type: boolean}
 
       # ── BRANCH ─────────────────────────────────────────────────────────────
       - id: gate_branch
@@ -430,6 +452,12 @@ workflow:
             - variable: test_results
               value_type: string
               value_selector: [tdd_multios_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_multios_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_multios_gate, replan_recommended]
 
       # ── REMEDIATION ────────────────────────────────────────────────────────
       - id: remediation_llm
@@ -493,6 +521,12 @@ workflow:
             - variable: overall_risk_level
               value_type: string
               value_selector: [tdd_multios_gate, overall_risk_level]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_multios_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_multios_gate, replan_recommended]
 
     edges:
       - id: e-start-spec

@@ -72,6 +72,10 @@ workflow:
                 - value: DPDK
                   label: "DPDK"
               default: FreeBSD
+            - variable: risk_register
+              label: "Risk Register JSON (shared across phases)"
+              type: paragraph
+              required: false
 
       # ── TDD WRITER ─────────────────────────────────────────────────────────
       - id: tdd_writer
@@ -160,10 +164,16 @@ workflow:
           code: |
             import json
 
-            def main(harness_json: str) -> dict:
+            def main(harness_json: str, risk_register_json: str = "[]") -> dict:
                 results = []
                 passed = 0
                 failed = 0
+              try:
+                risk_register = json.loads(risk_register_json) if risk_register_json else []
+                if not isinstance(risk_register, list):
+                  risk_register = []
+              except Exception:
+                risk_register = []
 
                 def check(tid, ok, detail=""):
                     nonlocal passed, failed
@@ -224,6 +234,19 @@ workflow:
                 total = passed + failed
                 gate_score = round((passed / total) * 100, 1) if total else 0.0
                 fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
+                updated_risk_register = list(risk_register)
+                if failed != 0:
+                  updated_risk_register.append({
+                    "risk_id": f"RISK-{len(updated_risk_register) + 1:03d}",
+                    "phase_raised": "phase-3",
+                    "category": "maintenance",
+                    "description": f"Phase 3 TDD harness issues: {'; '.join(fail_ids)}",
+                    "severity": "medium",
+                    "status": "open",
+                    "mitigation_action": "Complete harness scaffolding and enforce red/green expectations",
+                    "mitigation_phase": "phase-3",
+                    "residual_risk": "medium"
+                  })
 
                 return {
                     "all_passed": failed == 0,
@@ -240,6 +263,7 @@ workflow:
                     "stub_tests_json": json.dumps(stub_tests),
                     "porting_tests_json": json.dumps(porting_tests),
                     "coverage_by_subsystem": json.dumps(cov),
+                    "updated_risk_register": json.dumps(updated_risk_register),
                 }
 
             def _fail(reason):
@@ -248,11 +272,14 @@ workflow:
                     "gate_score": 0.0, "test_results": json.dumps([{"test_id": "parse", "status": "FAIL", "detail": reason}]),
                     "fail_summary": reason, "total_stub_tests": 0, "total_porting_tests": 0,
                     "build_command": "", "ci_script": "", "gate_script": "",
-                    "stub_tests_json": "[]", "porting_tests_json": "[]", "coverage_by_subsystem": "{}"
+                    "stub_tests_json": "[]", "porting_tests_json": "[]", "coverage_by_subsystem": "{}",
+                    "updated_risk_register": risk_register_json if risk_register_json else "[]"
                 }
           variables:
             - variable: harness_json
               value_selector: [tdd_writer, text]
+            - variable: risk_register_json
+              value_selector: [start, risk_register]
           outputs:
             all_passed: {type: boolean}
             passed_count: {type: number}
@@ -268,6 +295,7 @@ workflow:
             stub_tests_json: {type: string}
             porting_tests_json: {type: string}
             coverage_by_subsystem: {type: string}
+            updated_risk_register: {type: string}
 
       # ── BRANCH ─────────────────────────────────────────────────────────────
       - id: gate_branch
@@ -314,6 +342,9 @@ workflow:
             - variable: test_results
               value_type: string
               value_selector: [tdd_harness_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_harness_gate, updated_risk_register]
 
       # ── REMEDIATION ────────────────────────────────────────────────────────
       - id: remediation_llm
@@ -365,6 +396,9 @@ workflow:
             - variable: test_results
               value_type: string
               value_selector: [tdd_harness_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_harness_gate, updated_risk_register]
 
     edges:
       - id: e-start-writer
