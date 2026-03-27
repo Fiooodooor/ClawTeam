@@ -1,0 +1,19 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+clawteam = {file = ".", editable = true}
+langchain = ">=0.3.0"
+langgraph = ">=0.3.0"
+langchain-openai = ">=0.3.0"
+pydantic = ">=2.7.0"
+langchain-core = "*"
+langchain-xai = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.12"
+python_full_version = "3.12.3"

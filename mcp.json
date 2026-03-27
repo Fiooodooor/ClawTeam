@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "clawteam": {
+      "command": "pipenv",
+      "args": ["run", "clawteam-mcp"],
+      "cwd": "/root/claw-team",
+      "env": {
+        "CLAWTEAM_DATA_DIR": "/root/.clawteam",
+        "CLAWTEAM_DEFAULT_BACKEND": "tmux"
+      }
+    }
+  }
+}
