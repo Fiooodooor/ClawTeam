@@ -36,7 +36,7 @@ class NativeCliAdapter:
 
         if skip_permissions:
             if is_claude_command(normalized_command):
-                final_command.extend(["--permission-mode", "dontAsk"])
+                final_command.append("--dangerously-skip-permissions")
             elif is_codex_command(normalized_command):
                 final_command.append("--dangerously-bypass-approvals-and-sandbox")
             elif (

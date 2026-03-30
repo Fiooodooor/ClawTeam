@@ -7,7 +7,6 @@ import json
 import socket
 from pathlib import Path
 
-
 MAX_RESPONSE_SIZE = 10 * 1024 * 1024
 
 

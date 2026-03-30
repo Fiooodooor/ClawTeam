@@ -16,10 +16,6 @@ from clawteam.spawn.adapters import (
     is_claude_command,
     is_codex_command,
     is_gemini_command,
-    is_kimi_command,
-    is_nanobot_command,
-    is_opencode_command,
-    is_qwen_command,
 )
 from clawteam.spawn.base import SpawnBackend
 from clawteam.spawn.cli_env import build_spawn_path, resolve_clawteam_executable
@@ -267,7 +263,6 @@ class WshBackend(SpawnBackend):
         normalized_command = prepared.normalized_command
         validation_command = normalized_command
         final_command = list(prepared.final_command)
-        post_launch_prompt = None
 
         if prompt and is_claude_command(normalized_command):
             final_command.append(prompt)
@@ -292,8 +287,8 @@ class WshBackend(SpawnBackend):
             f"--agent {shlex.quote(agent_name)}"
         )
 
-        _SHELL_ENV_KEY_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
-        export_vars = {k: v for k, v in env_vars.items() if _SHELL_ENV_KEY_RE.fullmatch(k)}
+        shell_env_key_re = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+        export_vars = {k: v for k, v in env_vars.items() if shell_env_key_re.fullmatch(k)}
         export_prefix = " ".join(f"export {k}={shlex.quote(v)}" for k, v in export_vars.items())
 
         if cwd:
