@@ -253,7 +253,8 @@ class CostStore:
         tmp.write_text(
             event.model_dump_json(indent=2, by_alias=True), encoding="utf-8"
         )
-        tmp.replace(path)
+        import os
+        os.replace(str(tmp), str(path))
         try:
             _record_event_in_summary_cache(self.team_name, path, event)
         except Exception:

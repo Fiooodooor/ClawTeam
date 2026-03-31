@@ -43,7 +43,8 @@ def _save_config(config: TeamConfig) -> None:
     tmp.write_text(
         config.model_dump_json(indent=2, by_alias=True), encoding="utf-8"
     )
-    tmp.replace(path)
+    import os
+    os.replace(str(tmp), str(path))
 
 
 class TeamManager:

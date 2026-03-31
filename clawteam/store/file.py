@@ -299,7 +299,7 @@ class FileTaskStore(BaseTaskStore):
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
                 tmp_file.write(task.model_dump_json(indent=2, by_alias=True))
-            Path(tmp_name).replace(path)
+            os.replace(tmp_name, str(path))
         except BaseException:
             Path(tmp_name).unlink(missing_ok=True)
             raise

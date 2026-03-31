@@ -55,7 +55,8 @@ class MailboxManager:
             msg.model_dump_json(indent=2, by_alias=True, exclude_none=True),
             encoding="utf-8",
         )
-        tmp.replace(path)
+        import os
+        os.replace(str(tmp), str(path))
 
     def get_event_log(self, limit: int = 100) -> list[TeamMessage]:
         """Read event log (newest first). Non-destructive."""

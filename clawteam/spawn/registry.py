@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import signal
 import subprocess
 import time
@@ -27,6 +28,7 @@ def register_agent(
     agent_name: str,
     backend: str,
     tmux_target: str = "",
+    block_id: str = "",
     pid: int = 0,
     command: list[str] | None = None,
 ) -> None:
@@ -37,6 +39,7 @@ def register_agent(
         registry[agent_name] = {
             "backend": backend,
             "tmux_target": tmux_target,
+            "block_id": block_id,
             "pid": pid,
             "command": command or [],
             "spawned_at": time.time(),
@@ -71,6 +74,8 @@ def is_agent_alive(team_name: str, agent_name: str) -> bool | None:
         return alive
     elif backend == "subprocess":
         return _pid_alive(info.get("pid", 0))
+    elif backend == "wsh":
+        return _wsh_block_alive(info.get("block_id", ""))
     return None
 
 
@@ -144,6 +149,14 @@ def stop_agent(team_name: str, agent_name: str, timeout_seconds: float = 3.0) ->
                 pass
             except PermissionError:
                 return False
+    elif backend == "wsh":
+        block_id = info.get("block_id", "")
+        if block_id:
+            subprocess.run(
+                ["wsh", "deleteblock", "-b", block_id],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
 
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
@@ -183,6 +196,18 @@ def _pid_alive(pid: int) -> bool:
     """Check if a process with the given PID is still running."""
     if pid <= 0:
         return False
+    import sys
+    if sys.platform == "win32":
+        import ctypes
+        # PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        # STILL_ACTIVE = 259
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return False
+        exit_code = ctypes.c_ulong()
+        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return exit_code.value == 259
     try:
         os.kill(pid, 0)
         return True
@@ -191,6 +216,43 @@ def _pid_alive(pid: int) -> bool:
     except PermissionError:
         # Process exists but we can't signal it
         return True
+
+
+def _wsh_block_alive(block_id: str) -> bool:
+    """Check if a wsh block is still alive."""
+    if not block_id:
+        return False
+
+    wsh_bin = shutil.which("wsh")
+    if not wsh_bin:
+        for p in [
+            Path.home() / ".local/share/tideterm/bin/wsh",
+            Path.home() / ".local/state/waveterm/bin/wsh",
+        ]:
+            if p.is_file() and os.access(p, os.X_OK):
+                wsh_bin = str(p)
+                break
+    if not wsh_bin:
+        return False
+
+    result = subprocess.run(
+        [wsh_bin, "blocks", "list", "--json"],
+        capture_output=True,
+        text=True,
+        timeout=5.0,
+    )
+    if result.returncode != 0:
+        return False
+
+    try:
+        blocks = json.loads(result.stdout)
+        for block in blocks:
+            if block.get("blockid") == block_id:
+                return True
+    except json.JSONDecodeError:
+        pass
+
+    return False
 
 
 def _load(path: Path) -> dict:
