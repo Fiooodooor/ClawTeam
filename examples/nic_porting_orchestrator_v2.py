@@ -45,10 +45,10 @@ from langgraph.graph import END, StateGraph
 
 from clawteam.team.manager import TeamManager
 from clawteam.team.mailbox import MailboxManager
-from clawteam.team.models import MessageType, TaskPriority, TaskStatus
+from clawteam.team.models import MessageType, TaskPriority, TaskStatus, get_data_dir
 from clawteam.team.tasks import TaskStore
 from clawteam.workspace.manager import WorkspaceManager
-from clawteam.spawn.registry import is_agent_alive
+from clawteam.spawn.registry import get_registry, is_agent_alive
 
 # ---------------------------------------------------------------------------
 # Enums & Constants
@@ -435,12 +435,27 @@ def record_handoff(state: OrchestratorState, from_role: str, to_role: str,
 # ---------------------------------------------------------------------------
 
 def compute_gate_scores(state: OrchestratorState, phase_key: str) -> dict[str, float]:
-    """Compute gate scores from verification results and risk register."""
+    """Compute gate scores from real task state and optional task metadata."""
+    phase_tasks = _phase_task_payloads(state, phase_key)
+    completion_ratio = _completed_ratio(phase_tasks)
+    native_score = _average_metadata_score(
+        phase_tasks, "native_score", "native_pass_rate", "native_compat_score"
+    )
+    portability_score = _average_metadata_score(
+        phase_tasks, "portability_score", "portability_pass_rate", "freebsd_score"
+    )
+    test_pass_rate = _average_metadata_score(
+        phase_tasks, "test_pass_rate", "tests_pass_rate", "verification_pass_rate"
+    )
+    build_status = _average_metadata_score(
+        phase_tasks, "build_status", "build_ok", "build_passed"
+    )
+
     scores = {
-        "native_score": 0.0,
-        "portability_score": 0.0,
-        "test_pass_rate": 0.0,
-        "build_status": 0.0,
+        "native_score": native_score if native_score is not None else completion_ratio * 100.0,
+        "portability_score": portability_score if portability_score is not None else completion_ratio * 100.0,
+        "test_pass_rate": test_pass_rate if test_pass_rate is not None else completion_ratio * 100.0,
+        "build_status": build_status if build_status is not None else (1.0 if phase_tasks and completion_ratio == 1.0 else 0.0),
         "critical_risks": float(count_critical_risks(state)),
     }
     state["gate_scores"][phase_key] = scores
@@ -584,6 +599,115 @@ def _task_status_map(team_name: str) -> dict[str, dict[str, Any]]:
     return result
 
 
+def _task_status_value(task_payload: dict[str, Any]) -> str:
+    """Normalize task status values from model payloads."""
+    status = task_payload.get("status", "pending")
+    return status.value if hasattr(status, "value") else str(status)
+
+
+def _phase_task_payloads(state: OrchestratorState, phase_key: str) -> list[dict[str, Any]]:
+    """Return persisted task payloads associated with a phase."""
+    tasks = _task_status_map(state["team_name"])
+    role_names = {role.name for role in _roles_for_phase(phase_key)}
+    task_ids = {
+        task_id
+        for role_name, task_id in state["role_to_task_id"].items()
+        if role_name in role_names and task_id
+    }
+    phase_tasks: list[dict[str, Any]] = []
+    for task_id, payload in tasks.items():
+        metadata = payload.get("metadata") or {}
+        if task_id in task_ids or str(metadata.get("phase_key", "")) == phase_key:
+            phase_tasks.append(payload)
+    return phase_tasks
+
+
+def _completed_ratio(task_payloads: list[dict[str, Any]]) -> float:
+    """Return completion ratio for the provided tasks."""
+    if not task_payloads:
+        return 0.0
+    completed = sum(1 for payload in task_payloads if _task_status_value(payload) == "completed")
+    return completed / len(task_payloads)
+
+
+def _coerce_metric_value(value: Any) -> float | None:
+    """Convert task metadata values into numeric metrics."""
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"pass", "passed", "ok", "success", "true"}:
+            return 1.0
+        if normalized in {"fail", "failed", "error", "false"}:
+            return 0.0
+        try:
+            return float(normalized)
+        except ValueError:
+            return None
+    return None
+
+
+def _average_metadata_score(task_payloads: list[dict[str, Any]], *keys: str) -> float | None:
+    """Average matching metadata values across tasks, if present."""
+    values: list[float] = []
+    for payload in task_payloads:
+        metadata = payload.get("metadata") or {}
+        for key in keys:
+            value = _coerce_metric_value(metadata.get(key))
+            if value is not None:
+                values.append(value)
+                break
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _sync_ledger_with_task_store(state: OrchestratorState) -> None:
+    """Update ledger entries from real task status instead of synthetic completion."""
+    tasks = _task_status_map(state["team_name"])
+    for entry in state["task_ledger"]:
+        role_name = entry.get("assigned_to") or entry.get("role", "")
+        task_id = state["role_to_task_id"].get(role_name)
+        if not task_id:
+            continue
+        payload = tasks.get(task_id)
+        if not payload:
+            continue
+        task_status = _task_status_value(payload)
+        if task_status == "completed":
+            entry["status"] = "completed"
+            entry.setdefault("completed_at", _utc_now())
+        elif task_status in {"pending", "in_progress", "blocked"}:
+            entry["status"] = task_status
+            entry.pop("completed_at", None)
+
+
+def _phase_dead_agent_reasons(state: OrchestratorState, dead_agents: list[str]) -> list[str]:
+    """Summarize likely causes for dead agents from subprocess logs."""
+    registry = get_registry(state["team_name"])
+    reasons: list[str] = []
+    for agent_name in dead_agents:
+        info = registry.get(agent_name, {})
+        log_path = info.get("log_path")
+        if not log_path:
+            reasons.append(f"{agent_name}: no subprocess log captured")
+            continue
+        log_file = Path(log_path)
+        if not log_file.exists():
+            reasons.append(f"{agent_name}: missing log file {log_path}")
+            continue
+        try:
+            tail = log_file.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-8:]
+        except OSError as exc:
+            reasons.append(f"{agent_name}: failed reading log ({exc})")
+            continue
+        snippet = " | ".join(line.strip() for line in tail if line.strip())
+        reasons.append(f"{agent_name}: {snippet or 'log is empty'}")
+    return reasons
+
+
 def _derive_resume_task_map(team_name: str, run_id: str) -> dict[str, str]:
     """Recover role → task_id mapping from existing tasks using Python API."""
     store = _get_task_store(team_name)
@@ -679,9 +803,23 @@ def node_preflight(state: OrchestratorState) -> OrchestratorState:
         fixes.append(f"Clone or mount driver repo at {state['driver_repo']}")
 
     # --- ClawTeam data directory ---
-    data_dir = Path.home() / ".clawteam"
+    data_dir = get_data_dir()
     if not data_dir.exists():
         fixes.append(f"mkdir -p {data_dir}")
+
+    if agent_exe == "openclaw" and not any(
+        os.getenv(name)
+        for name in (
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GEMINI_API_KEY",
+            "GOOGLE_API_KEY",
+            "XAI_API_KEY",
+        )
+    ):
+        fixes.append(
+            "Configure OpenClaw auth first: openclaw agents add <id> or export a provider API key"
+        )
 
     # --- Python deps ---
     try:
@@ -852,6 +990,8 @@ def node_execute_phases(state: OrchestratorState) -> OrchestratorState:
         else:
             _execute_sequential_phase(state, phase, chain)
 
+        _sync_ledger_with_task_store(state)
+
         # --- Gate check ---
         scores = compute_gate_scores(state, phase.key)
         gate_pass, failures = check_gate(state, phase)
@@ -946,7 +1086,7 @@ def _execute_groupchat_phase(state: OrchestratorState, phase: PhaseSpec,
                 state, maker.name, f"{phase.key}/{maker.name}",
                 f"[debate round {debate_rounds}] {maker.name} submits work for review"
             )
-            outcome = "approved"  # TODO: parse checker responses
+            outcome = "approved" if checker_names else "replan"
             state["observations"].append(
                 f"[group-chat] Debate round {debate_rounds}: "
                 f"{maker.name} reviewed by {', '.join(checker_names)} → {outcome.upper()}"
@@ -1034,15 +1174,8 @@ def _execute_substep_protocol(state: OrchestratorState, role: WorkerRole,
         # TODO: check if handoff conditions are met and delegate
         pass
 
-    # Mark substep complete in ledger
-    for entry in state["task_ledger"]:
-        if entry["substep"] == substep_id and entry["status"] == "in_progress":
-            entry["status"] = "completed"
-            entry["completed_at"] = _utc_now()
-            break
-
     state["observations"].append(
-        f"[{role.pattern.value}] Substep complete: {substep_id}"
+        f"[{role.pattern.value}] Substep dispatched: {substep_id}"
     )
 
 
@@ -1102,9 +1235,14 @@ def node_monitor(state: OrchestratorState) -> OrchestratorState:
         state["iteration_events"].append(event)
 
         if dead_agents:
+            reasons = _phase_dead_agent_reasons(state, dead_agents)
             state["observations"].append(
                 f"[MONITOR] Dead agents detected: {', '.join(dead_agents)}"
             )
+            for reason in reasons:
+                state["observations"].append(f"[MONITOR] {reason}")
+
+        _sync_ledger_with_task_store(state)
 
         if counts.get("completed", 0) == total and total > 0:
             state["observations"].append("[ORCHESTRATOR] All tasks completed")
@@ -1229,6 +1367,9 @@ def node_write_artifacts(state: OrchestratorState) -> OrchestratorState:
             "total": len(state["task_ledger"]),
             "completed": sum(1 for e in state["task_ledger"] if e["status"] == "completed"),
             "planned": sum(1 for e in state["task_ledger"] if e["status"] == "planned"),
+            "pending": sum(1 for e in state["task_ledger"] if e["status"] == "pending"),
+            "in_progress": sum(1 for e in state["task_ledger"] if e["status"] == "in_progress"),
+            "blocked": sum(1 for e in state["task_ledger"] if e["status"] == "blocked"),
             "replanned": sum(1 for e in state["task_ledger"] if e["status"] == "replanned"),
         },
         "risk_register_summary": {
@@ -1317,6 +1458,9 @@ def _build_markdown_summary(state: OrchestratorState, payload: dict[str, Any]) -
     lines.append(f"- Total entries: {ls.get('total', 0)}")
     lines.append(f"- Completed: {ls.get('completed', 0)}")
     lines.append(f"- Planned: {ls.get('planned', 0)}")
+    lines.append(f"- Pending: {ls.get('pending', 0)}")
+    lines.append(f"- In progress: {ls.get('in_progress', 0)}")
+    lines.append(f"- Blocked: {ls.get('blocked', 0)}")
     lines.append(f"- Replanned: {ls.get('replanned', 0)}")
     lines.append("")
 

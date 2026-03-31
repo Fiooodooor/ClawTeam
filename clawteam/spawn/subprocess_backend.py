@@ -10,6 +10,7 @@ from clawteam.spawn.adapters import NativeCliAdapter, is_claude_command, is_pi_c
 from clawteam.spawn.base import SpawnBackend
 from clawteam.spawn.cli_env import build_spawn_path, resolve_clawteam_executable
 from clawteam.spawn.command_validation import validate_spawn_command
+from clawteam.team.models import get_data_dir
 
 
 class SubprocessBackend(SpawnBackend):
@@ -94,15 +95,18 @@ class SubprocessBackend(SpawnBackend):
             )
             shell_cmd = f"{cmd_str}; {exit_hook}"
 
-        process = subprocess.Popen(
-            shell_cmd,
-            shell=True,
-            env=spawn_env,
-            # Subprocess agents are fire-and-forget; unread pipes can block long-lived runs.
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            cwd=cwd,
-        )
+        log_dir = get_data_dir() / "teams" / team_name / "agent-logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / f"{agent_name}.log"
+        with log_path.open("ab") as log_handle:
+            process = subprocess.Popen(
+                shell_cmd,
+                shell=True,
+                env=spawn_env,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                cwd=cwd,
+            )
         self._processes[agent_name] = process
 
         # Persist spawn info for liveness checking
@@ -113,6 +117,7 @@ class SubprocessBackend(SpawnBackend):
             backend="subprocess",
             pid=process.pid,
             command=list(final_command),
+            log_path=str(log_path),
         )
 
         return f"Agent '{agent_name}' spawned as subprocess (pid={process.pid})"
