@@ -6,7 +6,7 @@ import os
 import shlex
 import subprocess
 
-from clawteam.spawn.adapters import NativeCliAdapter, is_claude_command, is_pi_command
+from clawteam.spawn.adapters import NativeCliAdapter, is_claude_command, is_openclaw_command, is_pi_command
 from clawteam.spawn.base import SpawnBackend
 from clawteam.spawn.cli_env import build_spawn_path, resolve_clawteam_executable
 from clawteam.spawn.command_validation import validate_spawn_command
@@ -71,6 +71,10 @@ class SubprocessBackend(SpawnBackend):
         normalized_command = prepared.normalized_command
         validation_command = normalized_command
         final_command = list(prepared.final_command)
+
+        # Clean stale OpenClaw session files to avoid lock contention on re-runs
+        if is_openclaw_command(normalized_command) and agent_name:
+            _cleanup_openclaw_session(agent_name)
         if system_prompt and (is_claude_command(normalized_command) or is_pi_command(normalized_command)):
             insert_at = final_command.index("-p") if "-p" in final_command else len(final_command)
             final_command[insert_at:insert_at] = ["--append-system-prompt", system_prompt]
@@ -130,3 +134,23 @@ class SubprocessBackend(SpawnBackend):
             else:
                 self._processes.pop(name, None)
         return result
+
+
+def _cleanup_openclaw_session(agent_name: str) -> None:
+    """Remove stale OpenClaw session and lock files for an agent.
+
+    OpenClaw stores session files at ~/.openclaw/agents/main/sessions/<name>.jsonl
+    and acquires locks at <name>.jsonl.lock.  Leftover files from a previous run
+    cause FailoverError on the next spawn.
+    """
+    from pathlib import Path
+
+    sessions_dir = Path.home() / ".openclaw" / "agents" / "main" / "sessions"
+    if not sessions_dir.is_dir():
+        return
+    for suffix in (".jsonl", ".jsonl.lock"):
+        target = sessions_dir / f"{agent_name}{suffix}"
+        try:
+            target.unlink(missing_ok=True)
+        except OSError:
+            pass
