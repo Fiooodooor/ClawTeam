@@ -103,7 +103,13 @@ fi
 # -----------------------------------------------------------------------------
 # 4. Send result to inbox
 # -----------------------------------------------------------------------------
-SEND_RESULT=$($(command -v clawteam 2>/dev/null || echo "/Users/alanli/.local/bin/clawteam") inbox send "$TEAM_NAME" "$RECIPIENT" "$RESULT" 2>&1)
+# Resolve clawteam binary: prefer CLAWTEAM_BIN env var, then PATH; fail fast if not found
+CLAWTEAM_CMD="${CLAWTEAM_BIN:-$(command -v clawteam 2>/dev/null)}"
+if [[ -z "$CLAWTEAM_CMD" ]]; then
+    echo "ERROR: 'clawteam' not found on PATH and CLAWTEAM_BIN is not set. Please install clawteam or set CLAWTEAM_BIN." >&2
+    exit 1
+fi
+SEND_RESULT=$("$CLAWTEAM_CMD" inbox send "$TEAM_NAME" "$RECIPIENT" "$RESULT" 2>&1)
 echo "Send result: $SEND_RESULT" >> "$LOG_FILE"
 
 # 5. Clean exit
