@@ -999,7 +999,7 @@ def test_subprocess_backend_sets_utf8_locale(monkeypatch, tmp_path):
         agent_id="agent-1",
         agent_type="general-purpose",
         team_name="demo-team",
-        prompt="使用技能",
+        prompt="use skill",
     )
 
     env = captured["env"]
