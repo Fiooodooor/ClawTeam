@@ -63,7 +63,7 @@ def test_subprocess_backend_prepends_current_clawteam_bin_to_path(monkeypatch, t
     assert env["CLAWTEAM_BIN"] == str(clawteam_bin)
 
 
-def test_subprocess_backend_discards_output_and_preserves_exit_hook_and_registry(
+def test_subprocess_backend_captures_output_and_preserves_exit_hook_and_registry(
     monkeypatch, tmp_path
 ):
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
@@ -105,8 +105,8 @@ def test_subprocess_backend_discards_output_and_preserves_exit_hook_and_registry
     )
 
     assert result == "Agent 'worker1' spawned as subprocess (pid=9876)"
-    assert captured["stdout"] is subprocess.DEVNULL
-    assert captured["stderr"] is subprocess.DEVNULL
+    assert getattr(captured["stdout"], "name", "").endswith("/demo-team/agent-logs/worker1.log")
+    assert captured["stderr"] is subprocess.STDOUT
     assert captured["cwd"] == "/tmp/demo"
     assert (
         f"{clawteam_bin} lifecycle on-exit --team demo-team --agent worker1" in captured["cmd"]
@@ -117,6 +117,7 @@ def test_subprocess_backend_discards_output_and_preserves_exit_hook_and_registry
         "backend": "subprocess",
         "pid": 9876,
         "command": ["codex", "--dangerously-bypass-approvals-and-sandbox", "do work"],
+        "log_path": str(tmp_path / ".clawteam" / "teams" / "demo-team" / "agent-logs" / "worker1.log"),
     }
 
 
