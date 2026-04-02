@@ -40,9 +40,8 @@ done
 # -----------------------------------------------------------------------------
 # 2. Dynamic model inheritance (audit remediation: hard-coded config fix)
 # -----------------------------------------------------------------------------
-# Read current leader model settings
+# Read current model setting; fall back to OPENCLAW_MODEL if not set
 CURRENT_MODEL="${OPENCLAW_CURRENT_MODEL:-}"
-CURRENT_PROVIDER="${OPENCLAW_CURRENT_PROVIDER:-}"
 
 # If not found, try fallback inference from current session env
 if [ -z "$CURRENT_MODEL" ]; then
