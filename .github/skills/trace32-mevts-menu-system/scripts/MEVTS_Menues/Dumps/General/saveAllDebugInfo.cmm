@@ -1,0 +1,152 @@
+&dir=OS.PTD()
+chdir &dir
+
+IF !SYSTEM.UP()
+	GOSUB print_error
+
+; break
+&is_to_rerun=0
+if run()
+(
+&is_to_rerun=1
+BREAK
+)
+
+
+
+
+
+
+&isCancle=0
+;create
+DIALOG.view
+(
+ HEADER "Select Directoty"
+
+ POS 2. 1. 15.    
+ TEXT "Dump directory name "
+
+
+ POS 17. 1. 50.
+ directory_INPUT: EDIT "MEV_Dump" "" 
+ 
+
+ POS 1. 3. 11.
+ BUTTON "[:tree]Select path"
+ (
+ DIALOG.SetDIR path_INPUT *
+ )
+ POS 17. 3. 50.
+ path_INPUT: EDIT "" ""
+
+
+ POS 1. 5. 10.
+ DEFBUTTON "OK" "CONTinue"
+ POS 13. 5. 10.
+ btn: BUTTON "Cancel"
+ (
+ &isCancle=1
+ CONTinue
+ )
+
+)
+DIALOG.Disable path_INPUT
+STOP
+
+&PATH=DIALOG.STRing(path_INPUT) ;get the string from the EDIT box
+&DIRECTORY=DIALOG.STRing(directory_INPUT) ;get the string from the EDIT box
+
+DIALOG.END ;and then close the dialog
+
+if &isCancle==1 
+(
+GOTO END
+)
+
+IF ("&PATH")==""
+(
+   DIALOG.OK "Invalid directory &PATH"
+   GOTO END
+)
+
+&FULL_PATH="&PATH\&DIRECTORY"
+
+DIALOG.OK "The dump will be saved under: &FULL_PATH"
+
+os.hidden rmdir /s /q "&(FULL_PATH)"
+os.hidden md "&(FULL_PATH)"
+
+
+;save CPU registers
+&x0_reg=Register(X0)
+&x1_reg=Register(X1)
+&x2_reg=Register(X2)
+&x3_reg=Register(X3)
+&x4_reg=Register(X4)
+&x5_reg=Register(X5)
+&x6_reg=Register(X6)
+&x7_reg=Register(X7)
+&x8_reg=Register(X8)
+&x9_reg=Register(X9)
+&x10_reg=Register(X10)
+&x11_reg=Register(X11)
+&x12_reg=Register(X12)
+&x13_reg=Register(X13)
+&x14_reg=Register(X14)
+&x15_reg=Register(X15)
+&x16_reg=Register(X16)
+&x17_reg=Register(X17)
+&x18_reg=Register(X18)
+&x19_reg=Register(X19)
+&x20_reg=Register(X20)
+&x21_reg=Register(X21)
+&x22_reg=Register(X22)
+&x23_reg=Register(X23)
+&x24_reg=Register(X24)
+&x25_reg=Register(X25)
+&x26_reg=Register(X26)
+&x27_reg=Register(X27)
+&x28_reg=Register(X28)
+&x29_reg=Register(X29)
+&x30_reg=Register(X30)
+
+&pc_reg=Register(PC)
+OPEN #1 &FULL_PATH\cpu_register.txt /Create
+WRITE #1 "X0: &x0_reg						X16: &x16_reg"
+WRITE #1 "X1: &x1_reg						X17: &x17_reg"
+WRITE #1 "X2: &x2_reg						X18: &x18_reg" 
+WRITE #1 "X3: &x3_reg						X19: &x19_reg"
+WRITE #1 "X4: &x4_reg						X20: &x20_reg"	
+WRITE #1 "X5: &x5_reg						X21: &x21_reg"	
+WRITE #1 "X6: &x6_reg						X22: &x22_reg"	
+WRITE #1 "X7: &x7_reg						X23: &x23_reg"	
+WRITE #1 "X8: &x8_reg 						X24: &x24_reg"	
+WRITE #1 "X9: &x9_reg						X25: &x25_reg"	
+WRITE #1 "X10: &x10_reg						X25: &x25_reg"
+WRITE #1 "X11: &x11_reg						X26: &x26_reg"
+WRITE #1 "X12: &x12_reg						X27: &x27_reg"
+WRITE #1 "X13: &x13_reg						X28: &x28_reg"
+WRITE #1 "X14: &x14_reg						X29: &x29_reg"
+WRITE #1 "X15: &x15_reg						X30: &x30_reg"
+WRITE #1 "PC: &pc_reg					"
+CLOSE #1
+
+
+END:
+if &is_to_rerun==1
+(
+Step
+Step
+Go ; run
+)
+ENDDO
+
+
+print_error:
+	ON.ERROR inherit
+	if SYStem.Up()
+		&msg="Illegal Input. Please recheck.."
+	else
+		&msg="Target is not connected. Please run the attach script."
+	do ~~/demo/arm/MEVTS_Menues/Error_print "&msg"
+	ENDDO

@@ -1,0 +1,176 @@
+; MEV TS MENUE
+add
+menu
+(   
+	popup "&FW"
+	(
+		default
+		menuitem "DAP config"
+		(
+		do ~~/demo/arm/MEVTS_Menues/Generic/DAP_config.cmm
+		)
+		menuitem "Attach"
+		(
+		do ~~/demo/arm/MEVTS_Menues/Generic/Attach.cmm
+		)
+		menuitem "Load &Source,ALT+F3"
+		(
+		do ~~/demo/arm/MEVTS_Menues/Generic/LoadSource.cmm
+		)
+		menuitem "Load &Code,ALT+F4"
+		(
+		do ~~/demo/arm/MEVTS_Menues/Generic/LoadCode.cmm
+		)			
+;		popup "&Reset"
+;		(
+;			menuitem "Trigger &EMPR"
+;			(
+;				do ~~/demo/arm/MEVTS_Menues/Reset/Trigger_EMPR.cmm
+;			)
+;			menuitem "Trigger &GLOBR"
+;			(
+;			do ~~/demo/arm/MEVTS_Menues/Reset/Trigger_GLOBR.cmm
+;			)
+;			menuitem "Trigger &CORER"
+;			(
+;			do ~~/demo/arm/MEVTS_Menues/Reset/Trigger_CORER.cmm
+;			)
+;			menuitem "Trigger &PFR"
+;			(
+;			do ~~/demo/arm/MEVTS_Menues/Reset/Trigger_PFR.cmm
+;			)
+;			menuitem "Check Reset &Done"
+;			(
+;			do ~~/demo/arm/MEVTS_Menues/Reset/Reset_Check.cmm
+;			)
+;		)
+	
+;		popup "&Versions"
+;		(
+;			menuitem "&FW,ALT+F5"
+;			(
+;			do ~~/demo/arm/MEVTS_Menues/Versions/GetVersionsFW.cmm
+;			)
+;	
+;			menuitem "&NVM,ALT+F6"
+;			(
+;			do ~~/demo/arm/MEVTS_Menues/Versions/GetVersionsNVM.cmm
+;			)
+;		)
+		
+		popup "&View Memory Dump"
+		(
+			menuitem "IR&OM"
+			(
+				data.dump 0x10000000--0x1001ffff /Dialog
+			)
+			menuitem "&IRAM"
+			(
+				data.dump 0x20000000--0x203fffff /Dialog
+			)
+			menuitem "&DRAM"
+			(
+				data.dump 0x30000000--0x303fffff /Dialog
+			)
+		)
+		
+		popup "Save Memory Dump"
+		(
+			menuitem "IR&OM"
+			(
+				do ~~/demo/arm/MEVTS_Menues/Dumps/General/getDump.cmm  "irom0"
+			)
+			menuitem "&IRAM"
+			(
+				do ~~/demo/arm/MEVTS_Menues/Dumps/General/getDump.cmm "iram0" 
+			)
+			menuitem "&DRAM"
+			(
+				do ~~/demo/arm/MEVTS_Menues/Dumps/General/getDump.cmm "dram0" 
+			)	
+	)
+   )
+)
+ADD
+TOOLBAR
+(
+   TOOLITEM   "DAP config"                            "DO ~~/demo/arm/MEVTS_Menues/Generic/DAP_config.cmm"
+   [   
+CCCCCCCCCCCCCCCC
+CCCMMMMMMMMMCCCC
+CCCMMMMMMMMMCCCC
+CCCMMMCCCCMMMCCC
+CCCMMMCCCCMMMCCC
+CCCMMMCCCCMMMCCC
+CCCMMMCCCCMMMCCC
+CCCMMMCCCCMMMCCC
+CCCMMMCCCCMMMCCC
+CCCMMMCCCCMMMCCC
+CCCMMMCCCCMMMCCC
+CCCMMMCCCCMMMCCC
+CCCMMMCCCCMMMCCC
+CCCMMMMMMMMMCCCC
+CCCMMMMMMMMMCCCC
+CCCCCCCCCCCCCCCC
+   ]
+   
+   
+   TOOLITEM "Attach MEVTS"                            "DO ~~/demo/arm/MEVTS_Menues/Generic/Attach.cmm"
+   [
+YYYYYRYYYYYRRYYY
+YYYYYRRYYYYRRYYY
+YYYYYRRYYYRRRRYY
+YYYYRYRYYYRYYRYY
+YYYYRYRRYRRYYRYY
+YYYYRYYRRRYYYRYY
+YYYRRYYRRYYYYRYY
+YYYRYYYYYYYYYRYY
+YYYRYYYYYYYYYYRY
+YYYRYYYYYYYYYYRY
+YYRRYYYYYYYYYYRY
+YYRYYYYYYYYYYYRY
+YRRYYYYYYYYYYYRY
+YRYYYYYYYYYYYYRR
+YYYYYYYYYYYYYYYR
+
+        ]
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+  SEPARATOR
+  ;TOOLITEM   "Load Code"      "[:dump]"              "do ~~/demo/arm/MEVTS_Menues/Generic/LoadCode.cmm"
+  TOOLITEM   "Load Source"    "[:uppage]"            "do ~~/demo/arm/MEVTS_Menues/Generic/LoadSource.cmm"
+  TOOLITEM   "Update LTB scripts from Server" "[:advdown]"   "do ~~/demo/arm/MEVTS_Menues/Generic/UpdateScripts.cmm"
+  SEPARATOR     
+  TOOLITEM   "Check Status"      "[:btnok]" "DO ~~/demo/arm/MEVTS_Menues/Generic/showDebug_info.cmm 1 ""show"""
+  TOOLITEM   "Show  Debug info"                "DO ~~/demo/arm/MEVTS_Menues/Generic/showDebug_info.cmm 2 ""show"""
+   [
+XXXXXXXRRXXXXXXX
+XXXXRRRRRRXXXXXX
+XXXXRXXXXRXXXXXX
+XXXXXXXXXRXXXXXX
+XXXXXXXXRRXXXXXX
+XXXXXXRRRXXXXXXX
+XXXXRRXXXXXXXXXX
+XXXXRXXXXXXXXXXX
+XXXXRRXXXRXXXXXX
+XXXXXRRRRRXXXXXX
+XXXXXXXXXXXXXXXX
+XXXXXXXRXXXXXXXX
+XXXXXXRRRXXXXXXX
+XXXXXRRRRRXXXXXX
+XXXXXXRRRXXXXXXX
+XXXXXXXRXXXXXXXX
+    ]
+   TOOLITEM   "Save all debug info"      "[:flashfile]"        "do ~~/demo/arm/MEVTS_Menues/Dumps/General/saveAllDebugInfo.cmm"
+
+)
+  

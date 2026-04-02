@@ -1,0 +1,111 @@
+#!/usr/bin/env perl
+
+use warnings;
+use strict;
+use Cwd 'chdir';
+use Cwd 'getcwd';
+use Getopt::Long qw(GetOptions);
+use File::Path 'rmtree';
+
+my $run_dir = getcwd();
+my $test = 'all';
+my ($yml_file, $rm_build, $debug, $help);
+
+GetOptions(
+    'run_dir=s' => \$run_dir,
+    'yml_file=s' => \$yml_file,
+    'rm_build' => \$rm_build,
+    'test_name=s' => \$test,
+    'debug' => \$debug,
+    'help' => \$help,
+) or &print_usage;
+
+&print_usage if (defined $help);
+
+my $is_win = (-d 'C:\mev_toolchain');
+if ($is_win) {
+  my $tools_path = (not defined $debug) ? 'C:\mev_toolchain\cygwin64\bin\;' :
+    'C:\MinGW\bin\;';
+  $ENV{PATH} = $tools_path .
+    'C:\Ruby26-x64\bin\;' . $ENV{PATH};
+    $0 =~ s/\\/\//g;
+}
+
+$0 =~ /(.*)\/([^\/]+)\/scripts\/.*/;
+my ($rel_path, $repo_name) = ($1, $2);
+my $root_dir = "$rel_path/$repo_name";
+
+chdir $run_dir or die "Failed to change directory to '$run_dir' ($!)\n";
+$run_dir = getcwd();
+
+if (defined $rm_build) {
+        print "[INFO] removing build directory '$run_dir/build'\n";
+        rmtree(["$run_dir/build"]);
+}
+
+if (not defined $yml_file) {
+    opendir (DIR, ".") or die "Failed to open directory '$run_dir' for reading\n";
+    foreach my $file (readdir DIR) {
+        next unless ($file =~ /\.yml$/);
+        $yml_file = $file;
+        last;
+    }
+    closedir (DIR);
+    die "Failed to find YML file in running directory '$run_dir'\n"
+        unless (defined $yml_file);
+}
+
+print "[INFO] Building temp debug YML file from '$yml_file'\n";
+
+my $in_yml_path = "$run_dir/$yml_file";
+my $out_yml_name = 'temp_debug_utests.yml';
+my $out_yml_path = "$run_dir/$out_yml_name";
+
+open (IN, $in_yml_path) or die "Failed to open '$in_yml_path' for reading ($!)\n";
+open (OUT, ">$out_yml_path") or die "Failed to open '$out_yml_path' for writing ($!)\n";
+
+foreach my $line (<IN>) {
+    chomp($line);
+    $line =~ s/(:executable:)(\s+)\S+covc.exe/${1}${2}gcc/;
+    $line =~ s/\- \-i gcc\.exe/- -g -O0 #debug symbols/;
+    $line =~ s/\S+mev_tools\//$root_dir\//;
+    print OUT "$line\n";
+}
+
+close (IN);
+close (OUT);
+
+$ENV{CEEDLING_MAIN_PROJECT_FILE} = $out_yml_path;
+
+print "[INFO] Setting YML file to '$ENV{CEEDLING_MAIN_PROJECT_FILE}'\n";
+
+my $ws_path = "$root_dir/ceedling/ceed_ws";
+my $ceedling_cmd = "ruby $ws_path/vendor/ceedling/bin/ceedling test:${test} logging";
+print "[INFO] Running Ceedling - '$ceedling_cmd'\n";
+my $rc = system($ceedling_cmd);
+unlink $out_yml_path;
+die "Failed to run Ceedling ($!)\n" unless ($rc == 0);
+
+exit(0) unless (defined $debug);
+
+my $dbg_dir = 'build/test/out';
+my $dbg_file;
+opendir (DIR, $dbg_dir) or die "Failed to open '$dbg_dir' for reading ($!)\n";
+foreach my $file1 (readdir DIR) {
+    next unless ($file1 =~ /\.out$/);
+    $dbg_file = $file1;
+    last;
+}
+die "Failed to find output file in directory '$dbg_dir'\n"
+    unless (defined $dbg_file);
+
+my $gdb_cmd = "gdb $dbg_dir/$dbg_file";
+print "[INFO] Running debugger - '$gdb_cmd'\n";
+exec $gdb_cmd;
+
+sub print_usage {
+        print "Usage: common_debug_utests.prl\n\t\t[--run_dir < running directory >]\n" .
+                "\t\t[--yml_file < YML file >] [--rm_build]\n" .
+                "\t\t[--test_name] < test name > [--debug] [--help]\n";
+        exit(0);
+}

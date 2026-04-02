@@ -1,0 +1,4 @@
+SYStem.attach
+;DO  ~~/demo/arc/scripts/Menus_cpk/MEVTS_Menues/TitleUpdate.cmm
+DO ~~/demo/arm/MEVTS_Menues/Generic/ShowDebug_info.cmm 1 "show"
+

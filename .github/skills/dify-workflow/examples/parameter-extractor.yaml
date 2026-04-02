@@ -1,0 +1,314 @@
+version: "0.6.0"
+kind: app
+dependencies: []
+app:
+  name: Parameter Extractor Pipeline
+  description: >
+    LLM extracts structured parameters from free-form user input, a code
+    node validates required fields, and an if-else routes to a fulfillment
+    agent (valid input) or a clarification agent (missing fields).
+  mode: workflow
+  icon: "🔍"
+  icon_background: "#F0FFF4"
+  use_icon_as_answer_icon: false
+
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload:
+      image:
+        enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      autoPlay: false
+  graph:
+    nodes:
+      # ── Start ─────────────────────────────────────────────────────────────
+      - data:
+          desc: Accept free-form user request
+          selected: false
+          title: Start
+          type: start
+          variables:
+          - default: ""
+            label: User Request
+            max_length: 2048
+            options: []
+            required: true
+            type: paragraph
+            variable: user_request
+        id: start
+        position: {x: -800, y: 400}
+        type: custom
+
+      # ── LLM Extractor ─────────────────────────────────────────────────────
+      - data:
+          context:
+            enabled: false
+            variable_selector: []
+          desc: Extract structured parameters from the user's free-form request
+          memory: null
+          model:
+            completion_params:
+              max_tokens: 512
+              temperature: 0.0
+            mode: chat
+            name: gpt-4o-mini
+            provider: openai
+          prompt_template:
+          - role: system
+            text: >
+              Extract the following fields from the user request as JSON.
+              Return ONLY valid JSON with these exact keys:
+              - "action": string (one of: create, read, update, delete)
+              - "resource": string (the resource name)
+              - "filters": object (key-value filters, can be empty {})
+              - "missing": array of strings (names of required fields that could not be determined)
+
+              If a required field cannot be extracted, include its name in "missing".
+          - role: user
+            text: "User request: {{#start.user_request#}}"
+          selected: false
+          structured_output_enabled: false
+          title: Parameter Extractor
+          type: llm
+          vision:
+            enabled: false
+        id: extractor
+        position: {x: -500, y: 400}
+        type: custom
+
+      # ── Code Validator ────────────────────────────────────────────────────
+      - data:
+          code: |
+            import json
+
+            def main(llm_text: str) -> dict:
+                try:
+                    params = json.loads(llm_text.strip())
+                except json.JSONDecodeError:
+                    return {
+                        "is_valid": False,
+                        "action": "",
+                        "resource": "",
+                        "filters": "{}",
+                        "missing_fields": "action, resource",
+                        "error": "LLM did not return valid JSON",
+                    }
+
+                missing = params.get("missing", [])
+                is_valid = (
+                    bool(params.get("action")) and
+                    bool(params.get("resource")) and
+                    len(missing) == 0
+                )
+                return {
+                    "is_valid": is_valid,
+                    "action": params.get("action", ""),
+                    "resource": params.get("resource", ""),
+                    "filters": json.dumps(params.get("filters", {})),
+                    "missing_fields": ", ".join(missing) if missing else "",
+                    "error": "",
+                }
+          code_language: python3
+          desc: Validate extracted parameters and flag missing required fields
+          outputs:
+            is_valid:
+              type: boolean
+            action:
+              type: string
+            resource:
+              type: string
+            filters:
+              type: string
+            missing_fields:
+              type: string
+            error:
+              type: string
+          selected: false
+          title: Validator
+          type: code
+          variables:
+          - value_selector: [extractor, text]
+            value_type: string
+            variable: llm_text
+        id: validator
+        position: {x: -200, y: 400}
+        type: custom
+
+      # ── If-Else Router ────────────────────────────────────────────────────
+      - data:
+          cases:
+          - case_id: valid
+            conditions:
+            - comparison_operator: is
+              value: "true"
+              variable_selector: [validator, is_valid]
+            logical_operator: and
+          desc: Route on validation result
+          selected: false
+          title: Valid?
+          type: if-else
+        id: router
+        position: {x: 100, y: 400}
+        type: custom
+
+      # ── Fulfillment Agent (valid path) ────────────────────────────────────
+      - data:
+          context:
+            enabled: false
+            variable_selector: []
+          desc: Fulfill the validated user request
+          memory: null
+          model:
+            completion_params:
+              max_tokens: 1024
+              temperature: 0.3
+            mode: chat
+            name: gpt-4o-mini
+            provider: openai
+          prompt_template:
+          - role: system
+            text: >
+              You are an API orchestrator. Fulfill the following validated request.
+              Respond with a clear, structured result.
+          - role: user
+            text: |
+              Action: {{#validator.action#}}
+              Resource: {{#validator.resource#}}
+              Filters: {{#validator.filters#}}
+
+              Please fulfill this request and confirm what was done.
+          selected: false
+          title: Fulfillment Agent
+          type: llm
+          vision:
+            enabled: false
+        id: fulfillment
+        position: {x: 400, y: 200}
+        type: custom
+
+      # ── Clarification Agent (invalid path) ───────────────────────────────
+      - data:
+          context:
+            enabled: false
+            variable_selector: []
+          desc: Ask the user to clarify missing fields
+          memory: null
+          model:
+            completion_params:
+              max_tokens: 512
+              temperature: 0.5
+            mode: chat
+            name: gpt-4o-mini
+            provider: openai
+          prompt_template:
+          - role: system
+            text: >
+              You are a helpful assistant. The user's request was unclear.
+              Ask targeted questions to collect the missing information.
+          - role: user
+            text: |
+              Original request: {{#start.user_request#}}
+              Missing fields: {{#validator.missing_fields#}}
+
+              Ask the user to provide the missing information in a friendly way.
+          selected: false
+          title: Clarification Agent
+          type: llm
+          vision:
+            enabled: false
+        id: clarifier
+        position: {x: 400, y: 600}
+        type: custom
+
+      # ── Variable Aggregator ───────────────────────────────────────────────
+      - data:
+          desc: Merge results from both branches
+          output_type: string
+          selected: false
+          title: Merge Response
+          type: variable-aggregator
+          variables:
+          - - fulfillment
+            - text
+          - - clarifier
+            - text
+        id: aggregator
+        position: {x: 700, y: 400}
+        type: custom
+
+      # ── End ───────────────────────────────────────────────────────────────
+      - data:
+          desc: ""
+          outputs:
+          - type: string
+            value_selector: [aggregator, output]
+            variable: response
+          selected: false
+          title: End
+          type: end
+        id: end
+        position: {x: 1000, y: 400}
+        type: custom
+
+    edges:
+      - id: start-extractor
+        source: start
+        sourceHandle: source
+        target: extractor
+        targetHandle: target
+        type: custom
+      - id: extractor-validator
+        source: extractor
+        sourceHandle: source
+        target: validator
+        targetHandle: target
+        type: custom
+      - id: validator-router
+        source: validator
+        sourceHandle: source
+        target: router
+        targetHandle: target
+        type: custom
+      - id: router-fulfillment
+        source: router
+        sourceHandle: "valid"
+        target: fulfillment
+        targetHandle: target
+        type: custom
+      - id: router-clarifier
+        source: router
+        sourceHandle: "false"
+        target: clarifier
+        targetHandle: target
+        type: custom
+      - id: fulfillment-aggregator
+        source: fulfillment
+        sourceHandle: source
+        target: aggregator
+        targetHandle: target
+        type: custom
+      - id: clarifier-aggregator
+        source: clarifier
+        sourceHandle: source
+        target: aggregator
+        targetHandle: target
+        type: custom
+      - id: aggregator-end
+        source: aggregator
+        sourceHandle: source
+        target: end
+        targetHandle: target
+        type: custom

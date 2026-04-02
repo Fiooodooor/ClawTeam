@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins-sanity-exporter
+  namespace: monitoring
+  labels:
+    app: jenkins-sanity-exporter
+spec:
+  ports:
+    - name: metrics
+      port: 8002
+      targetPort: 8002
+  # no selector here on purpose – we’ll bind it via Endpoints
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: jenkins-sanity-exporter
+  namespace: monitoring
+subsets:
+  - addresses:
+      - ip: 10.139.163.16
+    ports:
+      - name: metrics
+        port: 8002
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: jenkins-sanity-exporter
+  namespace: monitoring
+  labels:
+    app: jenkins-sanity-exporter   # match your Prometheus serviceMonitorSelector behavior
+spec:
+  namespaceSelector:
+    matchNames:
+      - monitoring
+  selector:
+    matchLabels:
+      app: jenkins-sanity-exporter
+  endpoints:
+    - port: metrics
+      path: /metrics        # or "/" if that’s how your exporter exposes
+      interval: 30s
+      scheme: http

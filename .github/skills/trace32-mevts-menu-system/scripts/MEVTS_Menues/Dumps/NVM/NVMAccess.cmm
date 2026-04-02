@@ -1,0 +1,52 @@
+ON ERROR Continue
+
+DIALOG
+(
+  HEADER "NVM ACCESS"
+  POS 0. 0. 27. 1.
+  TEXT "Address"
+  addr: EDIT "0x0" ""
+  TEXT "Value"
+  value: EDIT "N\A" ""
+  btnRead: DEFBUTTON "Read" "GOTO f1"
+  btnWrite: DEFBUTTON "Write" "GOTO f2"
+  CLOSE "GOTO closeDialog"
+)
+
+waitforaction:
+STOP
+
+f1:
+&addr=DIALOG.STRING(addr)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+&whdr0=0x11000  		;Read=0x10000,SPI_dest=0x1000
+&whdr2=0x40				;chunk size = 64 const
+&dword_len=0x10			;Dword rength of response- const 16
+&msgcsr=0x80001003		;CTRL - HDR Dwords=3 const, Expected RD words = 0x10, Read = 0x8000000, CMD enable = 0x80000000
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+on error continue
+Data.Set D:0x402223D0 %Long &whdr0
+Data.Set D:0x402223E0 %Long &addr
+Data.Set D:0x402223F0 %Long &whdr2
+Data.Set D:0x40222090 %Long &dword_len
+Data.Set D:0x40222080 %Long &msgcsr
+
+;poll the CMD valid bit until cleared
+&done=data.long(D:0x40222080)
+&done=((&done)&(0x80000000))
+
+while &done!=0 
+(
+&done=data.long(D:40222080)
+&done=((&done)&(0x80000000))
+)
+
+&data=data.long(D:40222C00)
+
+DIALOG.Set value "&data"
+
+goto waitforaction
+
+closeDialog:
+ DIALOG.END

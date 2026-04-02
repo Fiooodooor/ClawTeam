@@ -1,0 +1,200 @@
+###############################################################################
+# Agent Tool Pipeline — Dify DSL v0.6.0
+#
+# Pattern: Agent node autonomously invokes bound tools (web-search, calculator)
+# to answer complex questions.  An if-else error gate after the agent
+# separates successful answers from runtime failures.
+#
+# Key features demonstrated:
+#   - agent node with ReAct strategy and multiple tools
+#   - if-else error branch based on agent output field
+#   - separate answer paths for success vs. fallback
+#   - advanced-chat mode with memory window
+###############################################################################
+version: "0.6.0"
+kind: app
+app:
+  name: "Agent Tool Pipeline"
+  mode: advanced-chat
+  icon: "🤖"
+  icon_type: emoji
+  icon_background: "#FFF3E0"
+  description: "ReAct agent that uses web-search and calculator tools with error handling"
+  use_icon_as_answer_icon: false
+dependencies:
+  - plugin:
+      provider: dify
+      plugin_id: websearch
+      version: "1.0.0"
+  - plugin:
+      provider: dify
+      plugin_id: calculator
+      version: "1.0.0"
+workflow:
+  conversation_variables: []
+  environment_variables: []
+
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: >-
+      I'm a research agent. Ask me anything — I can search the web and
+      calculate answers on the fly.
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+      - "What is the current price of gold per ounce?"
+      - "Calculate compound interest on $10,000 at 5% for 3 years"
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+
+  graph:
+    edges:
+      - id: start-to-agent
+        source: start
+        sourceHandle: source
+        target: research-agent
+        targetHandle: target
+        type: custom
+
+      - id: agent-to-check
+        source: research-agent
+        sourceHandle: source
+        target: error-check
+        targetHandle: target
+        type: custom
+
+      - id: check-to-success
+        source: error-check
+        sourceHandle: "true"
+        target: answer-success
+        targetHandle: target
+        type: custom
+
+      - id: check-to-fallback
+        source: error-check
+        sourceHandle: "false"
+        target: answer-fallback
+        targetHandle: target
+        type: custom
+
+    nodes:
+      # ── Start ───────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: { x: 80, y: 320 }
+        data:
+          type: start
+          title: "Start"
+          variables: []
+
+      # ── ReAct Agent ─────────────────────────────────────────────────────────
+      - id: research-agent
+        type: custom
+        position: { x: 340, y: 320 }
+        data:
+          type: agent
+          title: "Research Agent"
+          agent_mode:
+            strategy: react
+            max_iterations: 6
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.2
+              max_tokens: 2048
+          prompt_template:
+            - id: sys-prompt
+              role: system
+              text: >-
+                You are a research assistant with access to a web search tool
+                and a calculator. Think step-by-step (ReAct) before answering.
+                Always verify facts with a search before stating figures.
+                Respond concisely. If you cannot complete a task, set
+                `error` to a human-readable explanation.
+          memory:
+            window:
+              enabled: true
+              size: 10
+          tools:
+            - provider_type: builtin
+              plugin_id: websearch
+              tool_name: web_search
+              tool_label: "Web Search"
+              tool_description: "Search the internet for current information"
+              not_used: false
+              tool_parameters:
+                query:
+                  type: selector
+                  value: null  # passed by agent at runtime
+                max_results:
+                  type: constant
+                  value: "5"
+            - provider_type: builtin
+              plugin_id: calculator
+              tool_name: calculate
+              tool_label: "Calculator"
+              tool_description: "Evaluate mathematical expressions"
+              not_used: false
+              tool_parameters:
+                expression:
+                  type: selector
+                  value: null  # passed by agent at runtime
+          # Agent outputs: `text` for the final answer, `error` if it failed
+          outputs:
+            text:
+              type: string
+            error:
+              type: string
+
+      # ── Error Gate ──────────────────────────────────────────────────────────
+      - id: error-check
+        type: custom
+        position: { x: 640, y: 320 }
+        data:
+          type: if-else
+          title: "Error Gate"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector:
+                    - research-agent
+                    - error
+                  comparison_operator: is-empty
+                  value: ""
+
+      # ── Success Answer ───────────────────────────────────────────────────────
+      - id: answer-success
+        type: custom
+        position: { x: 880, y: 200 }
+        data:
+          type: answer
+          title: "Answer (success)"
+          answer: "{{#research-agent.text#}}"
+
+      # ── Fallback Answer ──────────────────────────────────────────────────────
+      - id: answer-fallback
+        type: custom
+        position: { x: 880, y: 440 }
+        data:
+          type: answer
+          title: "Answer (fallback)"
+          answer: >-
+            I encountered an issue while researching your question:
+            {{#research-agent.error#}}
+
+            Please try rephrasing, or ask a simpler follow-up question.
+
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1

@@ -1,0 +1,203 @@
+###############################################################################
+# Code + Transform + LLM Chain — Dify DSL v0.6.0
+#
+# Demonstrates chaining a code node, template-transform, and LLM node.
+#
+# Flow: start → code_extract → template_format → llm_analyze → end
+###############################################################################
+version: "0.6.0"
+kind: app
+app:
+  name: "Code Transform Chain"
+  mode: workflow
+  icon: "⚙️"
+  icon_type: emoji
+  icon_background: "#ECEFF1"
+  description: "Extracts data with code, formats with Jinja2, and analyzes with LLM"
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - id: start-to-code
+        source: start
+        sourceHandle: source
+        target: code_extract
+        targetHandle: target
+        type: custom
+
+      - id: code-to-template
+        source: code_extract
+        sourceHandle: source
+        target: template_format
+        targetHandle: target
+        type: custom
+
+      - id: template-to-llm
+        source: template_format
+        sourceHandle: source
+        target: llm_analyze
+        targetHandle: target
+        type: custom
+
+      - id: llm-to-end
+        source: llm_analyze
+        sourceHandle: source
+        target: output
+        targetHandle: target
+        type: custom
+
+    nodes:
+      - id: start
+        type: custom
+        position: { x: 80, y: 282 }
+        data:
+          type: start
+          title: "Start"
+          variables:
+            - variable: raw_data
+              label: "Raw Data (JSON or text)"
+              type: paragraph
+              required: true
+              max_length: 50000
+              options: []
+
+      - id: code_extract
+        type: custom
+        position: { x: 380, y: 282 }
+        data:
+          type: code
+          title: "Extract & Parse"
+          code_language: python3
+          code: |
+            import json
+
+            def main(raw: str) -> dict:
+                try:
+                    data = json.loads(raw)
+                    keys = list(data.keys()) if isinstance(data, dict) else []
+                    item_count = len(data) if isinstance(data, (list, dict)) else 1
+                except (json.JSONDecodeError, TypeError):
+                    data = raw
+                    keys = []
+                    item_count = len(raw.split("\n"))
+                return {
+                    "parsed": json.dumps(data, indent=2) if isinstance(data, (dict, list)) else raw,
+                    "keys": json.dumps(keys),
+                    "item_count": item_count,
+                    "is_json": isinstance(data, (dict, list))
+                }
+          variables:
+            - variable: raw
+              value_selector:
+                - start
+                - raw_data
+          outputs:
+            parsed:
+              type: string
+            keys:
+              type: string
+            item_count:
+              type: number
+            is_json:
+              type: boolean
+
+      - id: template_format
+        type: custom
+        position: { x: 680, y: 282 }
+        data:
+          type: template-transform
+          title: "Format Report"
+          template: |
+            ## Data Analysis Request
+
+            **Format**: {{ "JSON" if is_json else "Plain Text" }}
+            **Item Count**: {{ item_count }}
+            **Keys**: {{ keys }}
+
+            ### Data:
+            ```
+            {{ parsed }}
+            ```
+
+            Please analyze this data and provide:
+            1. A summary of the structure
+            2. Key observations
+            3. Any anomalies or notable patterns
+          variables:
+            - variable: parsed
+              value_selector:
+                - code_extract
+                - parsed
+            - variable: keys
+              value_selector:
+                - code_extract
+                - keys
+            - variable: item_count
+              value_selector:
+                - code_extract
+                - item_count
+            - variable: is_json
+              value_selector:
+                - code_extract
+                - is_json
+
+      - id: llm_analyze
+        type: custom
+        position: { x: 980, y: 282 }
+        data:
+          type: llm
+          title: "Analyze"
+          model:
+            provider: openai
+            name: gpt-4
+            mode: chat
+            completion_params:
+              temperature: 0.4
+              max_tokens: 2048
+          prompt_template:
+            - role: system
+              text: >-
+                You are a data analyst. Analyze the provided data thoroughly
+                and produce a clear, structured report.
+            - role: user
+              text: "{{#template_format.output#}}"
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      - id: output
+        type: custom
+        position: { x: 1280, y: 282 }
+        data:
+          type: end
+          title: "Output"
+          outputs:
+            - variable: analysis
+              value_type: string
+              value_selector:
+                - llm_analyze
+                - text
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7

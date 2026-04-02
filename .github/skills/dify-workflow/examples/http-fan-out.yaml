@@ -1,0 +1,202 @@
+version: "0.6.0"
+kind: app
+dependencies: []
+app:
+  name: HTTP Fan-Out via Iteration
+  description: >
+    Demonstrates fetching multiple URLs in parallel using an iteration container.
+    A code node builds a list of URLs; the iteration feeds each URL to an
+    http-request node; results are merged into a single output.
+  mode: workflow
+  icon: "🌐"
+  icon_background: "#E8F4FD"
+  use_icon_as_answer_icon: false
+
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload:
+      image:
+        enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      autoPlay: false
+  graph:
+    nodes:
+      # ── Outer: Start ──────────────────────────────────────────────────────
+      - data:
+          desc: Accept a comma-separated list of GitHub raw file URLs
+          selected: false
+          title: Start
+          type: start
+          variables:
+          - default: ""
+            label: File URLs (comma-separated)
+            max_length: 4096
+            options: []
+            required: true
+            type: paragraph
+            variable: raw_urls
+        id: start
+        position: {x: -700, y: 400}
+        type: custom
+
+      # ── Outer: URL Splitter ───────────────────────────────────────────────
+      - data:
+          code: |
+            def main(raw_urls: str) -> dict:
+                urls = [u.strip() for u in raw_urls.split(",") if u.strip()]
+                return {"urls": urls, "count": len(urls)}
+          code_language: python3
+          desc: Split the comma-separated URLs into an array for iteration
+          outputs:
+            urls:
+              type: array[string]
+            count:
+              type: number
+          selected: false
+          title: URL Splitter
+          type: code
+          variables:
+          - value_selector: [start, raw_urls]
+            value_type: string
+            variable: raw_urls
+        id: url_splitter
+        position: {x: -400, y: 400}
+        type: custom
+
+      # ── Outer: Iteration Container ────────────────────────────────────────
+      - data:
+          desc: Fetch each URL in sequence via HTTP
+          error_handle_mode: terminated
+          flatten_output: true
+          is_parallel: true
+          parallel_nums: 5
+          iterator_selector:
+          - url_splitter
+          - urls
+          output_selector:
+          - fetch_inner
+          - body
+          selected: false
+          start_node_id: iter_start
+          title: Fetch Each URL
+          type: iteration
+        id: fetch_iter
+        position: {x: -100, y: 300}
+        type: custom
+
+      # ── Inner: Iteration Start ────────────────────────────────────────────
+      - data:
+          desc: ""
+          isInIteration: true
+          selected: false
+          title: ""
+          type: iteration-start
+        draggable: false
+        id: iter_start
+        parentId: fetch_iter
+        position: {x: 24, y: 68}
+        type: custom-iteration-start
+
+      # ── Inner: HTTP Fetch ─────────────────────────────────────────────────
+      - data:
+          authorization:
+            config: {}
+            type: no-auth
+          body:
+            data: []
+            type: none
+          desc: Fetch the current URL from the iteration item
+          headers: "User-Agent:Dify-Fan-Out-Demo"
+          isInIteration: true
+          method: GET
+          params: ""
+          retry_config:
+            max_retries: 2
+            retry_enabled: true
+            retry_interval: 200
+          selected: false
+          ssl_verify: true
+          timeout:
+            connect: 10
+            read: 30
+            write: 10
+          title: Fetch URL
+          type: http-request
+          url: "{{#item#}}"
+        id: fetch_inner
+        parentId: fetch_iter
+        position: {x: 200, y: 68}
+        type: custom
+
+      # ── Outer: Merge Results ──────────────────────────────────────────────
+      - data:
+          desc: Collect all fetched bodies into a single output
+          output_type: string
+          selected: false
+          title: Merge Results
+          type: variable-aggregator
+          variables:
+          - - fetch_iter
+            - output
+        id: merge
+        position: {x: 300, y: 400}
+        type: custom
+
+      # ── Outer: End ────────────────────────────────────────────────────────
+      - data:
+          desc: ""
+          outputs:
+          - type: string
+            value_selector: [merge, output]
+            variable: combined_content
+          selected: false
+          title: End
+          type: end
+        id: end
+        position: {x: 600, y: 400}
+        type: custom
+
+    edges:
+      - id: start-url_splitter
+        source: start
+        sourceHandle: source
+        target: url_splitter
+        targetHandle: target
+        type: custom
+      - id: url_splitter-fetch_iter
+        source: url_splitter
+        sourceHandle: source
+        target: fetch_iter
+        targetHandle: target
+        type: custom
+      - id: iter_start-fetch_inner
+        source: iter_start
+        sourceHandle: source
+        target: fetch_inner
+        targetHandle: target
+        type: custom
+      - id: fetch_iter-merge
+        source: fetch_iter
+        sourceHandle: source
+        target: merge
+        targetHandle: target
+        type: custom
+      - id: merge-end
+        source: merge
+        sourceHandle: source
+        target: end
+        targetHandle: target
+        type: custom

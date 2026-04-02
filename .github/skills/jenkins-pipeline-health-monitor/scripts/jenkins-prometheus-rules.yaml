@@ -1,0 +1,96 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: jenkins-agent-alerts
+  namespace: monitoring
+spec:
+  groups:
+    - name: jenkins.agent.rules
+      interval: 30s
+      rules:
+        # Initial failure alert - fires quickly
+        - alert: JenkinsPipelineDownInitial
+          expr: jenkins_pipeline_success == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: jenkins
+            team: devops
+            component: pipeline
+            duration: "1min"
+          annotations:
+            summary: "Jenkins instance is failing"
+            description: "Jenkins instance {{ $labels.jenkins_url }} is DOWN!"
+            jenkins_url: "{{ $labels.jenkins_url }}"
+            dashboard_url: "http://ipu-dora.intel.com/d/8392eea3-f418-4384-879b-98fe81fffbef/jenkins-uptime"
+
+        # Extended failure alert - more serious
+        - alert: JenkinsPipelineDownExtended
+          expr: jenkins_pipeline_success == 0
+          for: 10m
+          labels:
+            severity: critical
+            service: jenkins
+            team: devops
+            component: pipeline
+            duration: "10min"
+          annotations:
+            summary: "Jenkins instance down for 10+ minutes"
+            description: "Jenkins instance {{ $labels.jenkins_url }} is DOWN for more than 10 minutes!"
+            jenkins_url: "{{ $labels.jenkins_url }}"
+            dashboard_url: "http://ipu-dora.intel.com/d/8392eea3-f418-4384-879b-98fe81fffbef/jenkins-uptime"
+
+        # Prolonged failure alert - critical
+        - alert: JenkinsPipelineDownProlonged
+          expr: jenkins_pipeline_success == 0
+          for: 30m
+          labels:
+            severity: critical
+            service: jenkins
+            team: devops
+            component: pipeline
+            duration: "30min"
+          annotations:
+            summary: "Jenkins instance down for 30+ minutes"
+            description: "Jenkins instance {{ $labels.jenkins_url }} is DOWN for more than 30 minutes!"
+            jenkins_url: "{{ $labels.jenkins_url }}"
+            dashboard_url: "http://ipu-dora.intel.com/d/8392eea3-f418-4384-879b-98fe81fffbef/jenkins-uptime"
+
+        # Alert for pipeline recovery
+        - alert: JenkinsPipelineRecovered
+          expr: jenkins_pipeline_success == 1 and jenkins_pipeline_success offset 10m == 0
+          for: 1m
+          labels:
+            severity: info
+            service: jenkins
+            team: devops
+            component: pipeline
+          annotations:
+            summary: "Jenkins Instance recovered"
+            description: "Jenkins instance {{ $labels.jenkins_url }} has been recovered!"
+
+        # Alert when monitoring agent is down
+        - alert: JenkinsMonitoringAgentDown
+          expr: up{job="jenkins-health-monitor"} == 0
+          for: 3m
+          labels:
+            severity: critical
+            service: jenkins-monitoring
+            team: devops
+            component: monitoring
+          annotations:
+            summary: "Jenkins monitoring agent is down"
+            description: "Jenkins health monitoring agent has been down for more than 3 minutes. No pipeline health data available."
+
+        # Alert when no checks for extended period
+        - alert: JenkinsSanityNoRecentChecks
+          expr: increase(jenkins_pipeline_checks_total[10m]) == 0
+          for: 5m
+          labels:
+            severity: warning
+            service: jenkins-monitoring
+            team: devops
+            component: monitoring
+          annotations:
+            summary: "No recent Jenkins pipeline sanity checks"
+            description: "No Jenkins pipeline sanity checks recorded for {{ $labels.jenkins_url }} in the last 10 minutes"

@@ -1,0 +1,5 @@
+AREA.view 
+PRINT 
+PRINT %COLOR.BLUE  "For updating the TRACE32 scripts , please run the following script:"
+PRINT 
+PRINT %COLOR.RED  "\\ladjfs.jer.intel.com\hwfw\Software\Trace32\MEVTS\update_mevts_menu.bat"
