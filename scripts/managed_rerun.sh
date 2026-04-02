@@ -148,7 +148,7 @@ with open(cp, "r", encoding="utf-8") as f:
     d = json.load(f)
 d["current_phase"] = 0
 d["iteration_events"] = []
-d["spawned_agents"] = {}
+d["spawned_agents"] = []
 d["phase_results"] = {}
 for e in d.get("task_ledger", []):
     e["status"] = "planned"
