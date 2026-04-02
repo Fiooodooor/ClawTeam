@@ -131,7 +131,18 @@ PY
 
 step "2/7 Kill lingering orchestrator/agent processes"
 pkill -f "nic_porting_orchestrator_v2.py" 2>/dev/null || true
-pkill -f openclaw 2>/dev/null || true
+# Scope openclaw cleanup to this orchestrator run by including TEAM/OUTPUT_DIR
+openclaw_pattern="openclaw"
+if [[ -n "${TEAM:-}" ]]; then
+  openclaw_pattern+=".*${TEAM}"
+fi
+if [[ -n "${OUTPUT_DIR:-}" ]]; then
+  openclaw_pattern+=".*${OUTPUT_DIR}"
+fi
+if pgrep -f "$openclaw_pattern" >/dev/null 2>&1; then
+  echo "Killing lingering openclaw processes matching pattern: $openclaw_pattern"
+  pkill -f "$openclaw_pattern" 2>/dev/null || true
+fi
 
 step "3/7 Clean sessions/logs/registry"
 mkdir -p "$sessions_dir" "$agent_logs_dir" "$OUTPUT_DIR"
