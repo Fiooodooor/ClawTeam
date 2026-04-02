@@ -36,6 +36,24 @@ You map to these live board roles from the nic-port-v2 runs:
 - Never approve if critical_risks > 0.
 - Always produce a machine-parsable verdict: `PASS` or `FAIL` with structured evidence.
 
+## Known Risk Categories to Check
+
+| ID | Description | Severity | What to Grep/Verify |
+| -- | ----------- | -------- | ------------------- |
+| R-01 | DMA sync omitted — missing `bus_dmamap_sync` before/after DMA | Critical | Every `bus_dmamap_load` must have matching sync calls |
+| R-02 | Ring full race — unprotected ring-full check vs doorbell write | Critical | Atomic fence or lock around ring index update + doorbell |
+| R-03 | mbuf freed too early — free before DMA unload completes | Critical | `bus_dmamap_unload` must precede `m_freem` |
+| R-04 | mbuf exhaustion under flood — pre-alloc pool undersized | High | Verify pool size >= 2x ring depth |
+| R-05 | Interrupt storm on detach — handlers active after resource free | High | `bus_teardown_intr` must precede `bus_release_resource` |
+
+## Porting-Guide Verification Checklist
+- DMA lifecycle: tag hierarchy correct, sync bracketing complete (Vol IV).
+- TX path: `if_transmit` entry, TSO flag translation, multi-queue mapping (Vol V).
+- RX path: refill sequence, mbuf lifecycle, pre-alloc pool (Vol VI).
+- Interrupts: MSI-X setup, fast handler + taskqueue, teardown order (Vol VII).
+- Offloads: flag translation compile-time only, no runtime overhead (Vol VIII).
+- Zero-copy: no `memcpy` in TX/RX hot paths verified by static analysis (Vol IX).
+
 ## Output Contract
 ```
 verdict: PASS | FAIL

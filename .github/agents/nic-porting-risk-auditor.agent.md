@@ -45,13 +45,28 @@ Every risk entry must follow this structure:
   - Estimated impact of proceeding without mitigation.
 
 ## Common Risk Categories for NIC Porting
-- Non-native API leakage into data paths.
-- Missing LinuxKPI shim for required kernel function.
-- Zero-copy path regression (memcpy in hot path).
-- Build failure on secondary target (FreeBSD cross-compile).
-- Test coverage gap in ported subsystem.
-- Seam boundary violation (runtime overhead in adapter layer).
-- Dependency on unmerged upstream LinuxKPI patch.
+
+| ID | Description | Severity | Default Mitigation |
+| -- | ----------- | -------- | ------------------ |
+| R-01 | DMA sync omitted — missing `bus_dmamap_sync` before/after DMA access | Critical | Grep audit + dedicated lifecycle test |
+| R-02 | Ring full race — unprotected ring-full check vs doorbell write | Critical | Atomic fence or lock audit + stress test |
+| R-03 | mbuf freed too early — `m_freem` before `bus_dmamap_unload` completes | Critical | Lifecycle sequence test with error injection |
+| R-04 | mbuf exhaustion under flood — pre-alloc pool undersized for line rate | High | Stress test at sustained line rate, pool >= 2x ring depth |
+| R-05 | Interrupt storm on detach — handlers active after resource free | High | Teardown sequence test: detach under load |
+| R-06 | Non-native API leakage into data paths | Critical | Static analysis grep for banned calls |
+| R-07 | Missing LinuxKPI shim for required kernel function | High | API inventory cross-reference (Vol I) |
+| R-08 | Zero-copy path regression (memcpy in hot path) | High | Tracing or static analysis verification |
+| R-09 | Build failure on secondary target (FreeBSD cross-compile) | High | CI cross-compile gate |
+| R-10 | Test coverage gap in ported subsystem | Medium | Coverage report review per phase |
+| R-11 | Seam boundary violation (runtime overhead in adapter layer) | High | Performance benchmark vs baseline |
+| R-12 | Dependency on unmerged upstream LinuxKPI patch | High | Upstream status tracking |
+
+### Volume-to-Risk Mapping
+- **Vol IV (DMA)**: R-01, R-02 are primary risks.
+- **Vol V (TX)**: R-02, R-06, R-08 are primary risks.
+- **Vol VI (RX)**: R-03, R-04, R-08 are primary risks.
+- **Vol VII (Interrupts)**: R-05 is the primary risk.
+- **Vol VIII (Offloads)**: R-06, R-11 are primary risks.
 
 ## Output Contract
 Always return:

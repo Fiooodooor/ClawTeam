@@ -1,33 +1,53 @@
 # Summary
 
-Describe the problem and fix in 2–5 bullets:
-
-If this PR fixes a plugin beta-release blocker, title it `fix(<plugin-id>): beta blocker - <summary>` and link the matching `Beta blocker: <plugin-name> - <summary>` issue labeled `beta-blocker`. Contributors cannot label PRs, so the title is the PR-side signal for maintainers and automation.
-
 - Problem:
 - Why it matters:
 - What changed:
 - What did NOT change (scope boundary):
 
-## Change Type (select all)
+## Change Type
 
 - [ ] Bug fix
 - [ ] Feature
-- [ ] Refactor required for the fix
+- [ ] Refactor
+- [ ] NIC porting slice (specify phase + role below)
 - [ ] Docs
 - [ ] Security hardening
 - [ ] Chore/infra
 
-## Scope (select all touched areas)
+## Scope
 
-- [ ] Gateway / orchestration
+- [ ] ClawTeam CLI / orchestration
+- [ ] Spawn / backends
 - [ ] Skills / tool execution
-- [ ] Auth / tokens
-- [ ] Memory / storage
-- [ ] Integrations
-- [ ] API / contracts
-- [ ] UI / DX
+- [ ] MCP server / transport
+- [ ] Task board / inbox
+- [ ] NIC porting agents / identities
+- [ ] Templates / profiles
+- [ ] Tests
 - [ ] CI/CD / infra
+- [ ] Docs
+
+## NIC Porting Context (if applicable)
+
+| Field         | Value |
+| ------------- | ----- |
+| Driver        |       |
+| Target OS     |       |
+| Phase         |       |
+| Role          |       |
+| Board Task ID |       |
+
+## Gate Checklist (NIC porting PRs)
+
+- [ ] native_score >= 98.0 (no framework/non-native API calls)
+- [ ] portability_score >= 95.0 (cross-compile matrix clean)
+- [ ] test_pass_rate = 100% (all TDD tests green)
+- [ ] build_status = green (Linux + FreeBSD compile)
+- [ ] critical_risks = 0 (no open critical risks in register)
+- [ ] Zero-copy verified (no memcpy in hot paths)
+- [ ] DMA sync discipline followed (PREWRITE/POSTREAD bracketing)
+- [ ] Checker agent PASS verdict attached
 
 ## Linked Issue/PR
 
@@ -37,17 +57,21 @@ If this PR fixes a plugin beta-release blocker, title it `fix(<plugin-id>): beta
 
 ## Root Cause / Regression History (if applicable)
 
-For bug fixes or regressions, explain why this happened, not just what changed. Otherwise write `N/A`. If the cause is unclear, write `Unknown`.
-
 - Root cause:
 - Missing detection / guardrail:
-- Prior context (`git blame`, prior PR, issue, or refactor if known):
+- Prior context:
 - Why this regressed now:
-- If unknown, what was ruled out:
 
-## Regression Test Plan (if applicable)
+## Risk Register Impact
 
-For bug fixes or regressions, name the smallest reliable test coverage that should have caught this. Otherwise write `N/A`.
+- [ ] No new risks introduced
+- [ ] New risk(s) added to register with mitigation owner
+- [ ] Existing risk(s) mitigated or closed (specify IDs):
+
+## Regression Test Plan
+
+For bug fixes, name the test(s) that would have caught this. For porting slices,
+list the TDD tests that validate the change. Otherwise write `N/A`.
 
 - Coverage level that should have caught this:
   - [ ] Unit test

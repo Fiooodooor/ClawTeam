@@ -80,3 +80,28 @@ Produce outputs with these sections:
 4. Gate Thresholds (metric, threshold, enforcer)
 5. Recovery Paths (what happens on gate failure per phase)
 6. Agent File Mapping (which `.agent.md` serves each role)
+
+## Volume-Mapped Deliverables Per Phase
+
+Reference the `nic-porting-guide-references` skill for full details on each volume.
+
+| Phase | Key | Guide Volume(s) | Primary Deliverable | Validation |
+| ----- | --- | ---------------- | ------------------- | ---------- |
+| 0 | scope-baseline | Vol I (Architectural Foundations) | Extracted Linux dataplane file inventory + dependency graph | File list reviewed, scope lock signed |
+| 1 | api-mapping | Vol I | API call inventory with frequency counts + Linux-to-FreeBSD mapping table | native_score >= 98 |
+| 2 | seam-design | Vol II (Portable NIC Core), Vol III (FreeBSD Adapter) | `mynic_osdep.h` + compilable FreeBSD skeleton (`kldload` succeeds) | Build green on both targets |
+| 3 | tdd-harness | Vol II, Vol IX (TDD) | Failing test suite (500+ tests across all subsystems) | All tests red, zero implementation |
+| 4 | incremental-port | Vol IV (DMA), Vol V (TX), Vol VI (RX), Vol VII (Interrupts) | `mynic_dma.c`, `mynic_tx.c`, `mynic_rx.c`, `mynic_intr.c` | Tests go green incrementally |
+| 5 | gates | Vol VII, Vol VIII (Offloads), Vol IX | RSS/TSO/checksum config + full gate validation | native >= 98, portability >= 95, tests 100%, risks 0 |
+| 6 | merge-sync | Vol IX | Reviewed patch set, merge-ready | Portability >= 95, clean rebase |
+| 7 | multi-os-extension | Vol IX | Future OS shim design docs + risk register fully resolved | All risks closed or accepted |
+
+## Known Risk Categories (from Porting Guide)
+
+| ID | Description | Severity | Primary Volume | Mitigation Owner |
+| -- | ----------- | -------- | -------------- | ---------------- |
+| R-01 | DMA sync omitted | Critical | Vol IV | native-validator |
+| R-02 | Ring full race | Critical | Vol IV-V | native-validator |
+| R-03 | mbuf freed too early | Critical | Vol VI | native-validator |
+| R-04 | mbuf exhaustion under flood | High | Vol VI | performance-engineer |
+| R-05 | Interrupt storm on detach | High | Vol VII | verification-executor |
