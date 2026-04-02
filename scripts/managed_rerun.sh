@@ -117,11 +117,15 @@ step "1/7 Activate environment"
 # shellcheck disable=SC1090
 source "$VENV_DIR/bin/activate"
 python3 - <<'PY'
-import importlib
 mods = ["jsonpointer", "langchain_core"]
-missing = [m for m in mods if importlib.util.find_spec(m) is None]
+missing = []
+for m in mods:
+  try:
+    __import__(m)
+  except Exception:
+    missing.append(m)
 if missing:
-    raise SystemExit(f"Missing python modules: {', '.join(missing)}")
+  raise SystemExit("Missing python modules: " + ", ".join(missing))
 print("Python environment check: OK")
 PY
 
