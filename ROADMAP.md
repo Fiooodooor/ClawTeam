@@ -1,209 +1,192 @@
-# ClawTeam Evolution Roadmap
+# ClawTeam Roadmap
 
-## 现状 (v0.2)
+## Current State (v0.2)
+
+Single user -> single machine -> filesystem -> CLI-driven workflow.
+
+- All state is stored under `~/.clawteam/` (team config, tasks, messages)
+- All agents run on the same host
+- Pure file I/O with zero external service dependencies
+
+## Phase 1: Transport Abstraction Layer (v0.3)
+
+**Goal**: Make message transport pluggable without changing upper-layer APIs.
+
+**Architecture change**:
+
+Before:
 
 ```
-单用户 → 单机 → 文件系统 → CLI 驱动
+MailboxManager -> direct file read/write
 ```
 
-- 所有数据在 `~/.clawteam/`（团队配置、任务、消息）
-- 所有 agent 必须在同一台机器
-- 纯文件 I/O，零依赖
+After:
 
----
-
-## Phase 1: Transport 抽象层 (v0.3)
-
-**目标**: 让消息通信层可插拔，不改上层接口。
-
-**架构变化**:
 ```
-现在:
-  MailboxManager → 直接读写文件
-
-Phase 1:
-  MailboxManager → Transport(接口)
-                   ├── FileTransport (默认，当前行为)
-                   └── (未来: RedisTransport, ...)
+MailboxManager -> Transport (interface)
+                  |- FileTransport (default, current behavior)
+                  |- (future: RedisTransport, ...)
 ```
 
-**具体任务**:
+**Work items**:
 
-| 任务 | 描述 | 建议 |
-|------|------|------|
-| 定义 Transport 接口 | `send()`, `receive()`, `peek()`, `peek_count()`, `broadcast()` | 人员 A |
-| 重构 FileTransport | 把 `mailbox.py` 当前的文件操作抽成 `FileTransport` 类 | 人员 A |
-| 重构 MailboxManager | 通过 `CLAWTEAM_TRANSPORT=file` 选择 backend | 人员 A |
-| TaskStore 抽象 | 同样抽出 `FileTaskStore`，预留接口 | 人员 B |
-| 测试 | 确保重构后行为不变 | 人员 B |
+| Task | Description | Owner Suggestion |
+| --- | --- | --- |
+| Define Transport interface | `send()`, `receive()`, `peek()`, `peek_count()`, `broadcast()` | Person A |
+| Refactor FileTransport | Extract current file mailbox logic into `FileTransport` | Person A |
+| Refactor MailboxManager | Select backend via `CLAWTEAM_TRANSPORT=file` | Person A |
+| TaskStore abstraction | Extract `FileTaskStore` and reserve extension points | Person B |
+| Testing | Ensure behavior remains unchanged after refactor | Person B |
 
-**交付物**:
+**Deliverables**:
+
 ```
 clawteam/transport/
-├── __init__.py
-├── base.py           # Transport 抽象基类
-└── file.py           # FileTransport (当前行为)
+|- base.py   # Transport abstract base class
+|- file.py   # FileTransport (current behavior)
 
 clawteam/store/
-├── __init__.py
-├── base.py           # TaskStore 抽象基类
-└── file.py           # FileTaskStore (当前行为)
+|- base.py   # TaskStore abstract base class
+|- file.py   # FileTaskStore (current behavior)
 ```
 
-**验收**: 所有现有命令行为不变，`CLAWTEAM_TRANSPORT=file` 为默认值。
+**Acceptance**: Existing command behavior remains unchanged; `CLAWTEAM_TRANSPORT=file` stays the default.
 
----
+## Phase 2: Redis Message Transport (v0.4)
 
-## Phase 2: Redis Transport (v0.4)
+**Goal**: Support cross-machine message delivery.
 
-**目标**: 支持跨机器消息通信。
+**Architecture**:
 
-**架构变化**:
 ```
-机器A (leader) ─── RedisTransport ──┐
-                                    ├── Redis Server
-机器B (worker) ─── RedisTransport ──┘
+Machine A (leader) -- RedisTransport --+
+                                        |
+Machine B (worker) -- RedisTransport --+
 
-团队配置 / 任务 → 仍然用文件（或共享文件系统）
-消息通信 → Redis (高频，实时)
-```
-
-**具体任务**:
-
-| 任务 | 描述 | 建议 |
-|------|------|------|
-| RedisTransport 实现 | `LPUSH`/`RPOP` 实现 send/receive | 人员 A |
-| 连接管理 | URL 配置、连接池、断线重连 | 人员 A |
-| 配置方式 | `CLAWTEAM_TRANSPORT=redis` + `CLAWTEAM_REDIS_URL=redis://...` | 人员 B |
-| broadcast 实现 | 需要知道团队成员列表 → 依赖 TeamManager | 人员 B |
-| 混合模式 | 消息走 Redis，配置/任务走文件 | 人员 B |
-| 集成测试 | 两台机器（或两个 container）实际跑通 | 一起 |
-
-**新增依赖**: `redis` (pypi)，可选安装 `pip install clawteam[redis]`
-
-**验收**:
-```bash
-# 机器 A
-export CLAWTEAM_TRANSPORT=redis
-export CLAWTEAM_REDIS_URL=redis://192.168.1.100:6379
-clawteam team spawn-team dev-team -n leader
-clawteam spawn tmux claude --team dev-team -n worker1 --task "..."
-
-# 机器 B
-export CLAWTEAM_TRANSPORT=redis
-export CLAWTEAM_REDIS_URL=redis://192.168.1.100:6379
-clawteam inbox receive dev-team --agent worker1
-# => 收到消息 ✅
+Team config and tasks -> still file-based (or shared filesystem)
+Message transport      -> Redis (high-frequency, real-time)
 ```
 
----
+**Work items**:
 
-## Phase 3: 共享状态层 (v0.5)
+| Task | Description | Owner Suggestion |
+| --- | --- | --- |
+| RedisTransport implementation | Use `LPUSH`/`RPOP` for send/receive | Person A |
+| Connection management | URL config, pool, reconnect logic | Person A |
+| Configuration | `CLAWTEAM_TRANSPORT=redis` + `CLAWTEAM_REDIS_URL=redis://...` | Person B |
+| Broadcast implementation | Requires team member listing via TeamManager | Person B |
+| Hybrid mode | Messages via Redis, config/tasks via files | Person B |
+| Integration tests | Verify on 2 machines (or 2 containers) | Shared |
 
-**目标**: 团队配置和任务也能跨机器共享。
+**New dependency**: `redis` (PyPI), optional via `pip install clawteam[redis]`
 
-Phase 2 只解决了消息跨机器，但团队配置（`config.json`）和任务（`task-*.json`）还在本地文件。
+**Acceptance**:
 
-**两种路线（选一个）**:
-
-### 路线 A: NFS / 共享文件系统
+- On machine A:
 
 ```bash
-# 所有机器挂载同一个 NFS
-export CLAWTEAM_DATA_DIR=/mnt/shared/clawteam
-# 零代码改动，直接可用
+CLAWTEAM_TRANSPORT=redis CLAWTEAM_REDIS_URL=redis://127.0.0.1:6379 clawteam inbox send demo worker-a "hello"
 ```
 
-最简单，但依赖网络文件系统基础设施。
+- On machine B:
 
-### 路线 B: Redis 统一存储
-
-```
-消息 → Redis (Phase 2 已做)
-配置 → Redis Hash
-任务 → Redis Hash
-
-所有状态都在 Redis，文件系统只做本地缓存
+```bash
+CLAWTEAM_TRANSPORT=redis CLAWTEAM_REDIS_URL=redis://127.0.0.1:6379 clawteam inbox receive demo --agent worker-a
 ```
 
-**具体任务 (路线 B)**:
+Expected: message is received.
 
-| 任务 | 描述 | 建议 |
-|------|------|------|
-| RedisTeamStore | 团队配置存 Redis Hash | 人员 A |
-| RedisTaskStore | 任务存 Redis Hash | 人员 B |
-| 数据迁移工具 | `clawteam migrate file-to-redis` | 一起 |
-| 统一配置 | `CLAWTEAM_BACKEND=redis` 一个变量搞定所有 | 一起 |
+## Phase 3: Shared State Layer (v0.5)
 
-**验收**: 两台机器共享同一个团队、同一个任务板、同一个消息队列。
+**Goal**: Share team config and tasks across machines, not only messages.
 
----
+Phase 2 only solves cross-machine messaging. Team config (`config.json`) and tasks (`task-*.json`) remain local file data.
 
-## Phase 4: 多用户协作 (v0.6)
+**Two approaches (choose one):**
 
-**目标**: 不同人的 agent 组成一个团队。
+### Option A: NFS / Shared filesystem
 
-**新增能力**:
-
-| 能力 | 描述 |
-|------|------|
-| 用户身份 | 区分"谁的 agent"（不只是 agent name） |
-| 权限模型 | 谁能创建团队、谁能加入、谁能看任务 |
-| 命名空间 | `user1/worker1` vs `user2/worker1` |
-| Token 认证 | 连接 Redis 时验证身份 |
-
-```
-用户 A 的 Claude Code ──┐
-                        ├── Redis ── Team: project-x
-用户 B 的 Claude Code ──┘
-
-用户 A 的 agent 和用户 B 的 agent 在同一个团队里协作
+```bash
+# All machines mount the same NFS path
+# Works with no code changes
 ```
 
----
+Simplest rollout path, but requires network filesystem infrastructure.
 
-## Phase 5: Web UI (v1.0)
-
-**目标**: 浏览器看板，替代终端 Rich 渲染。
+### Option B: Redis as unified store
 
 ```
-clawteam board serve --port 8080
+messages -> Redis (done in Phase 2)
+config   -> Redis Hash
+tasks    -> Redis Hash
+
+All state in Redis; filesystem is local cache only
 ```
 
-- 实时看板（WebSocket 推送）
-- 多团队概览
-- 任务拖拽
-- 消息历史
+**Work items (Option B):**
 
----
+| Task | Description | Owner Suggestion |
+| --- | --- | --- |
+| RedisTeamStore | Store team config in Redis Hash | Person A |
+| RedisTaskStore | Store tasks in Redis Hash | Person B |
+| Migration tool | `clawteam migrate file-to-redis` | Shared |
+| Unified config | One switch: `CLAWTEAM_BACKEND=redis` | Shared |
 
-## 总览
+**Acceptance**: Two machines share one team config, one task board, and one message queue.
+
+## Phase 4: Multi-user Collaboration (v0.6)
+
+**Goal**: Let agents owned by different users collaborate in one team.
+
+**New capabilities**:
+
+| Capability | Description |
+| --- | --- |
+| User identity | Distinguish "whose agent" beyond agent name |
+| Permission model | Who can create/join/view teams/tasks |
+| Namespace | `user1/worker1` vs `user2/worker1` |
+| Token auth | Validate identity when connecting to Redis |
 
 ```
-v0.2         → 单机文件系统，能用
-v0.3 (现在)  → Config 系统 + 多用户协作 + Web UI (已完成，跨机器用 SSHFS)
-v0.4+        → 可选: Transport 抽象层 / Redis (如需超出 SSHFS 的场景)
+User A's Claude Code --+
+                        +-- shared team collaboration
+User B's Claude Code --+
 ```
 
-### v0.3 已完成内容
-- Config 系统：`clawteam config show/set/get/health`
-- 多用户协作：`CLAWTEAM_USER` / `clawteam config set user`，(user, name) 复合唯一性
-- Web UI：`clawteam board serve`，SSE 实时推送，深色主题看板
-- 跨机器方案：SSHFS/云盘 + `CLAWTEAM_DATA_DIR`，零代码改动
+## Future UI and Operations
 
-## 协作建议
+**Goal**: Browser-first dashboard as a richer alternative to terminal rendering.
 
-两人并行的最佳分工模式：
+- Real-time board updates (WebSocket/SSE)
+- Multi-team overview
+- Drag-and-drop task operations
+- Message history timeline
 
-```
-Phase 1:  人员 A — Transport 抽象 + FileTransport
-          人员 B — Store 抽象 + FileTaskStore + 测试
+## Summary
 
-Phase 2:  人员 A — RedisTransport 核心实现
-          人员 B — 配置系统 + broadcast + 集成测试
+- v0.2: single-machine filesystem baseline, usable today
+- v0.3: config + multi-user + Web UI baseline complete (cross-machine via shared FS)
+- v0.4+: optional transport abstraction / Redis path for larger distributed usage
 
-Phase 3:  人员 A — RedisTeamStore
-          人员 B — RedisTaskStore + 迁移工具
-```
+### v0.3 Completed
 
-接口定义（Phase 1）要先一起对齐，后面就可以各做各的。
+- Config system: `clawteam config show/set/get/health`
+- Multi-user support: `CLAWTEAM_USER` / `clawteam config set user`, composite uniqueness via `(user, name)`
+- Web UI: `clawteam board serve` with live updates and dark dashboard
+- Cross-machine pattern: shared FS + `CLAWTEAM_DATA_DIR`, no code changes required
+
+## Collaboration Suggestion
+
+Recommended parallel split for two contributors:
+
+- Phase 1:
+  - Person A: Transport abstraction + FileTransport
+  - Person B: Store abstraction + FileTaskStore + tests
+- Phase 2:
+  - Person A: RedisTransport core
+  - Person B: config wiring + broadcast + integration tests
+- Phase 3:
+  - Person A: RedisTeamStore
+  - Person B: RedisTaskStore + migration tooling
+
+Align interface contracts early in Phase 1, then implement in parallel.
