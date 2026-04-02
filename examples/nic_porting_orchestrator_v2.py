@@ -631,15 +631,19 @@ def _completed_ratio(task_payloads: list[dict[str, Any]]) -> float:
 
 
 def _coerce_metric_value(value: Any) -> float | None:
-    """Convert task metadata values into numeric metrics."""
+    """Convert task metadata values into numeric metrics.
+
+    All pass/fail-style values are normalized onto a 0–100 scale so they align
+    with percent-based gate thresholds (e.g., native_score >= 98, test_pass_rate == 100).
+    """
     if isinstance(value, bool):
-        return 1.0 if value else 0.0
+        return 100.0 if value else 0.0
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, str):
         normalized = value.strip().lower()
         if normalized in {"pass", "passed", "ok", "success", "true"}:
-            return 1.0
+            return 100.0
         if normalized in {"fail", "failed", "error", "false"}:
             return 0.0
         try:
@@ -699,7 +703,14 @@ def _phase_dead_agent_reasons(state: OrchestratorState, dead_agents: list[str]) 
             reasons.append(f"{agent_name}: missing log file {log_path}")
             continue
         try:
-            tail = log_file.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-8:]
+            # Read only the last ~8 KB to bound memory usage on large log files
+            _TAIL_BYTES = 8192
+            with log_file.open("rb") as log_handle:
+                log_handle.seek(0, 2)
+                file_size = log_handle.tell()
+                log_handle.seek(max(0, file_size - _TAIL_BYTES))
+                tail_bytes = log_handle.read()
+            tail = tail_bytes.decode("utf-8", errors="replace").splitlines()[-8:]
         except OSError as exc:
             reasons.append(f"{agent_name}: failed reading log ({exc})")
             continue
