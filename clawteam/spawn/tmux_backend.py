@@ -59,7 +59,14 @@ class TmuxBackend(SpawnBackend):
         if cwd:
             env_vars["CLAWTEAM_WORKSPACE_DIR"] = cwd
         if env:
-            env_vars.update(env)
+            # Keys mapped to the unset sentinel should be REMOVED from the
+            # environment (via explicit ``unset`` in the shell preamble).
+            _UNSET = "__CLAWTEAM_UNSET__"
+            for k, v in env.items():
+                if v == _UNSET:
+                    env_vars.pop(k, None)
+                else:
+                    env_vars[k] = v
         env_vars["PATH"] = build_spawn_path(env_vars.get("PATH", os.environ.get("PATH")))
         if os.path.isabs(clawteam_bin):
             env_vars.setdefault("CLAWTEAM_BIN", clawteam_bin)
@@ -71,9 +78,24 @@ class TmuxBackend(SpawnBackend):
             return command_error
 
         export_str = "; ".join(f"export {k}={shlex.quote(v)}" for k, v in env_vars.items())
+        # Also unset keys that the caller marked for deletion so the tmux
+        # shell (which inherits the tmux server's env) doesn't leak them.
+        if env:
+            _UNSET = "__CLAWTEAM_UNSET__"
+            unset_keys = [k for k, v in env.items() if v == _UNSET]
+            if unset_keys:
+                export_str += "; unset " + " ".join(unset_keys)
 
         # Build the command (without prompt — we'll send it via send-keys)
         final_command = list(normalized_command)
+        # Default Claude agents to Opus 4.6 unless explicitly overridden
+        if _is_claude_command(normalized_command) and not _command_has_model_arg(normalized_command):
+            model = (
+                (env or {}).get("CLAWTEAM_SPAWN_MODEL")
+                or os.environ.get("CLAWTEAM_SPAWN_MODEL")
+                or "claude-opus-4-6"
+            )
+            final_command.extend(["--model", model])
         if skip_permissions:
             if _is_claude_command(normalized_command):
                 final_command.append("--dangerously-skip-permissions")
@@ -232,6 +254,116 @@ class TmuxBackend(SpawnBackend):
         return f"clawteam-{team_name}"
 
     @staticmethod
+    def is_agent_idle(target: str, timeout_seconds: float = 3.0) -> bool:
+        """Claude CLI가 입력 대기(idle) 상태인지 확인.
+
+        tmux capture-pane으로 마지막 몇 줄을 읽고,
+        Claude의 프롬프트 대기 패턴을 감지한다:
+        - "❯" (claude code 프롬프트)
+        - ">" (일반 프롬프트)
+        - "⏵⏵" (bypass permissions indicator)
+        - 빈 줄로 끝나면서 이전 줄에 출력이 있으면 idle
+
+        timeout_seconds 동안 폴링해서 idle이 확인되면 True.
+        """
+        poll_interval = 0.3
+        deadline = time.monotonic() + timeout_seconds
+
+        while time.monotonic() < deadline:
+            result = subprocess.run(
+                ["tmux", "capture-pane", "-p", "-t", target],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                time.sleep(poll_interval)
+                continue
+
+            if _detect_idle_from_pane_output(result.stdout):
+                return True
+
+            time.sleep(poll_interval)
+
+        return False
+
+    def send_followup_prompt(
+        self,
+        target: str,
+        prompt: str,
+        agent_name: str,
+    ) -> str:
+        """기존 tmux 세션에 새 프롬프트를 전송.
+
+        1. is_agent_idle(target) 확인
+        2. idle이면 load-buffer/paste-buffer/Enter로 전송
+        3. idle이 아니면 에러 반환
+
+        Returns:
+            성공 메시지 or "Error: ..."
+        """
+        if not prompt:
+            return "Error: prompt is empty"
+
+        # Early exit: tmux 세션 존재 확인
+        check = subprocess.run(
+            ["tmux", "list-panes", "-t", target, "-F", "#{pane_id}"],
+            capture_output=True,
+            text=True,
+        )
+        if check.returncode != 0 or not check.stdout.strip():
+            return f"Error: tmux target '{target}' not found or has no panes"
+
+        if not self.is_agent_idle(target):
+            return f"Error: agent at '{target}' is not idle (still processing)"
+
+        # load-buffer / paste-buffer / Enter 패턴으로 프롬프트 전송
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, prefix="clawteam-followup-"
+        ) as f:
+            f.write(prompt)
+            tmp_path = f.name
+
+        buffer_name = f"prompt-{agent_name}"
+        try:
+            load = subprocess.run(
+                ["tmux", "load-buffer", "-b", buffer_name, tmp_path],
+                capture_output=True,
+                text=True,
+            )
+            if load.returncode != 0:
+                return f"Error: tmux load-buffer failed: {load.stderr.strip()}"
+
+            paste = subprocess.run(
+                ["tmux", "paste-buffer", "-b", buffer_name, "-t", target],
+                capture_output=True,
+                text=True,
+            )
+            if paste.returncode != 0:
+                return f"Error: tmux paste-buffer failed: {paste.stderr.strip()}"
+
+            time.sleep(0.5)
+            subprocess.run(
+                ["tmux", "send-keys", "-t", target, "Enter"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            time.sleep(0.3)
+            subprocess.run(
+                ["tmux", "send-keys", "-t", target, "Enter"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        finally:
+            subprocess.run(
+                ["tmux", "delete-buffer", "-b", buffer_name],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            os.unlink(tmp_path)
+
+        return f"Followup prompt sent to '{agent_name}' at {target}"
+
+    @staticmethod
     def tile_panes(team_name: str) -> str:
         """Merge all windows into one tiled view. Does NOT attach.
 
@@ -329,6 +461,11 @@ def _command_has_workspace_arg(command: list[str]) -> bool:
     return "-w" in command or "--workspace" in command
 
 
+def _command_has_model_arg(command: list[str]) -> bool:
+    """Return True when a command already specifies a --model flag."""
+    return "--model" in command or "-m" in command
+
+
 def _confirm_workspace_trust_if_prompted(
     target: str,
     command: list[str],
@@ -387,3 +524,52 @@ def _looks_like_workspace_trust_prompt(command: list[str], pane_text: str) -> bo
 def _is_interactive_cli(command: list[str]) -> bool:
     """Check if the command is an interactive AI CLI."""
     return _is_claude_command(command) or _is_codex_command(command) or _is_nanobot_command(command)
+
+
+# ---------- idle detection helpers ----------
+
+_IDLE_PATTERNS: tuple[str, ...] = (
+    "\u276f",   # ❯ (claude code prompt)
+    "\u23f5\u23f5",  # ⏵⏵ (bypass permissions indicator)
+)
+
+
+def _detect_idle_from_pane_output(pane_output: str) -> bool:
+    """tmux capture-pane 출력에서 idle 상태를 감지.
+
+    마지막 비공백 줄 3줄을 검사하여:
+    1. 알려진 프롬프트 패턴(❯, ⏵⏵)이 있으면 idle
+    2. ">" 문자로 시작하는 줄이 있으면 idle
+    3. 마지막 줄이 빈 줄이고 그 이전에 출력이 있으면 idle
+    """
+    if not pane_output:
+        return False
+
+    # trailing newline 감지를 위해 strip 전의 줄 목록 보존
+    raw_lines = pane_output.split("\n")
+    lines = pane_output.rstrip("\n").split("\n")
+
+    # 전체가 빈 출력이면 idle 아님
+    non_empty = [line for line in lines if line.strip()]
+    if not non_empty:
+        return False
+
+    # 마지막 3줄 (비어있지 않은 줄 포함) 검사
+    tail = lines[-3:] if len(lines) >= 3 else lines
+
+    for line in tail:
+        stripped = line.strip()
+        # 알려진 프롬프트 패턴
+        for pattern in _IDLE_PATTERNS:
+            if pattern in stripped:
+                return True
+        # ">" 프롬프트 (단독 또는 줄 시작)
+        if stripped == ">" or stripped.startswith("> "):
+            return True
+
+    # 마지막 줄이 빈 줄이고, 이전 줄에 내용이 있으면 idle
+    # (tmux capture-pane은 idle 상태에서 trailing newline을 포함)
+    if len(raw_lines) >= 2 and not raw_lines[-1].strip() and non_empty:
+        return True
+
+    return False

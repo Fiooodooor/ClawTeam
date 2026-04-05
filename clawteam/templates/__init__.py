@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from typing import Any
+
 from pydantic import BaseModel
 
 # TOML support: built-in on 3.11+, conditional dependency on 3.10
@@ -42,6 +44,8 @@ class TemplateDef(BaseModel):
     leader: AgentDef
     agents: list[AgentDef] = []
     tasks: list[TaskDef] = []
+    investment: dict[str, Any] | None = None
+    devteam: dict[str, Any] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +101,8 @@ def _parse_toml(path: Path) -> TemplateDef:
         leader=leader,
         agents=agents,
         tasks=tasks,
+        investment=tmpl.get("investment"),
+        devteam=tmpl.get("devteam"),
     )
 
 

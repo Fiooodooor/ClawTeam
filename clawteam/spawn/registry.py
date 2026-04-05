@@ -38,6 +38,25 @@ def get_registry(team_name: str) -> dict[str, dict]:
     return _load(_registry_path(team_name))
 
 
+def get_spawn_info(agent_name: str, team_name: str = "") -> dict | None:
+    """Return spawn info for an agent, searching all teams if team_name is empty."""
+    if team_name:
+        registry = get_registry(team_name)
+        return registry.get(agent_name)
+    # Search all teams
+    teams_dir = get_data_dir() / "teams"
+    if not teams_dir.exists():
+        return None
+    for team_dir in teams_dir.iterdir():
+        if not team_dir.is_dir():
+            continue
+        registry = _load(team_dir / "spawn_registry.json")
+        info = registry.get(agent_name)
+        if info:
+            return info
+    return None
+
+
 def is_agent_alive(team_name: str, agent_name: str) -> bool | None:
     """Check if a spawned agent process is still alive.
 

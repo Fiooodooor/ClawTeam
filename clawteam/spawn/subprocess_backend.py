@@ -49,7 +49,14 @@ class SubprocessBackend(SpawnBackend):
         if cwd:
             spawn_env["CLAWTEAM_WORKSPACE_DIR"] = cwd
         if env:
-            spawn_env.update(env)
+            # Keys mapped to the unset sentinel should be REMOVED from the
+            # environment rather than set to empty string.
+            _UNSET = "__CLAWTEAM_UNSET__"
+            for k, v in env.items():
+                if v == _UNSET:
+                    spawn_env.pop(k, None)
+                else:
+                    spawn_env[k] = v
         spawn_env["PATH"] = build_spawn_path(spawn_env.get("PATH"))
         if os.path.isabs(clawteam_bin):
             spawn_env.setdefault("CLAWTEAM_BIN", clawteam_bin)
@@ -61,6 +68,14 @@ class SubprocessBackend(SpawnBackend):
             return command_error
 
         final_command = list(normalized_command)
+        # Default Claude agents to Opus 4.6 unless explicitly overridden
+        if _is_claude_command(normalized_command) and not _command_has_model_arg(normalized_command):
+            model = (
+                (env or {}).get("CLAWTEAM_SPAWN_MODEL")
+                or os.environ.get("CLAWTEAM_SPAWN_MODEL")
+                or "claude-opus-4-6"
+            )
+            final_command.extend(["--model", model])
         if skip_permissions:
             if _is_claude_command(normalized_command):
                 final_command.append("--dangerously-skip-permissions")
@@ -146,3 +161,8 @@ def _is_nanobot_command(command: list[str]) -> bool:
 def _command_has_workspace_arg(command: list[str]) -> bool:
     """Return True when a command already specifies a nanobot workspace."""
     return "-w" in command or "--workspace" in command
+
+
+def _command_has_model_arg(command: list[str]) -> bool:
+    """Return True when a command already specifies a --model flag."""
+    return "--model" in command or "-m" in command

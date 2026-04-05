@@ -2273,5 +2273,531 @@ def launch_team(
     _output(out, _human)
 
 
+# ---------------------------------------------------------------------------
+# devteam — Dev Team Operating Runtime
+# ---------------------------------------------------------------------------
+
+devteam_app = typer.Typer(help="Dev team operating runtime (custom UI + Slack-ready control plane).")
+app.add_typer(devteam_app, name="devteam")
+
+
+@devteam_app.command("bootstrap")
+def devteam_bootstrap(
+    team: str = typer.Argument(..., help="Team name"),
+    template: str = typer.Option("dev-company", help="Template name"),
+    goal: str = typer.Option("", help="Team goal"),
+):
+    """Bootstrap a dev team from a template."""
+    from clawteam.devteam.bootstrap import bootstrap_devteam
+    from clawteam.devteam.models import DevTeamBlueprint
+    from clawteam.templates import load_template
+
+    tmpl = load_template(template)
+    if tmpl.devteam is None:
+        console.print(f"[red]Template '{template}' has no [template.devteam] section.[/red]")
+        raise typer.Exit(1)
+
+    blueprint = DevTeamBlueprint.model_validate(tmpl.devteam)
+    leader = tmpl.leader.name
+    members = [agent.name for agent in tmpl.agents]
+
+    runtime = bootstrap_devteam(
+        template_name=template,
+        team_name=team,
+        goal=goal,
+        leader=leader,
+        members=members,
+        blueprint=blueprint,
+    )
+
+    out = {
+        "team": team,
+        "template": template,
+        "leader": leader,
+        "members": members,
+        "channels": [ch.name for ch in blueprint.channels],
+        "personas": [p.agent for p in blueprint.personas],
+        "stages": [s.stage.value for s in blueprint.workflow_stages],
+    }
+
+    def _human(_):
+        console.print(f"[bold green]Dev team '{team}' bootstrapped from '{template}'[/bold green]")
+        console.print(f"  Leader: {leader}")
+        console.print(f"  Members: {', '.join(members)}")
+        console.print(f"  Channels: {', '.join(out['channels'])}")
+        console.print(f"  Stages: {' → '.join(out['stages'])}")
+        console.print()
+        console.print(f"[bold]Run:[/bold] clawteam devteam run {team}")
+
+    _output(out, _human)
+
+
+@devteam_app.command("run")
+def devteam_run(
+    team: str = typer.Argument(..., help="Team name"),
+    poll_interval: float = typer.Option(5.0, help="Poll interval in seconds"),
+    max_iterations: int = typer.Option(None, help="Max iterations (None = infinite)"),
+):
+    """Start the dev team operating runtime (connects to Slack)."""
+    from clawteam.devteam.runtime import DevTeamOperatingRuntime
+
+    console.print(f"[bold]Starting dev team runtime for '{team}'...[/bold]")
+    runtime = DevTeamOperatingRuntime(team_name=team)
+    try:
+        runtime.run_forever(
+            poll_interval_seconds=poll_interval,
+            max_iterations=max_iterations,
+        )
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Shutting down...[/yellow]")
+    finally:
+        runtime.close()
+
+
+@devteam_app.command("status")
+def devteam_status(
+    team: str = typer.Argument(..., help="Team name"),
+):
+    """Show dev team runtime status."""
+    from clawteam.devteam.bootstrap import load_runtime_blueprint, load_runtime_state
+
+    try:
+        blueprint = load_runtime_blueprint(team)
+        state = load_runtime_state(team)
+    except FileNotFoundError:
+        console.print(f"[red]Dev team '{team}' not found. Run 'clawteam devteam bootstrap' first.[/red]")
+        raise typer.Exit(1)
+
+    out = {
+        "team": team,
+        "template": blueprint.template,
+        "mode": state.mode,
+        "leader": blueprint.leader,
+        "members": blueprint.members,
+        "active_projects": len(state.active_project_threads),
+        "last_heartbeat": state.last_heartbeat_at,
+    }
+
+    def _human(_):
+        console.print(f"[bold]{team}[/bold] ({blueprint.template})")
+        console.print(f"  Mode: {state.mode}")
+        console.print(f"  Leader: {blueprint.leader}")
+        console.print(f"  Members: {', '.join(blueprint.members)}")
+        console.print(f"  Active projects: {len(state.active_project_threads)}")
+        console.print(f"  Last heartbeat: {state.last_heartbeat_at}")
+
+    _output(out, _human)
+
+
+@devteam_app.command("project-list")
+def devteam_project_list(
+    team: str = typer.Argument(..., help="Team name"),
+    status: str = typer.Option("", help="Filter by status (open/completed/cancelled)"),
+):
+    """List dev team projects."""
+    from clawteam.devteam.projects import ProjectManager
+
+    pm = ProjectManager(team)
+    projects = pm.list_projects()
+    if status:
+        projects = [p for p in projects if p.status.value == status]
+
+    out = [
+        {
+            "project_id": p.project_id,
+            "title": p.title,
+            "type": p.project_type.value,
+            "status": p.status.value,
+            "stage": p.stage.value,
+        }
+        for p in projects
+    ]
+
+    def _human(_):
+        if not out:
+            console.print("[dim]No projects found.[/dim]")
+            return
+        table = Table(title=f"Projects ({team})")
+        table.add_column("ID", style="cyan")
+        table.add_column("Title")
+        table.add_column("Type")
+        table.add_column("Status")
+        table.add_column("Stage", style="green")
+        for p in out:
+            table.add_row(
+                p["project_id"][:20],
+                p["title"][:40],
+                p["type"],
+                p["status"],
+                p["stage"],
+            )
+        console.print(table)
+
+    _output(out, _human)
+
+
+@devteam_app.command("project-show")
+def devteam_project_show(
+    team: str = typer.Argument(..., help="Team name"),
+    project_id: str = typer.Argument(..., help="Project ID"),
+):
+    """Show details of a specific project."""
+    from clawteam.devteam.projects import ProjectManager
+
+    pm = ProjectManager(team)
+    project = pm.get_project(project_id)
+    if project is None:
+        console.print(f"[red]Project '{project_id}' not found.[/red]")
+        raise typer.Exit(1)
+
+    out = project.model_dump(mode="json")
+
+    def _human(_):
+        console.print(f"[bold]{project.title}[/bold]")
+        console.print(f"  ID: {project.project_id}")
+        console.print(f"  Type: {project.project_type.value}")
+        console.print(f"  Status: {project.status.value}")
+        console.print(f"  Stage: [green]{project.stage.value}[/green]")
+        if project.description:
+            console.print(f"  Description: {project.description[:200]}")
+        if project.assigned_agents:
+            console.print(f"  Assigned: {', '.join(project.assigned_agents)}")
+        if project.thread:
+            console.print(f"  Thread: #{project.thread.channel_name} ({project.thread.thread_ts})")
+
+    _output(out, _human)
+
+
+@devteam_app.command("request")
+def devteam_request(
+    team: str = typer.Argument(..., help="Team name"),
+    title: str = typer.Option(..., "--title", help="Request title"),
+    description: str = typer.Option("", "--description", help="Request description"),
+    project_type: str = typer.Option("feature", "--type", help="Project type"),
+    requested_by: str = typer.Option("CEO", "--requested-by", help="Requester display name"),
+):
+    """Submit a CEO request into the devteam control plane."""
+    from clawteam.devteam.control import DevTeamControlService
+
+    service = DevTeamControlService(team)
+    project = service.submit_request(
+        title=title,
+        description=description,
+        project_type=project_type,
+        requested_by=requested_by,
+    )
+    out = project.model_dump(mode="json")
+
+    def _human(_):
+        console.print(f"[bold green]Request submitted:[/bold green] {project.title}")
+        console.print(f"  Project ID: {project.project_id}")
+        console.print(f"  Type: {project.project_type.value}")
+        console.print(f"  Stage: [green]{project.stage.value}[/green]")
+        console.print(f"  Requested by: {requested_by}")
+
+    _output(out, _human)
+
+
+@devteam_app.command("approve")
+def devteam_approve(
+    team: str = typer.Argument(..., help="Team name"),
+    project_id: str = typer.Argument(..., help="Project ID"),
+    approved_by: str = typer.Option("CEO", "--approved-by", help="Approver display name"),
+):
+    """Approve the current stage and advance the project."""
+    from clawteam.devteam.control import DevTeamControlService
+
+    service = DevTeamControlService(team)
+    try:
+        project = service.approve_stage(project_id=project_id, approved_by=approved_by)
+    except FileNotFoundError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+    out = project.model_dump(mode="json")
+
+    def _human(_):
+        console.print(f"[bold green]Stage approved[/bold green] for {project.project_id}")
+        console.print(f"  Title: {project.title}")
+        console.print(f"  New stage: [green]{project.stage.value}[/green]")
+        console.print(f"  Approved by: {approved_by}")
+
+    _output(out, _human)
+
+
+@devteam_app.command("add-note")
+def devteam_add_note(
+    team: str = typer.Argument(..., help="Team name"),
+    title: str = typer.Option(..., "--title", help="Activity title"),
+    body: str = typer.Option("", "--body", help="Activity body"),
+    kind: str = typer.Option("note", "--kind", help="Activity kind: note/meeting/decision/worklog"),
+    author: str = typer.Option("CEO", "--author", help="Author display name"),
+    project_id: str = typer.Option("", "--project-id", help="Optional project ID"),
+    participants: Optional[list[str]] = typer.Option(None, "--participant", help="Repeatable participant names"),
+):
+    """Append a note, meeting, decision, or worklog activity."""
+    from clawteam.devteam.control import DevTeamControlService
+
+    service = DevTeamControlService(team)
+    activity = service.add_note(
+        title=title,
+        body=body,
+        author=author,
+        project_id=project_id,
+        participants=participants or [],
+        kind=kind,
+    )
+    out = activity.model_dump(mode="json")
+
+    def _human(_):
+        console.print(f"[bold green]Activity recorded[/bold green] ({activity.kind.value})")
+        console.print(f"  Title: {activity.title}")
+        if activity.project_id:
+            console.print(f"  Project ID: {activity.project_id}")
+        console.print(f"  Author: {activity.author or '(unknown)'}")
+
+    _output(out, _human)
+
+
+@devteam_app.command("activity-list")
+def devteam_activity_list(
+    team: str = typer.Argument(..., help="Team name"),
+    project_id: str = typer.Option("", "--project-id", help="Filter by project ID"),
+    limit: int = typer.Option(20, "--limit", min=1, max=200, help="Maximum activities to show"),
+):
+    """List recorded devteam control-plane activities."""
+    from clawteam.devteam.controlplane import ControlPlaneStore
+
+    store = ControlPlaneStore(team)
+    activities = store.list_activities(limit=limit, project_id=project_id)
+    out = [activity.model_dump(mode="json") for activity in activities]
+
+    def _human(_):
+        if not activities:
+            console.print("[dim]No activities found.[/dim]")
+            return
+        table = Table(title=f"Activities ({team})")
+        table.add_column("When", style="dim")
+        table.add_column("Kind", style="cyan")
+        table.add_column("Title")
+        table.add_column("Project", style="green")
+        table.add_column("Author")
+        for activity in activities:
+            table.add_row(
+                activity.created_at[:19],
+                activity.kind.value,
+                activity.title[:50],
+                activity.project_id[:16],
+                activity.author,
+            )
+        console.print(table)
+
+    _output(out, _human)
+
+
+@devteam_app.command("add-job")
+def devteam_add_job(
+    team: str = typer.Argument(..., help="Team name"),
+    title: str = typer.Option(..., "--title", help="Recurring job title"),
+    cadence: str = typer.Option(..., "--cadence", help="Cadence expression"),
+    owner: str = typer.Option(..., "--owner", help="Owning agent"),
+    instruction: str = typer.Option(..., "--instruction", help="Execution instruction"),
+    channels: Optional[list[str]] = typer.Option(None, "--channel", help="Repeatable output channels"),
+    created_by: str = typer.Option("CEO", "--created-by", help="Creator display name"),
+):
+    """Register a recurring job in the devteam control plane."""
+    from clawteam.devteam.control import DevTeamControlService
+
+    service = DevTeamControlService(team)
+    job = service.add_job(
+        title=title,
+        cadence=cadence,
+        owner=owner,
+        instruction=instruction,
+        channels=channels or [],
+        created_by=created_by,
+    )
+    out = job.model_dump(mode="json")
+
+    def _human(_):
+        console.print(f"[bold green]Recurring job added[/bold green] {job.title}")
+        console.print(f"  Key: {job.key}")
+        console.print(f"  Cadence: {job.cadence}")
+        console.print(f"  Owner: {job.owner}")
+
+    _output(out, _human)
+
+
+@devteam_app.command("job-list")
+def devteam_job_list(
+    team: str = typer.Argument(..., help="Team name"),
+    include_disabled: bool = typer.Option(False, "--all", help="Include disabled jobs"),
+):
+    """List recurring jobs registered in the devteam control plane."""
+    from clawteam.devteam.controlplane import ControlPlaneStore
+
+    store = ControlPlaneStore(team)
+    jobs = store.list_jobs(include_disabled=include_disabled)
+    out = [job.model_dump(mode="json") for job in jobs]
+
+    def _human(_):
+        if not jobs:
+            console.print("[dim]No recurring jobs found.[/dim]")
+            return
+        table = Table(title=f"Recurring Jobs ({team})")
+        table.add_column("Key", style="cyan")
+        table.add_column("Title")
+        table.add_column("Cadence")
+        table.add_column("Owner", style="green")
+        table.add_column("Last Run", style="dim")
+        table.add_column("Enabled")
+        for job in jobs:
+            table.add_row(
+                job.key,
+                job.title[:40],
+                job.cadence,
+                job.owner,
+                job.last_run_at[:19],
+                "yes" if job.enabled else "no",
+            )
+        console.print(table)
+
+    _output(out, _human)
+
+
+# ============================================================================
+# Company Commands (one-command startup)
+# ============================================================================
+
+company_app = typer.Typer(help="AI Company OS — one-command startup, dashboard, and lifecycle management.")
+app.add_typer(company_app, name="company")
+
+
+@company_app.command("up")
+def company_up(
+    team: str = typer.Argument(..., help="Team name"),
+    template: str = typer.Option("dev-company", help="Template name for bootstrap"),
+    goal: str = typer.Option("", help="Team goal"),
+    port: int = typer.Option(8080, "--port", "-p", help="HTTP server port"),
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind address"),
+    interval: float = typer.Option(2.0, "--interval", "-i", help="SSE push interval in seconds"),
+    no_autostart: bool = typer.Option(False, "--no-autostart", help="Don't auto-start the runtime supervisor"),
+):
+    """Bootstrap (if needed) and launch the AI Company OS dashboard.
+
+    This is the primary entry point: one command to bootstrap the team,
+    start the background runtime supervisor, and serve the interactive web UI.
+    """
+    from clawteam.devteam.bootstrap import bootstrap_devteam, load_runtime_blueprint
+    from clawteam.devteam.models import DevTeamBlueprint
+    from clawteam.board.server import serve
+
+    # 1. Bootstrap if not already done
+    try:
+        load_runtime_blueprint(team)
+        console.print(f"[dim]Team '{team}' already bootstrapped.[/dim]")
+    except FileNotFoundError:
+        from clawteam.templates import load_template
+
+        tmpl = load_template(template)
+        if tmpl.devteam is None:
+            console.print(f"[red]Template '{template}' has no [template.devteam] section.[/red]")
+            raise typer.Exit(1)
+
+        blueprint = DevTeamBlueprint.model_validate(tmpl.devteam)
+        leader = tmpl.leader.name
+        members = [agent.name for agent in tmpl.agents]
+
+        bootstrap_devteam(
+            template_name=template,
+            team_name=team,
+            goal=goal,
+            leader=leader,
+            members=members,
+            blueprint=blueprint,
+        )
+        console.print(f"[bold green]Dev team '{team}' bootstrapped from '{template}'.[/bold green]")
+
+    # 2. Auto-start supervisor
+    if not no_autostart:
+        from clawteam.devteam.supervisor import get_company_supervisor
+
+        supervisor = get_company_supervisor(team)
+        supervisor.start()
+        console.print(f"[bold green]Company runtime started.[/bold green]")
+
+    # 3. Serve the dashboard
+    console.print(f"\n[bold]AI Company OS → http://{host}:{port}[/bold]")
+    console.print(f"Team: {team} · Press Ctrl+C to stop.\n")
+    try:
+        serve(host=host, port=port, default_team=team, interval=interval)
+    finally:
+        if not no_autostart:
+            try:
+                from clawteam.devteam.supervisor import get_company_supervisor
+
+                get_company_supervisor(team).stop()
+                console.print("[yellow]Runtime supervisor stopped.[/yellow]")
+            except Exception:
+                pass
+
+
+@company_app.command("down")
+def company_down(
+    team: str = typer.Argument(..., help="Team name"),
+):
+    """Stop the company runtime supervisor."""
+    from clawteam.devteam.supervisor import get_company_supervisor
+
+    supervisor = get_company_supervisor(team)
+    state = supervisor.stop()
+    out = state.model_dump(mode="json")
+
+    def _human(_):
+        console.print(f"[yellow]Company '{team}' runtime stopped.[/yellow]")
+        console.print(f"  Status: {state.status.value}")
+
+    _output(out, _human)
+
+
+@company_app.command("status")
+def company_status(
+    team: str = typer.Argument(..., help="Team name"),
+):
+    """Show company runtime status."""
+    from clawteam.devteam.bootstrap import load_runtime_blueprint
+    from clawteam.devteam.eventstore import DevEventStore
+
+    try:
+        blueprint = load_runtime_blueprint(team)
+    except FileNotFoundError:
+        console.print(f"[red]Team '{team}' not bootstrapped. Run: clawteam company up {team}[/red]")
+        raise typer.Exit(1)
+
+    events = DevEventStore(team)
+    state = events.get_company_state()
+    out = {
+        "team": team,
+        "template": blueprint.template,
+        "goal": blueprint.goal,
+        "company": state.model_dump(mode="json"),
+    }
+
+    def _human(_):
+        console.print(f"[bold]{team}[/bold] — {blueprint.template}")
+        if blueprint.goal:
+            console.print(f"  Goal: {blueprint.goal}")
+        status_color = "green" if state.status.value == "online" else "yellow" if state.status.value == "stopped" else "red"
+        console.print(f"  Status: [{status_color}]{state.status.value}[/{status_color}]")
+        console.print(f"  Runtime: {state.runtime_status}")
+        console.print(f"  Scheduler: {state.scheduler_status}")
+        console.print(f"  Active sessions: {state.active_sessions}")
+        console.print(f"  Last heartbeat: {state.last_heartbeat_at[:19] if state.last_heartbeat_at else 'never'}")
+        if state.errors:
+            console.print(f"  [red]Errors: {len(state.errors)}[/red]")
+
+    _output(out, _human)
+
+
 if __name__ == "__main__":
     app()
