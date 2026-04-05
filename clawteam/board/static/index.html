@@ -1,16 +1,1603 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ClawTeam Nexus</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="/assets/index-G3o_UaVN.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-XwtARCXM.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClawTeam</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1F43E;</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        surface: { DEFAULT: '#141414', hover: '#1a1a1a', deep: '#0a0a0a' },
+        border: '#262626',
+        accent: '#3b82f6',
+        success: '#22c55e',
+        warn: '#f59e0b',
+        danger: '#ef4444',
+      },
+      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+    },
+  },
+}
+</script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+<script src="https://unpkg.com/dayjs@1.11.13/dayjs.min.js"></script>
+<script src="https://unpkg.com/dayjs@1.11.13/plugin/relativeTime.js"></script>
+<script>dayjs.extend(dayjs_plugin_relativeTime)</script>
+<script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #0a0a0a; color: #fafafa; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #444; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+  @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+  .animate-slide-in { animation: slideInRight 0.25s ease-out; }
+  .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+  .toast-enter { animation: fadeIn 0.2s ease-out; }
+  input::placeholder, textarea::placeholder { color: #525252; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo, useCallback, createContext, useContext } = React;
+const html = htm.bind(React.createElement);
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const STAGES = ['intake','think','plan','build','review','test','security','ship','reflect'];
+const STAGE_META = {
+  intake:   { label: 'Intake',   color: '#a855f7', icon: 'inbox' },
+  think:    { label: 'Think',    color: '#3b82f6', icon: 'brain' },
+  plan:     { label: 'Plan',     color: '#06b6d4', icon: 'clipboard-list' },
+  build:    { label: 'Build',    color: '#6366f1', icon: 'hammer' },
+  review:   { label: 'Review',   color: '#eab308', icon: 'eye' },
+  test:     { label: 'Test',     color: '#22c55e', icon: 'flask-conical' },
+  security: { label: 'Security', color: '#ef4444', icon: 'shield-check' },
+  ship:     { label: 'Ship',     color: '#f97316', icon: 'rocket' },
+  reflect:  { label: 'Reflect',  color: '#6b7280', icon: 'rotate-ccw' },
+};
+const TYPE_COLORS = { feature: '#3b82f6', bugfix: '#ef4444', refactor: '#a855f7', spike: '#f59e0b', code_review: '#06b6d4', log_analysis: '#22c55e', e2e_test: '#8b5cf6', quick_task: '#f97316' };
+const PIPELINE_STAGES = {
+  feature: STAGES,
+  bugfix: STAGES,
+  refactor: STAGES,
+  spike: ['intake', 'think', 'reflect'],
+  code_review: ['intake', 'review', 'reflect'],
+  log_analysis: ['intake', 'think', 'reflect'],
+  e2e_test: ['intake', 'build', 'test', 'reflect'],
+  quick_task: ['intake', 'reflect'],
+};
+const TYPE_LABELS = { feature: 'Feature', bugfix: 'Bugfix', refactor: 'Refactor', spike: 'Spike', code_review: 'Code Review', log_analysis: 'Log Analysis', e2e_test: 'E2E Test', quick_task: 'Quick Task' };
+const STATUS_COLORS = { online: '#22c55e', starting: '#f59e0b', degraded: '#f59e0b', stopping: '#f59e0b', stopped: '#6b7280' };
+const ACTIVITY_ICONS = {
+  ceo_request: 'message-square', human_message: 'user', agent_message: 'bot',
+  meeting: 'users', note: 'sticky-note', decision: 'check-circle',
+  worklog: 'file-text', schedule: 'clock', stage_transition: 'arrow-right',
+  system: 'settings', error: 'alert-triangle',
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function postJson(url, body) {
+  return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) })
+    .then(r => r.json().then(d => r.ok ? d : Promise.reject(new Error(d.error || 'Request failed'))));
+}
+function ago(v) { return v ? dayjs(v).fromNow() : '--'; }
+function ts(v) { return v ? String(v).replace('T', ' ').slice(0, 19) : '--'; }
+function initials(name) { return (name || '?').split('-').map(w => w[0] || '').join('').toUpperCase().slice(0, 2); }
+
+const AGENT_COLORS = {
+  'chief-of-staff': '#a855f7', 'cto': '#3b82f6', 'lead-engineer': '#6366f1',
+  'designer': '#f97316', 'qa-lead': '#22c55e', 'security-officer': '#ef4444', 'devops': '#06b6d4',
+};
+function agentColor(name) { return AGENT_COLORS[name] || '#6b7280'; }
+
+// ─── Icon Component ──────────────────────────────────────────────────────────
+
+function Icon({ name, size = 16, className = '', strokeWidth = 2, ...props }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current && lucide.icons[name]) {
+      const [tag, attrs, children] = lucide.icons[name];
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      Object.entries({ ...attrs, width: size, height: size, 'stroke-width': strokeWidth }).forEach(([k, v]) => svg.setAttribute(k, String(v)));
+      children.forEach(([childTag, childAttrs]) => {
+        const el = document.createElementNS('http://www.w3.org/2000/svg', childTag);
+        Object.entries(childAttrs).forEach(([k, v]) => el.setAttribute(k, String(v)));
+        svg.appendChild(el);
+      });
+      ref.current.innerHTML = '';
+      ref.current.appendChild(svg);
+    }
+  }, [name, size, strokeWidth]);
+  return html`<span ref=${ref} className=${`inline-flex items-center ${className}`} ...${props} />`;
+}
+
+// ─── Toast System ────────────────────────────────────────────────────────────
+
+const ToastContext = createContext(null);
+function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((msg, type = 'info') => {
+    const id = Date.now();
+    setToasts(t => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
+  }, []);
+  return (
+    <ToastContext.Provider value={addToast}>
+      {children}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast-enter px-4 py-2.5 rounded-lg text-sm font-medium shadow-lg border ${
+            t.type === 'success' ? 'bg-green-950 border-green-800 text-green-300' :
+            t.type === 'error' ? 'bg-red-950 border-red-800 text-red-300' :
+            'bg-surface border-border text-zinc-300'
+          }`}>{t.msg}</div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+function useToast() { return useContext(ToastContext); }
+
+// ─── Reusable UI Components ─────────────────────────────────────────────────
+
+function Badge({ children, color = '#3b82f6', className = '' }) {
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${className}`}
+    style={{ background: color + '20', color }}>{children}</span>;
+}
+
+function StatusDot({ status, size = 8 }) {
+  const color = STATUS_COLORS[status] || '#6b7280';
+  return <span className={status === 'online' ? 'pulse-dot' : ''} style={{
+    display: 'inline-block', width: size, height: size, borderRadius: '50%', background: color,
+  }} />;
+}
+
+function AgentAvatar({ name, size = 32 }) {
+  const color = agentColor(name);
+  return (
+    <div className="rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+      style={{ width: size, height: size, background: color + '25', color, border: `1.5px solid ${color}50` }}>
+      {initials(name)}
+    </div>
+  );
+}
+
+function Btn({ children, variant = 'default', size = 'sm', className = '', ...props }) {
+  const base = 'inline-flex items-center justify-center gap-1.5 font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
+  const sizes = { xs: 'px-2 py-1 text-[11px]', sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm' };
+  const variants = {
+    default: 'bg-surface hover:bg-surface-hover border border-border text-zinc-300',
+    primary: 'bg-accent hover:bg-blue-600 text-white',
+    success: 'bg-green-600 hover:bg-green-700 text-white',
+    danger: 'bg-red-600 hover:bg-red-700 text-white',
+    ghost: 'hover:bg-surface text-zinc-400 hover:text-zinc-200',
+    warn: 'bg-amber-600 hover:bg-amber-700 text-white',
+  };
+  return <button className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...props}>{children}</button>;
+}
+
+function EmptyState({ icon = 'inbox', title, subtitle }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <Icon name={icon} size={40} className="text-zinc-700 mb-3" />
+      <p className="text-zinc-500 text-sm font-medium">{title}</p>
+      {subtitle && <p className="text-zinc-600 text-xs mt-1">{subtitle}</p>}
+    </div>
+  );
+}
+
+function StageBadge({ stage }) {
+  const m = STAGE_META[stage] || {};
+  return <Badge color={m.color || '#6b7280'}>{m.label || stage}</Badge>;
+}
+
+function TypeBadge({ type }) {
+  return <Badge color={TYPE_COLORS[type] || '#6b7280'}>{type}</Badge>;
+}
+
+// ─── App State & Data ────────────────────────────────────────────────────────
+
+function useAppData(team) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!team) return;
+    setLoading(true);
+    let sse = null;
+    let retryTimeout = null;
+    let alive = true;
+
+    function connect() {
+      if (!alive) return;
+      sse = new EventSource(`/api/events/${team}`);
+      sse.onmessage = (e) => {
+        try {
+          const parsed = JSON.parse(e.data);
+          if (!parsed.error) { setData(parsed); setLoading(false); }
+        } catch {}
+      };
+      sse.onerror = () => {
+        sse.close();
+        retryTimeout = setTimeout(connect, 3000);
+      };
+    }
+
+    // Initial fetch then connect SSE
+    fetch(`/api/team/${team}`).then(r => r.json()).then(d => {
+      if (alive && !d.error) { setData(d); setLoading(false); }
+    }).catch(() => {});
+    connect();
+
+    return () => { alive = false; if (sse) sse.close(); if (retryTimeout) clearTimeout(retryTimeout); };
+  }, [team]);
+
+  return { data, loading };
+}
+
+function useTeams() {
+  const [teams, setTeams] = useState([]);
+  useEffect(() => {
+    fetch('/api/overview').then(r => r.json()).then(setTeams).catch(() => {});
+  }, []);
+  return teams;
+}
+
+// ─── New Project Modal ───────────────────────────────────────────────────────
+
+function NewProjectModal({ team, open, onClose }) {
+  const [title, setTitle] = useState('');
+  const [desc, setDesc] = useState('');
+  const [type, setType] = useState('feature');
+  const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
+  const inputRef = useRef(null);
+
+  useEffect(() => { if (open) { setTitle(''); setDesc(''); setType('feature'); setTimeout(() => inputRef.current?.focus(), 100); } }, [open]);
+
+  const submit = async () => {
+    if (!title.trim()) return;
+    setSubmitting(true);
+    try {
+      await postJson(`/api/devteam/${team}/request`, { title: title.trim(), description: desc.trim(), projectType: type });
+      toast('Project created', 'success');
+      onClose();
+    } catch (e) { toast(e.message, 'error'); }
+    setSubmitting(false);
+  };
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div className="bg-surface border border-border rounded-xl w-full max-w-lg mx-4 p-6 animate-fade-in" onClick={e => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold mb-4">New Project</h2>
+        <div className="space-y-3">
+          <input ref={inputRef} className="w-full bg-surface-deep border border-border rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent transition-colors" placeholder="Project title..." value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submit()} />
+          <textarea className="w-full bg-surface-deep border border-border rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-accent transition-colors resize-none h-20" placeholder="Description (optional)..." value={desc} onChange={e => setDesc(e.target.value)} />
+          <div className="flex gap-2">
+            {['feature','bugfix','refactor','spike','code_review','log_analysis','e2e_test','quick_task'].map(t => (
+              <button key={t} onClick={() => setType(t)} className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${type === t ? 'border-accent bg-accent/10 text-accent' : 'border-border bg-surface-deep text-zinc-400 hover:text-zinc-200'}`}>{TYPE_LABELS[t] || t}</button>
+            ))}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <Btn onClick={onClose}>Cancel</Btn>
+          <Btn variant="primary" onClick={submit} disabled={submitting || !title.trim()}>{submitting ? 'Creating...' : 'Create Project'}</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Project Detail Panel ────────────────────────────────────────────────────
+
+function ProjectDetail({ project, team, onClose, personas }) {
+  const [injectText, setInjectText] = useState('');
+  const [reroute, setReroute] = useState('');
+  const toast = useToast();
+  const ledgerEndRef = useRef(null);
+
+  useEffect(() => { ledgerEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [project?.ledger]);
+
+  if (!project) return null;
+  const p = project;
+  const pipelineStages = PIPELINE_STAGES[p.projectType || p.project_type] || STAGES;
+  const stageIdx = pipelineStages.indexOf(p.stage);
+
+  const action = async (act, body) => {
+    try {
+      await postJson(`/api/devteam/${team}/projects/${p.projectId || p.project_id}/${act}`, body);
+      toast(`Action "${act}" successful`, 'success');
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/40" onClick={onClose}>
+      <div className="w-full max-w-2xl bg-surface-deep border-l border-border h-full overflow-y-auto animate-slide-in" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 bg-surface-deep/95 backdrop-blur border-b border-border px-6 py-4 flex items-center justify-between z-10">
+          <div className="flex items-center gap-3">
+            <TypeBadge type={p.projectType} />
+            <h2 className="text-base font-semibold truncate">{p.title}</h2>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 transition-colors"><Icon name="x" size={18} /></button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Status & Stage */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <Badge color={p.status === 'open' ? '#3b82f6' : p.status === 'paused' ? '#f59e0b' : p.status === 'completed' ? '#22c55e' : '#6b7280'}>{p.status}</Badge>
+            <StageBadge stage={p.stage} />
+            {p.waitingForHuman && <Badge color="#f59e0b">Awaiting Approval</Badge>}
+            <span className="text-xs text-zinc-500">Owner: {p.effectiveOwner || p.stageOwner || '--'}</span>
+          </div>
+
+          {p.description && <p className="text-sm text-zinc-400 leading-relaxed">{p.description}</p>}
+
+          {/* Sprint Progress */}
+          <div>
+            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Sprint Progress</h3>
+            <div className="flex items-center gap-1">
+              {pipelineStages.map((s, i) => {
+                const meta = STAGE_META[s] || { label: s, color: '#6b7280' };
+                const isCurrent = s === p.stage;
+                const isPast = i < stageIdx;
+                return (
+                  <div key={s} className="flex-1 flex flex-col items-center gap-1.5">
+                    <div className={`w-full h-1.5 rounded-full transition-colors ${isPast ? 'opacity-100' : isCurrent ? 'opacity-100' : 'opacity-20'}`}
+                      style={{ background: meta.color }} />
+                    <span className={`text-[10px] ${isCurrent ? 'text-zinc-200 font-medium' : isPast ? 'text-zinc-500' : 'text-zinc-700'}`}>{meta.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Completion Report */}
+          {p.metadata?.completion_report && (
+            <div className="bg-green-950/30 border border-green-800/50 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-green-400 uppercase tracking-wider mb-2">Completion Report</h3>
+              <p className="text-sm text-zinc-300 whitespace-pre-wrap">{p.metadata.completion_report}</p>
+            </div>
+          )}
+
+          {/* Completed At */}
+          {p.status === 'completed' && p.metadata?.completed_at && (
+            <div className="text-xs text-zinc-500">
+              Completed: {ago(p.metadata.completed_at)}
+            </div>
+          )}
+
+          {/* GitHub PR Info */}
+          {p.githubPR && (
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">GitHub PR</h3>
+              <div className="bg-surface border border-border rounded-xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <a href={p.githubPR.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline font-medium">
+                    {p.githubPR.repo}#{p.githubPR.number}
+                  </a>
+                  <Badge color={p.githubPR.checksStatus === 'success' ? '#22c55e' : p.githubPR.checksStatus === 'failure' ? '#ef4444' : '#f59e0b'}>
+                    checks: {p.githubPR.checksStatus || 'pending'}
+                  </Badge>
+                  {p.githubPR.reviewDecision && (
+                    <Badge color={p.githubPR.reviewDecision === 'APPROVED' ? '#22c55e' : p.githubPR.reviewDecision === 'CHANGES_REQUESTED' ? '#ef4444' : '#6b7280'}>
+                      {p.githubPR.reviewDecision.toLowerCase()}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2">
+            {p.waitingForHuman && <Btn variant="success" onClick={() => action('approve')}><Icon name="check" size={13} /> Approve</Btn>}
+            {p.status === 'open' && <Btn variant="warn" onClick={() => action('pause')}><Icon name="pause" size={13} /> Pause</Btn>}
+            {p.status === 'paused' && <Btn variant="primary" onClick={() => action('resume')}><Icon name="play" size={13} /> Resume</Btn>}
+            <Btn variant="danger" onClick={() => { if (confirm('Delete this project?')) action('delete'); }}><Icon name="trash-2" size={13} /> Delete</Btn>
+          </div>
+
+          {/* Reroute */}
+          <div className="flex gap-2 items-center">
+            <select className="bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-zinc-300 outline-none" value={reroute} onChange={e => setReroute(e.target.value)}>
+              <option value="">Reroute to stage...</option>
+              {STAGES.map(s => <option key={s} value={s}>{STAGE_META[s].label}</option>)}
+            </select>
+            <Btn size="xs" disabled={!reroute} onClick={() => { action('reroute', { stage: reroute }); setReroute(''); }}>Reroute</Btn>
+          </div>
+
+          {/* Inject Instruction */}
+          <div>
+            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Inject Instruction</h3>
+            <div className="flex gap-2">
+              <input className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-accent transition-colors" placeholder="Add instruction..." value={injectText} onChange={e => setInjectText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && injectText.trim()) { action('inject', { instruction: injectText.trim() }); setInjectText(''); }}} />
+              <Btn variant="primary" disabled={!injectText.trim()} onClick={() => { action('inject', { instruction: injectText.trim() }); setInjectText(''); }}>Send</Btn>
+            </div>
+          </div>
+
+          {/* Conversation Ledger */}
+          <div>
+            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Conversation Ledger ({(p.ledger || []).length})</h3>
+            <div className="max-h-80 overflow-y-auto space-y-1.5 pr-1">
+              {(p.ledger || []).length === 0 && <p className="text-xs text-zinc-600">No messages yet</p>}
+              {(p.ledger || []).map((msg, i) => {
+                const agentId = msg.agent || msg.from || '';
+                const persona = personas.find(pp => pp.agent === agentId);
+                const speakerName = persona?.display_name || persona?.displayName || msg.from || msg.role || agentId || 'System';
+                const isHuman = msg.role === 'human' || msg.from === 'CEO';
+                return (
+                <div key={i} className={`text-xs px-3 py-2 rounded-lg border-l-2 ${isHuman ? 'bg-blue-950/30 border-l-blue-500' : 'bg-surface border-l-zinc-700'}`}>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    {persona && <AgentAvatar name={agentId} size={18} />}
+                    <span className="font-medium text-zinc-300">{speakerName}</span>
+                    {msg.action && <Badge color="#333">{msg.action}</Badge>}
+                    {msg.stage && <StageBadge stage={msg.stage} />}
+                    <span className="text-zinc-600 ml-auto">{ago(msg.ts || msg.timestamp)}</span>
+                  </div>
+                  <p className="text-zinc-400 whitespace-pre-wrap break-words">{msg.text || msg.body || msg.content || JSON.stringify(msg)}</p>
+                </div>
+                );
+              })}
+              <div ref={ledgerEndRef} />
+            </div>
+          </div>
+
+          {/* Sessions */}
+          {(p.sessions || []).length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Sessions ({p.sessions.length})</h3>
+              <div className="space-y-2">
+                {p.sessions.map(s => (
+                  <div key={s.sessionId || s.session_id} className="bg-surface rounded-lg p-3 text-xs border border-border">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AgentAvatar name={s.agentName || s.agent_name} size={20} />
+                      <span className="font-medium text-zinc-300">{s.agentName || s.agent_name}</span>
+                      <Badge color={s.status === 'running' ? '#22c55e' : s.status === 'completed' ? '#6b7280' : '#f59e0b'}>{s.status}</Badge>
+                    </div>
+                    {s.liveLog && <pre className="mt-2 text-[10px] text-zinc-500 bg-surface-deep rounded p-2 overflow-x-auto max-h-32 whitespace-pre-wrap">{s.liveLog}</pre>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Meetings */}
+          {(p.meetings || []).length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Meetings ({p.meetings.length})</h3>
+              <div className="space-y-2">
+                {p.meetings.map(m => (
+                  <div key={m.meetingId || m.meeting_id} className="bg-surface rounded-lg p-3 text-xs border border-border">
+                    <span className="font-medium text-zinc-300">{m.title}</span>
+                    <Badge color={m.status === 'live' ? '#22c55e' : '#6b7280'} className="ml-2">{m.status}</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Activities */}
+          {(p.projectActivities || []).length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Activity Log</h3>
+              <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
+                {(p.projectActivities || []).slice(0, 30).map((a, i) => {
+                  const persona = personas.find(pp => pp.agent === a.author);
+                  const name = persona?.display_name || persona?.displayName || a.author || '';
+                  return (
+                  <div key={a.activityId || a.activity_id || i} className="text-xs flex gap-2 py-1.5 border-b border-border/50">
+                    {persona ? <AgentAvatar name={a.author} size={20} /> : <Icon name={ACTIVITY_ICONS[a.kind] || 'circle'} size={12} className="text-zinc-600 mt-0.5 shrink-0" />}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        {name && <span className="text-zinc-300 font-medium">{name}</span>}
+                        <span className="text-zinc-500">{a.metadata?.action || a.kind}</span>
+                      </div>
+                      {a.body && <p className="text-zinc-600 mt-0.5">{a.body}</p>}
+                    </div>
+                    <span className="text-zinc-700 ml-auto shrink-0">{ago(a.createdAt || a.created_at)}</span>
+                  </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── View: Dashboard ─────────────────────────────────────────────────────────
+
+function DashboardView({ data, team, setView }) {
+  const dt = data?.devteam;
+  const company = dt?.company || {};
+  const projects = dt?.projects || [];
+  const activities = dt?.activities || [];
+  const sessions = dt?.sessions || [];
+  const [quickTitle, setQuickTitle] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [pipelineStage, setPipelineStage] = useState(null);
+  const toast = useToast();
+
+  const activeProjects = projects.filter(p => p.status === 'open' || p.status === 'in_progress');
+  const runningSessions = sessions.filter(s => s.status === 'running' || s.status === 'starting');
+  const pendingApprovals = projects.filter(p => p.waitingForHuman);
+
+  const quickSubmit = async () => {
+    if (!quickTitle.trim()) return;
+    setSubmitting(true);
+    try {
+      await postJson(`/api/devteam/${team}/request`, { title: quickTitle.trim() });
+      toast('Project created', 'success');
+      setQuickTitle('');
+    } catch (e) { toast(e.message, 'error'); }
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Quick Submit */}
+      <div className="bg-surface border border-border rounded-xl p-4">
+        <div className="flex gap-3">
+          <input className="flex-1 bg-surface-deep border border-border rounded-lg px-4 py-3 text-sm text-zinc-100 outline-none focus:border-accent transition-colors" placeholder="What needs to be built? Press Enter to create a project..." value={quickTitle} onChange={e => setQuickTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && quickSubmit()} />
+          <Btn variant="primary" size="md" onClick={quickSubmit} disabled={submitting || !quickTitle.trim()}><Icon name="plus" size={14} /> Create</Btn>
+        </div>
+      </div>
+
+      {/* Recently Completed */}
+      {(() => {
+        const completed = projects.filter(p => p.status === 'completed').slice(0, 3);
+        if (completed.length === 0) return null;
+        return (
+          <div className="bg-green-950/20 border border-green-800/40 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-green-400 mb-2 flex items-center gap-2">
+              <Icon name="check-circle" size={14} /> Recently Completed
+            </h3>
+            <div className="space-y-2">
+              {completed.map(p => (
+                <div key={p.projectId || p.project_id} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <TypeBadge type={p.projectType || p.project_type} />
+                    <span className="text-zinc-300">{p.title}</span>
+                  </div>
+                  <span className="text-zinc-500">{ago(p.metadata?.completed_at || p.createdAt || p.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Stats — clickable cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: 'Company', value: company.status || 'offline', icon: 'building-2', color: STATUS_COLORS[company.status] || '#6b7280', isDot: true, nav: 'settings' },
+          { label: 'Active Projects', value: activeProjects.length, icon: 'folder-open', color: '#3b82f6', nav: 'projects' },
+          { label: 'Running Sessions', value: runningSessions.length, icon: 'terminal', color: '#22c55e', nav: 'sessions' },
+          { label: 'Pending Approvals', value: pendingApprovals.length, icon: 'clock', color: pendingApprovals.length > 0 ? '#f59e0b' : '#6b7280', nav: 'projects' },
+        ].map(s => (
+          <div key={s.label} onClick={() => setView(s.nav)} className="bg-surface border border-border rounded-xl p-4 cursor-pointer hover:border-zinc-600 transition-colors">
+            <div className="flex items-center gap-2 mb-2">
+              <Icon name={s.icon} size={14} className="text-zinc-500" />
+              <span className="text-xs text-zinc-500 font-medium">{s.label}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {s.isDot && <StatusDot status={s.value} />}
+              <span className="text-xl font-semibold" style={{ color: typeof s.value === 'number' ? '#fafafa' : s.color }}>{s.value}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pending Approvals Banner — with conversation context */}
+      {pendingApprovals.length > 0 && (
+        <div className="bg-amber-950/30 border border-amber-800/50 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-amber-300 mb-3 flex items-center gap-2"><Icon name="alert-circle" size={14} /> Awaiting Your Approval</h3>
+          <div className="space-y-3">
+            {pendingApprovals.map(p => {
+              const ledger = p.ledger || p.metadata?.autonomy?.ledger || [];
+              const recentMsgs = ledger.slice(-3);
+              const allPersonas = dt?.personas || [];
+              return (
+              <div key={p.projectId || p.project_id} className="bg-surface/50 rounded-lg p-3 border border-amber-900/30">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <StageBadge stage={p.stage} />
+                    <span className="text-sm text-zinc-200 font-medium">{p.title}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Btn size="xs" onClick={() => setView('projects')}><Icon name="eye" size={12} /> Detail</Btn>
+                    <Btn variant="success" size="xs" onClick={async () => { try { await postJson(`/api/devteam/${team}/projects/${p.projectId || p.project_id}/approve`); toast('Approved', 'success'); } catch(e) { toast(e.message, 'error'); }}}><Icon name="check" size={12} /> Approve</Btn>
+                  </div>
+                </div>
+                {p.description && <p className="text-xs text-zinc-500 mb-2">{p.description}</p>}
+                {recentMsgs.length > 0 && (
+                  <div className="space-y-1 border-t border-amber-900/20 pt-2 mt-1">
+                    <span className="text-[10px] text-zinc-600 uppercase tracking-wider">Latest discussion</span>
+                    {recentMsgs.map((msg, mi) => {
+                      const sp = allPersonas.find(pp => pp.agent === msg.agent);
+                      const sn = sp?.display_name || sp?.displayName || msg.agent || '?';
+                      return (
+                      <div key={mi} className="text-xs flex gap-2">
+                        <span className="text-zinc-400 font-medium shrink-0">{sn}</span>
+                        <span className="text-zinc-600 truncate">{msg.text}</span>
+                      </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Pipeline Mini */}
+      <div>
+        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Pipeline Overview</h3>
+        <div className="flex gap-1">
+          {STAGES.map(s => {
+            const count = (dt?.stageSummary || {})[s] || 0;
+            const meta = STAGE_META[s];
+            return (
+              <div key={s} className="flex-1 text-center">
+                <div onClick={() => count > 0 && setPipelineStage(pipelineStage === s ? null : s)}
+                  className={`h-8 rounded-lg flex items-center justify-center text-xs font-semibold mb-1 transition-all ${count > 0 ? 'cursor-pointer hover:scale-110' : ''} ${pipelineStage === s ? 'ring-2 ring-offset-1 ring-offset-surface-deep' : ''}`}
+                  style={{ background: count > 0 ? meta.color + '25' : '#1a1a1a', color: count > 0 ? meta.color : '#525252', ...(pipelineStage === s ? { '--tw-ring-color': meta.color } : {}) }}
+                >{count}</div>
+                <span className="text-[10px] text-zinc-600">{meta.label}</span>
+              </div>
+            );
+          })}
+        </div>
+        {pipelineStage && (() => {
+          const meta = STAGE_META[pipelineStage];
+          const stageProjects = (dt?.projects || []).filter(p => p.stage === pipelineStage && (p.status === 'open' || p.status === 'in_progress'));
+          return (
+            <div className="mt-3 bg-surface border border-border rounded-xl p-3 animate-fade-in">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{ background: meta.color }} />
+                  <span className="text-xs font-semibold text-zinc-300">{meta.label} Stage</span>
+                  <span className="text-[10px] text-zinc-500">({stageProjects.length} projects)</span>
+                </div>
+                <button onClick={() => setPipelineStage(null)} className="text-zinc-500 hover:text-zinc-300"><Icon name="x" size={14} /></button>
+              </div>
+              {stageProjects.length === 0 ? (
+                <div className="text-xs text-zinc-600 text-center py-2">No active projects</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {stageProjects.map(p => {
+                    const id = p.projectId || p.project_id;
+                    return (
+                      <div key={id} onClick={() => { setPipelineStage(null); setView('projects'); }} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-hover cursor-pointer transition-colors">
+                        <TypeBadge type={p.projectType || p.project_type} />
+                        <span className="text-xs text-zinc-200 truncate flex-1">{p.title}</span>
+                        <span className="text-[10px] text-zinc-500">{p.effectiveOwner || p.stageOwner || ''}</span>
+                        {p.waitingForHuman && <Badge color="#f59e0b">Approve</Badge>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Type Distribution */}
+        <div className="mt-4">
+          <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">By Type</h3>
+          <div className="flex gap-2 flex-wrap">
+            {Object.entries(TYPE_COLORS).map(([type, color]) => {
+              const count = activeProjects.filter(p => (p.projectType || p.project_type) === type).length;
+              if (count === 0) return null;
+              return (
+                <div key={type} className="flex items-center gap-1.5 bg-surface border border-border rounded-lg px-2.5 py-1">
+                  <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+                  <span className="text-[10px] text-zinc-400">{type.replace('_', ' ')}</span>
+                  <span className="text-xs font-semibold text-zinc-200">{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div>
+        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Recent Activity</h3>
+        <div className="bg-surface border border-border rounded-xl divide-y divide-border">
+          {activities.length === 0 && <div className="p-6 text-center text-xs text-zinc-600">No activity yet</div>}
+          {activities.slice(0, 15).map((a, i) => {
+            const personas = dt?.personas || [];
+            const persona = personas.find(p => p.agent === a.author);
+            const displayName = persona?.display_name || persona?.displayName || a.author || '';
+            const stageBadge = a.metadata?.from_stage || a.metadata?.action || '';
+            return (
+            <div key={a.activityId || a.activity_id || i} className="flex items-center gap-3 px-4 py-3">
+              <div className="shrink-0">{persona ? <AgentAvatar name={a.author} size={28} /> : <Icon name={ACTIVITY_ICONS[a.kind] || 'circle'} size={14} className="text-zinc-500" />}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {displayName && <span className="text-xs text-zinc-200 font-semibold whitespace-nowrap">{displayName}</span>}
+                  {stageBadge && <Badge color="#333">{stageBadge}</Badge>}
+                </div>
+                {a.body && <p className="text-xs text-zinc-500 mt-0.5 truncate">{a.body}</p>}
+              </div>
+              <span className="text-[11px] text-zinc-600 shrink-0 whitespace-nowrap">{ago(a.createdAt || a.created_at)}</span>
+            </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── View: Projects ──────────────────────────────────────────────────────────
+
+function ProjectsView({ data, team }) {
+  const [selected, setSelected] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const dt = data?.devteam;
+  const projects = dt?.projects || [];
+  const toast = useToast();
+
+  const filtered = filter === 'all' ? projects : projects.filter(p => p.status === filter);
+
+  // Keep selected project synced with live data
+  const selectedProject = selected ? projects.find(p => (p.projectId || p.project_id) === (selected.projectId || selected.project_id)) || selected : null;
+
+  return (
+    <div className="animate-fade-in">
+      <div className="flex items-center gap-2 mb-4">
+        {['all','open','paused','completed','cancelled'].map(f => (
+          <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === f ? 'bg-accent/15 text-accent' : 'text-zinc-500 hover:text-zinc-300 hover:bg-surface'}`}>{f === 'all' ? `All (${projects.length})` : `${f} (${projects.filter(p => p.status === f).length})`}</button>
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        {filtered.length === 0 && <EmptyState icon="folder" title="No projects found" />}
+        {filtered.map(p => {
+          const id = p.projectId || p.project_id;
+          return (
+            <div key={id} onClick={() => setSelected(p)} className="bg-surface border border-border rounded-xl p-4 cursor-pointer hover:border-zinc-600 transition-colors group">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <TypeBadge type={p.projectType || p.project_type} />
+                    <StageBadge stage={p.stage} />
+                    <Badge color={p.status === 'open' ? '#3b82f6' : p.status === 'paused' ? '#f59e0b' : p.status === 'completed' ? '#22c55e' : '#6b7280'}>{p.status}</Badge>
+                    {p.waitingForHuman && <Badge color="#f59e0b">Needs Approval</Badge>}
+                  </div>
+                  <h3 className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors">{p.title}</h3>
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <AgentAvatar name={p.effectiveOwner || p.stageOwner} size={18} />
+                      <span className="text-xs text-zinc-500">{p.effectiveOwner || p.stageOwner || '--'}</span>
+                    </div>
+                    <span className="text-xs text-zinc-600">{ago(p.metadata?.last_activity_ts || p.metadata?.created_at)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {p.waitingForHuman && <Btn variant="success" size="xs" onClick={async (e) => { e.stopPropagation(); try { await postJson(`/api/devteam/${team}/projects/${id}/approve`); toast('Approved', 'success'); } catch(e) { toast(e.message, 'error'); }}}><Icon name="check" size={12} /></Btn>}
+                  {p.status === 'open' && <Btn size="xs" onClick={async (e) => { e.stopPropagation(); try { await postJson(`/api/devteam/${team}/projects/${id}/pause`); toast('Paused', 'success'); } catch(e) { toast(e.message, 'error'); }}}><Icon name="pause" size={12} /></Btn>}
+                  {p.status === 'paused' && <Btn size="xs" onClick={async (e) => { e.stopPropagation(); try { await postJson(`/api/devteam/${team}/projects/${id}/resume`); toast('Resumed', 'success'); } catch(e) { toast(e.message, 'error'); }}}><Icon name="play" size={12} /></Btn>}
+                </div>
+                <Icon name="chevron-right" size={16} className="text-zinc-600" />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {selectedProject && <ProjectDetail project={selectedProject} team={team} onClose={() => setSelected(null)} personas={dt?.personas || []} />}
+    </div>
+  );
+}
+
+// ─── View: Pipeline ──────────────────────────────────────────────────────────
+
+function PipelineView({ data, team }) {
+  const [selected, setSelected] = useState(null);
+  const dt = data?.devteam;
+  const projects = dt?.projects || [];
+  const toast = useToast();
+
+  const selectedProject = selected ? projects.find(p => (p.projectId || p.project_id) === (selected.projectId || selected.project_id)) || selected : null;
+
+  return (
+    <div className="animate-fade-in">
+      <div className="grid pb-4 gap-1.5" style={{ gridTemplateColumns: 'repeat(9, minmax(0, 1fr))', minHeight: 'calc(100vh - 160px)' }}>
+        {STAGES.map(stage => {
+          const meta = STAGE_META[stage];
+          const stageProjects = projects.filter(p => p.stage === stage && (p.status === 'open' || p.status === 'in_progress'));
+          return (
+            <div key={stage} className="min-w-0">
+              <div className="flex items-center gap-2 mb-3 px-2">
+                <div className="w-2 h-2 rounded-full" style={{ background: meta.color }} />
+                <span className="text-xs font-semibold text-zinc-400">{meta.label}</span>
+                <span className="text-[10px] text-zinc-600 bg-surface rounded-full px-1.5 py-0.5">{stageProjects.length}</span>
+              </div>
+              <div className="space-y-2">
+                {stageProjects.map(p => {
+                  const id = p.projectId || p.project_id;
+                  return (
+                    <div key={id} onClick={() => setSelected(p)} className="bg-surface border border-border rounded-lg p-3 cursor-pointer hover:border-zinc-600 transition-all hover:-translate-y-0.5">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TypeBadge type={p.projectType || p.project_type} />
+                        {p.waitingForHuman && <Badge color="#f59e0b">Approve</Badge>}
+                      </div>
+                      <h4 className="text-xs font-medium text-zinc-200 mb-2 line-clamp-2">{p.title}</h4>
+                      <div className="flex items-center justify-between">
+                        <AgentAvatar name={p.effectiveOwner || p.stageOwner} size={20} />
+                        {p.waitingForHuman && (
+                          <Btn variant="success" size="xs" onClick={async (e) => { e.stopPropagation(); try { await postJson(`/api/devteam/${team}/projects/${id}/approve`); toast('Approved', 'success'); } catch(e) { toast(e.message, 'error'); }}}>
+                            <Icon name="check" size={11} /> OK
+                          </Btn>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {stageProjects.length === 0 && <div className="text-center py-8 text-zinc-700 text-xs">No projects</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {selectedProject && <ProjectDetail project={selectedProject} team={team} onClose={() => setSelected(null)} personas={dt?.personas || []} />}
+    </div>
+  );
+}
+
+// ─── View: Activity ──────────────────────────────────────────────────────────
+
+function ActivityView({ data }) {
+  const [kindFilter, setKindFilter] = useState('all');
+  const dt = data?.devteam;
+  const activities = dt?.activities || [];
+  const events = dt?.eventTimeline || [];
+
+  const allItems = useMemo(() => {
+    const items = activities.map(a => ({ ...a, _type: 'activity', _ts: a.createdAt || a.created_at }));
+    events.forEach(e => {
+      if (typeof e === 'object' && e.created_at) items.push({ ...e, _type: 'event', _ts: e.created_at, kind: e.kind || 'system', title: e.title || e.event_type || 'Event', body: e.body || e.data || '' });
+    });
+    return items.sort((a, b) => (b._ts || '').localeCompare(a._ts || '')).slice(0, 100);
+  }, [activities, events]);
+
+  const kinds = useMemo(() => {
+    const s = new Set(allItems.map(a => a.kind).filter(Boolean));
+    return ['all', ...Array.from(s).sort()];
+  }, [allItems]);
+
+  const filtered = kindFilter === 'all' ? allItems : allItems.filter(a => a.kind === kindFilter);
+
+  return (
+    <div className="animate-fade-in">
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {kinds.map(k => (
+          <button key={k} onClick={() => setKindFilter(k)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${kindFilter === k ? 'bg-accent/15 text-accent' : 'text-zinc-500 hover:text-zinc-300 hover:bg-surface'}`}>{k}</button>
+        ))}
+      </div>
+      <div className="space-y-1">
+        {filtered.length === 0 && <EmptyState icon="activity" title="No activity" subtitle="Activity will appear here as your team works" />}
+        {filtered.map((a, i) => {
+          const personas = dt?.personas || [];
+          const persona = personas.find(pp => pp.agent === a.author);
+          const displayName = persona?.display_name || persona?.displayName || a.author || '';
+          return (
+          <div key={a.activityId || a.activity_id || a.event_id || i} className="flex items-start gap-3 px-4 py-3 bg-surface rounded-lg border border-transparent hover:border-border transition-colors">
+            {persona ? <AgentAvatar name={a.author} size={28} /> : (
+            <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: '#262626' }}>
+              <Icon name={ACTIVITY_ICONS[a.kind] || 'circle'} size={12} className="text-zinc-500" />
+            </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                {displayName && <span className="text-sm text-zinc-200 font-medium">{displayName}</span>}
+                <Badge color="#333">{a.metadata?.action || a.kind}</Badge>
+                <span className="text-xs text-zinc-500">{a.title || a.kind}</span>
+              </div>
+              {a.body && typeof a.body === 'string' && <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">{a.body}</p>}
+            </div>
+            <span className="text-[11px] text-zinc-600 shrink-0 whitespace-nowrap">{ago(a._ts)}</span>
+          </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── View: Agents ────────────────────────────────────────────────────────────
+
+function AgentsView({ data, team }) {
+  const dt = data?.devteam;
+  const toast = useToast();
+  const personas = dt?.personas || [];
+  const projects = dt?.projects || [];
+  const activities = dt?.activities || [];
+  const sessions = dt?.sessions || [];
+  const [expanded, setExpanded] = useState(null);
+
+  return (
+    <div className="animate-fade-in grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {personas.length === 0 && <div className="col-span-full"><EmptyState icon="users" title="No agent personas configured" /></div>}
+      {personas.map(p => {
+        const agentProjects = projects.filter(pr => (pr.effectiveOwner === p.agent || pr.stageOwner === p.agent || (pr.assigned_agents || []).includes(p.agent)) && (pr.status === 'open' || pr.status === 'in_progress'));
+        const agentActivities = activities.filter(a => a.author === p.agent).slice(0, 5);
+        const agentSessions = sessions.filter(s => (s.agent_type === p.agent || s.agent === p.agent) && (s.status === 'running' || s.status === 'starting'));
+        const isExpanded = expanded === p.agent;
+        return (
+          <div key={p.agent} onClick={() => setExpanded(isExpanded ? null : p.agent)} className={`bg-surface border rounded-xl p-5 cursor-pointer transition-colors ${isExpanded ? 'border-accent/50 col-span-full md:col-span-2' : 'border-border hover:border-zinc-600'}`}>
+            <div className="flex items-center gap-3 mb-3">
+              <AgentAvatar name={p.agent} size={40} />
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-zinc-200">{p.displayName || p.display_name || p.agent}</h3>
+                <p className="text-xs text-zinc-500">{p.role}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {agentSessions.length > 0 && <Badge color="#22c55e">{agentSessions.length} active</Badge>}
+                {agentProjects.length > 0 && <Badge color="#3b82f6">{agentProjects.length} project{agentProjects.length !== 1 ? 's' : ''}</Badge>}
+              </div>
+            </div>
+            {p.style && <p className="text-xs text-zinc-500 mb-3 line-clamp-2">{p.style}</p>}
+            {(p.responsibilities || []).length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {p.responsibilities.slice(0, isExpanded ? 10 : 4).map((r, i) => (
+                  <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-surface-deep text-zinc-500 border border-border">{r}</span>
+                ))}
+                {!isExpanded && p.responsibilities.length > 4 && <span className="text-[10px] text-zinc-600">+{p.responsibilities.length - 4}</span>}
+              </div>
+            )}
+            {/* Expanded detail */}
+            {isExpanded && (
+              <div className="mt-3 pt-3 border-t border-border space-y-3" onClick={e => e.stopPropagation()}>
+                {/* Current projects */}
+                {agentProjects.length > 0 && (
+                  <div>
+                    <h4 className="text-[10px] text-zinc-600 uppercase tracking-wider mb-1.5">Current Work</h4>
+                    <div className="space-y-1">
+                      {agentProjects.map(pr => (
+                        <div key={pr.projectId || pr.project_id} className="flex items-center gap-2 text-xs">
+                          <StageBadge stage={pr.stage} />
+                          <span className="text-zinc-300 truncate">{pr.title}</span>
+                          {pr.stageOwner === p.agent && <Badge color="#8b5cf6">owner</Badge>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {agentProjects.length === 0 && <p className="text-xs text-zinc-600">No active work assigned</p>}
+                {/* Workspace Snapshot */}
+                {p.workspaceSnapshot && (
+                  <div>
+                    <h4 className="text-[10px] text-zinc-600 uppercase tracking-wider mb-1.5">Workspace Status</h4>
+                    <div className="bg-surface-deep rounded-lg p-3 border border-border space-y-1.5">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-zinc-600 w-14 shrink-0">Branch</span>
+                        <span className="text-blue-400 font-mono">{p.workspaceSnapshot.branch || 'N/A'}</span>
+                        {p.workspaceSnapshot.clean ? <Badge color="#22c55e">clean</Badge> : <Badge color="#f59e0b">modified</Badge>}
+                      </div>
+                      {p.workspaceSnapshot.lastCommit && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-zinc-600 w-14 shrink-0">Commit</span>
+                          <span className="text-zinc-400 font-mono truncate">{p.workspaceSnapshot.lastCommit}</span>
+                        </div>
+                      )}
+                      {(p.workspaceSnapshot.changedFiles || []).length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 text-xs mb-1">
+                            <span className="text-zinc-600 w-14 shrink-0">Changes</span>
+                            <span className="text-zinc-400">{p.workspaceSnapshot.changedFiles.length} file{p.workspaceSnapshot.changedFiles.length !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className="ml-16 space-y-0.5">
+                            {p.workspaceSnapshot.changedFiles.slice(0, 8).map((f, i) => (
+                              <div key={i} className="text-[10px] font-mono text-zinc-500 truncate">{f}</div>
+                            ))}
+                            {p.workspaceSnapshot.changedFiles.length > 8 && <div className="text-[10px] text-zinc-600">+{p.workspaceSnapshot.changedFiles.length - 8} more</div>}
+                          </div>
+                        </div>
+                      )}
+                      {p.workspaceSnapshot.diffStat && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-zinc-600 w-14 shrink-0">Diff</span>
+                          <span className="text-zinc-500 font-mono text-[10px] truncate">{p.workspaceSnapshot.diffStat.split('\n').pop()}</span>
+                        </div>
+                      )}
+                      {p.workspaceSnapshot.status && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-zinc-600 w-14 shrink-0">Session</span>
+                          <Badge color={p.workspaceSnapshot.status === 'running' ? '#22c55e' : p.workspaceSnapshot.status === 'failed' ? '#ef4444' : '#6b7280'}>{p.workspaceSnapshot.status}</Badge>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {/* Recent messages from this agent */}
+                {agentActivities.length > 0 && (
+                  <div>
+                    <h4 className="text-[10px] text-zinc-600 uppercase tracking-wider mb-1.5">Recent Activity</h4>
+                    <div className="space-y-1">
+                      {agentActivities.map((a, i) => (
+                        <div key={i} className="text-xs flex gap-2">
+                          <Badge color="#333">{a.metadata?.action || a.kind}</Badge>
+                          <span className="text-zinc-500 truncate">{a.body}</span>
+                          <span className="text-zinc-700 shrink-0 ml-auto">{ago(a.createdAt || a.created_at)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Channels */}
+                {(p.channels || []).length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    <span className="text-[10px] text-zinc-600 mr-1">Channels:</span>
+                    {p.channels.map((ch, i) => <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-surface-deep text-zinc-500 border border-border">{ch}</span>)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── View: Sessions ──────────────────────────────────────────────────────────
+
+function SessionsView({ data }) {
+  const [expanded, setExpanded] = useState(null);
+  const [filter, setFilter] = useState('active');
+  const dt = data?.devteam;
+  const allSessions = (dt?.sessions || []).sort((a, b) => ((b.startedAt || b.started_at) || '').localeCompare((a.startedAt || a.started_at) || ''));
+  const sessions = filter === 'all' ? allSessions : filter === 'active' ? allSessions.filter(s => s.status === 'running' || s.status === 'starting') : allSessions.filter(s => s.status === filter);
+
+  return (
+    <div className="animate-fade-in">
+      <div className="flex gap-2 mb-4">
+        {['active', 'all', 'completed', 'failed'].map(f => (
+          <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filter === f ? 'bg-accent text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface'}`}>
+            {f === 'active' ? `Active (${allSessions.filter(s => s.status === 'running' || s.status === 'starting').length})` : f === 'all' ? `All (${allSessions.length})` : `${f} (${allSessions.filter(s => s.status === f).length})`}
+          </button>
+        ))}
+      </div>
+      {sessions.length === 0 && <EmptyState icon="terminal" title="No agent sessions" subtitle={filter === 'active' ? 'No currently running agents' : 'Sessions appear when agents are spawned to work on projects'} />}
+      <div className="space-y-2">
+        {sessions.slice(0, 50).map(s => {
+          const id = s.sessionId || s.session_id;
+          const isExpanded = expanded === id;
+          return (
+            <div key={id} className="bg-surface border border-border rounded-xl overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => setExpanded(isExpanded ? null : id)}>
+                <AgentAvatar name={s.agentName || s.agent_name} size={28} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-zinc-200">{s.agentName || s.agent_name}</span>
+                    <Badge color={s.status === 'running' ? '#22c55e' : s.status === 'completed' ? '#6b7280' : s.status === 'failed' ? '#ef4444' : '#f59e0b'}>{s.status}</Badge>
+                    {s.stage && <StageBadge stage={s.stage} />}
+                  </div>
+                  <span className="text-xs text-zinc-500">
+                    {s.projectId || s.project_id ? `Project: ${(s.projectId || s.project_id).slice(0, 8)}` : 'No project'}
+                    {' '}&middot;{' '}Started {ago(s.startedAt || s.started_at)}
+                  </span>
+                </div>
+                <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} className="text-zinc-500" />
+              </div>
+              {isExpanded && (
+                <div className="px-4 pb-4 border-t border-border pt-3">
+                  <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                    <div><span className="text-zinc-500">Workspace:</span> <span className="text-zinc-300 break-all">{s.workspacePath || s.workspace_path || '--'}</span></div>
+                    <div><span className="text-zinc-500">Branch:</span> <span className="text-zinc-300">{s.branch || '--'}</span></div>
+                    <div><span className="text-zinc-500">Agent Type:</span> <span className="text-zinc-300">{s.agentType || s.agent_type || '--'}</span></div>
+                    <div><span className="text-zinc-500">Tmux:</span> <span className="text-zinc-300">{s.tmuxTarget || s.tmux_target || '--'}</span></div>
+                  </div>
+                  {s.liveLog && (
+                    <div>
+                      <h4 className="text-[11px] font-semibold text-zinc-500 uppercase mb-1">Live Log</h4>
+                      <pre className="text-[10px] text-zinc-400 bg-surface-deep rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap font-mono">{s.liveLog}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── View: Meetings ──────────────────────────────────────────────────────────
+
+function MeetingsView({ data, team }) {
+  const [expanded, setExpanded] = useState(null);
+  const [showNew, setShowNew] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newAgenda, setNewAgenda] = useState('');
+  const [msgText, setMsgText] = useState('');
+  const [showQuickAsk, setShowQuickAsk] = useState(false);
+  const [qaPersona, setQaPersona] = useState('');
+  const [qaQuestion, setQaQuestion] = useState('');
+  const toast = useToast();
+  const dt = data?.devteam;
+  const meetings = dt?.meetings || [];
+  const personas = dt?.personas || [];
+
+  const startMeeting = async () => {
+    if (!newTitle.trim()) return;
+    try {
+      await postJson(`/api/devteam/${team}/meetings`, { title: newTitle.trim(), agenda: newAgenda.trim() });
+      toast('Meeting started', 'success');
+      setShowNew(false); setNewTitle(''); setNewAgenda('');
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  const sendMsg = async (meetingId) => {
+    if (!msgText.trim()) return;
+    try {
+      await postJson(`/api/devteam/${team}/meetings/${meetingId}/messages`, { body: msgText.trim(), author: 'CEO' });
+      setMsgText('');
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  const sendQuickAsk = async () => {
+    if (!qaPersona || !qaQuestion.trim()) return;
+    try {
+      const res = await postJson(`/api/devteam/${team}/meetings`, {
+        title: `1:1 with ${qaPersona}`,
+        agenda: qaQuestion.trim(),
+        participants: [qaPersona],
+      });
+      const meetingId = res?.meetingId || res?.meeting_id;
+      if (meetingId) {
+        await postJson(`/api/devteam/${team}/meetings/${meetingId}/messages`, {
+          body: qaQuestion.trim(),
+          author: 'CEO',
+        });
+      }
+      toast('Quick Ask sent — agent will respond shortly', 'success');
+      setShowQuickAsk(false);
+      setQaPersona('');
+      setQaQuestion('');
+      if (meetingId) setExpanded(meetingId);
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  return (
+    <div className="animate-fade-in">
+      <div className="mb-4 flex gap-2">
+        <Btn variant="primary" onClick={() => setShowNew(!showNew)}><Icon name="plus" size={14} /> Start Meeting</Btn>
+        <Btn onClick={() => setShowQuickAsk(!showQuickAsk)}><Icon name="message-square" size={14} /> Quick Ask</Btn>
+      </div>
+
+      {showNew && (
+        <div className="bg-surface border border-border rounded-xl p-4 mb-4 animate-fade-in space-y-3">
+          <input className="w-full bg-surface-deep border border-border rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-accent" placeholder="Meeting title..." value={newTitle} onChange={e => setNewTitle(e.target.value)} />
+          <textarea className="w-full bg-surface-deep border border-border rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-accent resize-none h-16" placeholder="Agenda..." value={newAgenda} onChange={e => setNewAgenda(e.target.value)} />
+          <div className="flex gap-2">
+            <Btn variant="primary" onClick={startMeeting} disabled={!newTitle.trim()}>Create</Btn>
+            <Btn onClick={() => setShowNew(false)}>Cancel</Btn>
+          </div>
+        </div>
+      )}
+
+      {showQuickAsk && (
+        <div className="bg-surface border border-border rounded-xl p-4 mb-4 animate-fade-in space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Icon name="message-square" size={14} className="text-accent" />
+            <span className="text-sm font-medium text-zinc-200">Quick Ask — 1:1 Chat</span>
+          </div>
+          <select className="w-full bg-surface-deep border border-border rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-accent" value={qaPersona} onChange={e => setQaPersona(e.target.value)}>
+            <option value="">Select a persona...</option>
+            {personas.map(p => (
+              <option key={p.agent || p.name} value={p.agent || p.name}>{p.display_name || p.displayName || p.agent || p.name}</option>
+            ))}
+          </select>
+          <textarea className="w-full bg-surface-deep border border-border rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-accent resize-none h-20" placeholder="Ask your question..." value={qaQuestion} onChange={e => setQaQuestion(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuickAsk(); }}} />
+          <div className="flex gap-2">
+            <Btn variant="primary" onClick={sendQuickAsk} disabled={!qaPersona || !qaQuestion.trim()}>Send</Btn>
+            <Btn onClick={() => setShowQuickAsk(false)}>Cancel</Btn>
+          </div>
+        </div>
+      )}
+
+      {meetings.length === 0 && <EmptyState icon="users" title="No meetings" subtitle="Start a meeting to facilitate agent discussions" />}
+      <div className="space-y-2">
+        {meetings.map(m => {
+          const id = m.meetingId || m.meeting_id;
+          const isExpanded = expanded === id;
+          return (
+            <div key={id} className="bg-surface border border-border rounded-xl overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => setExpanded(isExpanded ? null : id)}>
+                <Icon name="users" size={16} className="text-zinc-500" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-zinc-200">{m.title}</span>
+                    <Badge color={m.status === 'live' ? '#22c55e' : m.status === 'concluded' ? '#6b7280' : '#f59e0b'}>{m.status}</Badge>
+                  </div>
+                  <span className="text-xs text-zinc-500">{(m.participants || []).join(', ')} &middot; {ago(m.createdAt || m.created_at)}</span>
+                </div>
+                <div className="flex gap-2">
+                  {m.status === 'live' && <Btn size="xs" variant="danger" onClick={async (e) => { e.stopPropagation(); try { await postJson(`/api/devteam/${team}/meetings/${id}/end`); toast('Meeting ended', 'success'); } catch(err) { toast(err.message, 'error'); }}}>End</Btn>}
+                  <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} className="text-zinc-500" />
+                </div>
+              </div>
+              {isExpanded && (
+                <div className="border-t border-border">
+                  {m.agenda && <div className="px-4 py-2 text-xs text-zinc-400 bg-surface-deep/50"><span className="text-zinc-600">Agenda:</span> {m.agenda}</div>}
+                  <div className="max-h-72 overflow-y-auto divide-y divide-border/50">
+                    {(m.messages || []).map((msg, i) => (
+                      <div key={msg.messageId || msg.message_id || i} className="px-4 py-2.5 flex gap-3">
+                        <AgentAvatar name={msg.speaker} size={24} />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-zinc-300">{msg.speaker}</span>
+                            <span className="text-[10px] text-zinc-600">{ago(msg.createdAt || msg.created_at)}</span>
+                          </div>
+                          <p className="text-xs text-zinc-400 mt-0.5 whitespace-pre-wrap">{msg.body}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {(m.messages || []).length === 0 && <div className="px-4 py-4 text-xs text-zinc-600 text-center">No messages yet</div>}
+                  </div>
+                  {m.status === 'live' && (
+                    <div className="px-4 py-3 bg-surface-deep/50 flex gap-2">
+                      <input className="flex-1 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-accent" placeholder="Send a message as CEO..." value={msgText} onChange={e => setMsgText(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMsg(id)} />
+                      <Btn size="xs" variant="primary" onClick={() => sendMsg(id)}>Send</Btn>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── View: Jobs/Settings ─────────────────────────────────────────────────────
+
+function JobsView({ data, team }) {
+  const dt = data?.devteam;
+  const jobs = dt?.jobs || [];
+  const company = dt?.company || {};
+  const toast = useToast();
+
+  return (
+    <div className="animate-fade-in space-y-6">
+      {/* Company Controls */}
+      <div>
+        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Company Runtime</h3>
+        <div className="bg-surface border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <StatusDot status={company.status || 'stopped'} size={10} />
+              <span className="text-sm font-medium text-zinc-200">{company.status || 'stopped'}</span>
+              {company.startedAt && <span className="text-xs text-zinc-500">since {ago(company.startedAt || company.started_at)}</span>}
+            </div>
+            <div className="flex gap-2">
+              <Btn variant="success" onClick={async () => { try { await postJson(`/api/company/${team}/start`); toast('Starting...', 'success'); } catch(e) { toast(e.message, 'error'); }}} disabled={company.status === 'online'}><Icon name="play" size={13} /> Start</Btn>
+              <Btn variant="danger" onClick={async () => { try { await postJson(`/api/company/${team}/stop`); toast('Stopping...', 'success'); } catch(e) { toast(e.message, 'error'); }}} disabled={company.status === 'stopped'}><Icon name="square" size={13} /> Stop</Btn>
+              <Btn onClick={async () => { try { await postJson(`/api/company/${team}/restart`); toast('Restarting...', 'success'); } catch(e) { toast(e.message, 'error'); }}}><Icon name="refresh-cw" size={13} /> Restart</Btn>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-3 text-xs">
+            <div><span className="text-zinc-500">Runtime:</span> <span className="text-zinc-300">{company.runtimeStatus || company.runtime_status || '--'}</span></div>
+            <div><span className="text-zinc-500">Scheduler:</span> <span className="text-zinc-300">{company.schedulerStatus || company.scheduler_status || '--'}</span></div>
+            <div><span className="text-zinc-500">Active Sessions:</span> <span className="text-zinc-300">{company.activeSessions ?? company.active_sessions ?? 0}</span></div>
+            <div><span className="text-zinc-500">Heartbeat:</span> <span className="text-zinc-300">{ago(company.lastHeartbeatAt || company.last_heartbeat_at)}</span></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Jobs List */}
+      <div>
+        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Recurring Jobs ({jobs.length})</h3>
+        {jobs.length === 0 && <EmptyState icon="clock" title="No recurring jobs configured" />}
+        <div className="space-y-2">
+          {jobs.map(j => (
+            <div key={j.key} className="bg-surface border border-border rounded-xl p-4 flex items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-medium text-zinc-200">{j.title || j.key}</span>
+                  <Badge color={j.enabled ? '#22c55e' : '#6b7280'}>{j.enabled ? 'Enabled' : 'Disabled'}</Badge>
+                  <Badge color="#333">{j.source || 'dynamic'}</Badge>
+                </div>
+                <div className="flex gap-3 text-xs text-zinc-500">
+                  <span>Cadence: {j.cadence || '--'}</span>
+                  <span>Owner: {j.owner || '--'}</span>
+                  <span>Last run: {ago(j.lastRunAt || j.last_run_at)}</span>
+                </div>
+              </div>
+              <Btn size="xs" onClick={async () => { try { await postJson(`/api/devteam/${team}/jobs/${j.key}/run`); toast(`Running ${j.key}`, 'success'); } catch(e) { toast(e.message, 'error'); }}}><Icon name="play" size={12} /> Run Now</Btn>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Integrations & OpenCode */}
+      {(() => {
+        const oc = dt?.opencode || {};
+        const intg = oc.integrations || [];
+        const configured = intg.filter(i => i.configured);
+        const rules = oc.rules || [];
+        const envFiles = oc.envFiles || oc.loadedFiles || [];
+        return (
+          <div>
+            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Integrations & Dev Config</h3>
+            <div className="bg-surface border border-border rounded-xl p-4 space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {intg.map(i => (
+                  <div key={i.name} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${i.configured ? 'border-emerald-800/50 bg-emerald-950/20' : 'border-border bg-surface-deep'}`}>
+                    <StatusDot status={i.configured ? 'online' : 'stopped'} size={7} />
+                    <span className={`text-xs font-medium ${i.configured ? 'text-emerald-300' : 'text-zinc-500'}`}>{i.name}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                <div><span className="text-zinc-500">Skills:</span> <span className="text-zinc-300 font-mono">{oc.skillsCount ?? 0}</span></div>
+                <div><span className="text-zinc-500">Rules:</span> <span className="text-zinc-300 font-mono">{rules.length}</span></div>
+                <div><span className="text-zinc-500">Env files:</span> <span className="text-zinc-300 font-mono">{envFiles.length}</span></div>
+              </div>
+              {rules.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {rules.map((r, i) => <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-surface-deep text-zinc-500 border border-border font-mono truncate max-w-xs">{r.split('/').slice(-2).join('/')}</span>)}
+                </div>
+              )}
+              {envFiles.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {envFiles.map((f, i) => <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-950/30 text-blue-400 border border-blue-900/30 font-mono truncate max-w-xs">{f.split('/').slice(-3).join('/')}</span>)}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* GitHub Actions & PRs */}
+      {(() => {
+        const gh = dt?.github;
+        if (!gh || !gh.available) return null;
+        const runs = gh.actionsRuns || [];
+        const prs = gh.prs || [];
+        return (
+          <div>
+            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">GitHub</h3>
+            <div className="bg-surface border border-border rounded-xl p-4 space-y-4">
+              <div className="flex items-center gap-3 text-xs">
+                <StatusDot status="online" size={7} />
+                <span className="text-zinc-300">Authenticated as <span className="text-blue-400 font-mono">{gh.user}</span></span>
+                {gh.repos?.length > 0 && <span className="text-zinc-500">| Repos: {gh.repos.join(', ')}</span>}
+              </div>
+              {prs.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] text-zinc-600 uppercase tracking-wider mb-2">Linked PRs</h4>
+                  <div className="space-y-1">
+                    {prs.map((pr, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        <Badge color={pr.checksStatus === 'success' ? '#22c55e' : pr.checksStatus === 'failure' ? '#ef4444' : '#f59e0b'}>
+                          {pr.checksStatus || 'pending'}
+                        </Badge>
+                        <a href={pr.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                          {pr.repo}#{pr.number}
+                        </a>
+                        <span className="text-zinc-500">{pr.reviewDecision || ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {runs.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] text-zinc-600 uppercase tracking-wider mb-2">Recent Actions Runs</h4>
+                  <div className="space-y-1">
+                    {runs.slice(0, 10).map((run, i) => {
+                      const color = run.conclusion === 'success' ? '#22c55e' : run.conclusion === 'failure' ? '#ef4444' : run.status === 'in_progress' ? '#3b82f6' : '#f59e0b';
+                      return (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <Badge color={color}>{run.conclusion || run.status}</Badge>
+                          <span className="text-zinc-400 truncate flex-1">{run.name}</span>
+                          <span className="text-zinc-600 font-mono text-[10px]">{run.branch}</span>
+                          <span className="text-zinc-700 shrink-0">{ago(run.createdAt)}</span>
+                          {run.url && <a href={run.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-400 text-[10px]">→</a>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {runs.length === 0 && prs.length === 0 && (
+                <p className="text-xs text-zinc-600">No linked PRs or Actions runs. Submit a project referencing a GitHub PR to see data here.</p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Runtime Errors */}
+      {(dt?.runtimeErrors || []).length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Runtime Errors</h3>
+          <div className="space-y-2">
+            {dt.runtimeErrors.map((err, i) => (
+              <div key={i} className="bg-red-950/30 border border-red-900/50 rounded-xl p-3 text-xs text-red-300">{typeof err === 'string' ? err : JSON.stringify(err)}</div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sidebar ─────────────────────────────────────────────────────────────────
+
+const NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+  { key: 'projects', label: 'Projects', icon: 'folder-kanban' },
+  { key: 'pipeline', label: 'Pipeline', icon: 'columns-3' },
+  { key: 'activity', label: 'Activity', icon: 'activity' },
+  { key: 'agents', label: 'Agents', icon: 'users' },
+  { key: 'sessions', label: 'Sessions', icon: 'terminal' },
+  { key: 'meetings', label: 'Meetings', icon: 'message-circle' },
+  { key: 'settings', label: 'Settings', icon: 'settings' },
+];
+
+function Sidebar({ view, setView, teams, team, setTeam, data }) {
+  const dt = data?.devteam;
+  const company = dt?.company || {};
+  const projects = dt?.projects || [];
+  const pendingCount = projects.filter(p => p.waitingForHuman).length;
+
+  return (
+    <aside className="w-60 h-screen bg-surface border-r border-border flex flex-col shrink-0 sticky top-0">
+      {/* Logo */}
+      <div className="px-5 py-5 border-b border-border">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center">
+            <Icon name="paw-print" size={15} className="text-accent" />
+          </div>
+          <span className="text-sm font-bold tracking-tight text-zinc-100">ClawTeam</span>
+        </div>
+      </div>
+
+      {/* Team Selector */}
+      <div className="px-3 py-3 border-b border-border">
+        <select className="w-full bg-surface-deep border border-border rounded-lg px-3 py-2 text-xs text-zinc-300 outline-none focus:border-accent" value={team} onChange={e => setTeam(e.target.value)}>
+          <option value="">Select team...</option>
+          {teams.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+        </select>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto py-2 px-2">
+        {NAV_ITEMS.map(item => (
+          <button key={item.key} onClick={() => setView(item.key)} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-0.5 ${view === item.key ? 'bg-accent/10 text-accent' : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-hover'}`}>
+            <Icon name={item.icon} size={15} />
+            <span>{item.label}</span>
+            {item.key === 'projects' && pendingCount > 0 && (
+              <span className="ml-auto text-[10px] bg-amber-500/20 text-amber-400 rounded-full px-1.5 py-0.5 font-semibold">{pendingCount}</span>
+            )}
+          </button>
+        ))}
+      </nav>
+
+      {/* Bottom Status */}
+      <div className="px-4 py-3 border-t border-border">
+        <div className="flex items-center gap-2">
+          <StatusDot status={company.status || 'stopped'} />
+          <span className="text-xs text-zinc-500 capitalize">{company.status || 'offline'}</span>
+          {dt?.mode && <span className="text-xs text-zinc-600 ml-auto">{dt.mode}</span>}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+// ─── Main App ────────────────────────────────────────────────────────────────
+
+function App() {
+  const teams = useTeams();
+  const [team, setTeam] = useState('');
+  const [view, setView] = useState('dashboard');
+  const [showNewProject, setShowNewProject] = useState(false);
+  const { data, loading } = useAppData(team);
+
+  // Auto-select first team
+  useEffect(() => { if (teams.length > 0 && !team) setTeam(teams[0].name); }, [teams]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setShowNewProject(true); }
+      if (e.key === 'Escape') setShowNewProject(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const viewTitle = NAV_ITEMS.find(n => n.key === view)?.label || 'Dashboard';
+  const dt = data?.devteam;
+  const company = dt?.company || {};
+
+  return (
+    <div className="flex h-screen bg-surface-deep">
+      <Sidebar view={view} setView={setView} teams={teams} team={team} setTeam={setTeam} data={data} />
+
+      <main className="flex-1 overflow-y-auto">
+        {/* Top Bar */}
+        <header className="sticky top-0 z-20 bg-surface-deep/80 backdrop-blur-lg border-b border-border px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-base font-semibold text-zinc-100">{viewTitle}</h1>
+            {team && (
+              <div className="flex items-center gap-2 ml-3">
+                <StatusDot status={company.status || 'stopped'} />
+                <span className="text-xs text-zinc-500 capitalize">{team}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Btn variant="primary" size="sm" onClick={() => setShowNewProject(true)}><Icon name="plus" size={14} /> New Project</Btn>
+            <span className="text-[10px] text-zinc-600 border border-border rounded px-1.5 py-0.5">N</span>
+          </div>
+        </header>
+
+        {/* Content */}
+        <div className="p-6">
+          {!team && (
+            <EmptyState icon="server" title="No team selected" subtitle="Select or create a team to get started" />
+          )}
+          {team && loading && (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+          {team && !loading && data && (
+            <>
+              {view === 'dashboard' && <DashboardView data={data} team={team} setView={setView} />}
+              {view === 'projects' && <ProjectsView data={data} team={team} />}
+              {view === 'pipeline' && <PipelineView data={data} team={team} />}
+              {view === 'activity' && <ActivityView data={data} />}
+              {view === 'agents' && <AgentsView data={data} team={team} />}
+              {view === 'sessions' && <SessionsView data={data} />}
+              {view === 'meetings' && <MeetingsView data={data} team={team} />}
+              {view === 'settings' && <JobsView data={data} team={team} />}
+            </>
+          )}
+        </div>
+      </main>
+
+      <NewProjectModal team={team} open={showNewProject} onClose={() => setShowNewProject(false)} />
+    </div>
+  );
+}
+
+// ─── Mount ───────────────────────────────────────────────────────────────────
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <ToastProvider><App /></ToastProvider>
+);
+</script>
+</body>
 </html>
