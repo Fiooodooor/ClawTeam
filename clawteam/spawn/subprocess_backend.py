@@ -71,7 +71,14 @@ class SubprocessBackend(SpawnBackend):
         if cwd:
             spawn_env["CLAWTEAM_WORKSPACE_DIR"] = cwd
         if env:
-            spawn_env.update(env)
+            # Keys mapped to the unset sentinel should be REMOVED from the
+            # environment rather than set to empty string.
+            _UNSET = "__CLAWTEAM_UNSET__"
+            for k, v in env.items():
+                if v == _UNSET:
+                    spawn_env.pop(k, None)
+                else:
+                    spawn_env[k] = v
         spawn_env["PATH"] = build_spawn_path(spawn_env.get("PATH"))
         if os.path.isabs(clawteam_bin):
             spawn_env.setdefault("CLAWTEAM_BIN", clawteam_bin)
@@ -130,6 +137,32 @@ class SubprocessBackend(SpawnBackend):
         command_error = validate_spawn_command(validation_command, path=spawn_env["PATH"], cwd=cwd)
         if command_error:
             return command_error
+
+        final_command = list(normalized_command)
+        # Default Claude agents to Opus 4.6 unless explicitly overridden
+        if _is_claude_command(normalized_command) and not _command_has_model_arg(normalized_command):
+            model = (
+                (env or {}).get("CLAWTEAM_SPAWN_MODEL")
+                or os.environ.get("CLAWTEAM_SPAWN_MODEL")
+                or "claude-opus-4-6"
+            )
+            final_command.extend(["--model", model])
+        if skip_permissions:
+            if _is_claude_command(normalized_command):
+                final_command.append("--dangerously-skip-permissions")
+            elif _is_codex_command(normalized_command):
+                final_command.append("--dangerously-bypass-approvals-and-sandbox")
+        if _is_nanobot_command(normalized_command):
+            if cwd and not _command_has_workspace_arg(normalized_command):
+                final_command.extend(["-w", cwd])
+            if prompt:
+                final_command.extend(["-m", prompt])
+        elif prompt:
+            if _is_codex_command(normalized_command):
+                # Codex accepts prompt as positional argument
+                final_command.append(prompt)
+            else:
+                final_command.extend(["-p", prompt])
 
         # Wrap with on-exit hook so task status updates immediately on exit
         import sys
@@ -241,3 +274,13 @@ def _cleanup_openclaw_session(agent_name: str) -> None:
         target.unlink(missing_ok=True)
     except OSError:
         pass
+
+
+def _command_has_workspace_arg(command: list[str]) -> bool:
+    """Return True when a command already specifies a nanobot workspace."""
+    return "-w" in command or "--workspace" in command
+
+
+def _command_has_model_arg(command: list[str]) -> bool:
+    """Return True when a command already specifies a --model flag."""
+    return "--model" in command or "-m" in command
