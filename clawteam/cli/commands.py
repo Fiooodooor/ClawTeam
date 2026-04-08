@@ -676,7 +676,7 @@ app.add_typer(inbox_app, name="inbox")
 def inbox_send(
     team: str = typer.Argument(..., help="Team name"),
     to: str = typer.Argument(..., help="Recipient agent name"),
-    content: str = typer.Argument(..., help="Message content"),
+    content: Optional[str] = typer.Argument(None, help="Message content", metavar="[CONTENT]"),
     key: Optional[str] = typer.Option(None, "--key", "-k", help="Optional routing key"),
     msg_type: str = typer.Option("message", "--type", help="Message type"),
     from_agent: Optional[str] = typer.Option(None, "--from", "-f", help="Override sender name (default: from env identity)"),
@@ -685,6 +685,12 @@ def inbox_send(
     from clawteam.identity import AgentIdentity
     from clawteam.team.mailbox import MailboxManager
     from clawteam.team.models import MessageType
+
+    if content is None:
+        import sys
+        content = sys.stdin.read()
+        if content.endswith("\n"):
+            content = content[:-1]
 
     sender = from_agent or AgentIdentity.from_env().agent_name
     mailbox = MailboxManager(team)
