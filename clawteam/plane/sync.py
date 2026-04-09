@@ -27,7 +27,7 @@ class PlaneSyncEngine:
         self.config = config
         self._client = client or (
             PlaneClient(config.url, config.api_key, config.workspace_slug)
-            if config.url and config.api_key
+            if config.url
             else None
         )
         self._states: list[PlaneState] | None = None

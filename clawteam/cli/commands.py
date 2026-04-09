@@ -4559,7 +4559,7 @@ def plane_setup(
     if project:
         cfg.project_id = project
 
-    if cfg.url and cfg.api_key and cfg.workspace_slug and cfg.project_id:
+    if cfg.url and cfg.workspace_slug and cfg.project_id:
         cfg.sync_enabled = True
 
     save_plane_config(cfg)

@@ -48,10 +48,10 @@ class PlaneClient:
         self._http = httpx.Client(timeout=30.0)
 
     def _headers(self) -> dict[str, str]:
-        return {
-            "X-API-Key": self.api_key,
-            "Content-Type": "application/json",
-        }
+        headers: dict[str, str] = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+        return headers
 
     def _url(self, *parts: str) -> str:
         path = "/".join(parts)
