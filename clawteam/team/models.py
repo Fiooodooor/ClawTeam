@@ -13,14 +13,37 @@ from pydantic import BaseModel, Field
 
 
 def get_data_dir() -> Path:
-    """Return the data directory, respecting CLAWTEAM_DATA_DIR env var and config."""
+    """Return the data directory.
+
+    Resolution order:
+    1. ``CLAWTEAM_DATA_DIR`` env var (explicit override).
+    2. ``data_dir`` in the user config file (explicit override).
+    3. Nearest ``.clawteam/`` walking up from the current working directory
+       (project-local, git-style discovery).
+    4. ``~/.clawteam/`` (global fallback).
+    """
     custom = os.environ.get("CLAWTEAM_DATA_DIR")
     if not custom:
         from clawteam.config import load_config
         custom = load_config().data_dir or None
-    p = Path(custom) if custom else Path.home() / ".clawteam"
+
+    if custom:
+        p = Path(custom)
+    else:
+        p = _find_project_data_dir() or Path.home() / ".clawteam"
+
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def _find_project_data_dir() -> Path | None:
+    """Walk up from cwd looking for a ``.clawteam/`` directory. Returns it or None."""
+    cwd = Path.cwd().resolve()
+    for candidate in (cwd, *cwd.parents):
+        dot = candidate / ".clawteam"
+        if dot.is_dir():
+            return dot
+    return None
 
 
 def _now_iso() -> str:
@@ -36,7 +59,9 @@ class MemberStatus(str, Enum):
 class TaskStatus(str, Enum):
     pending = "pending"
     in_progress = "in_progress"
+    awaiting_approval = "awaiting_approval"
     completed = "completed"
+    verified = "verified"
     blocked = "blocked"
 
 

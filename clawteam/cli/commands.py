@@ -1214,6 +1214,152 @@ def team_spawn_team(
         raise typer.Exit(1)
 
 
+@team_app.command("start")
+def team_start(
+    team: str = typer.Argument(..., help="Existing team name"),
+    goal: str = typer.Option("", "--goal", "-g", help="Initial prompt/goal passed to every agent"),
+    backend: Optional[str] = typer.Option(None, "--backend", "-b", help="Override backend (default: tmux)"),
+    workspace: bool = typer.Option(False, "--workspace/--no-workspace", "-w", help="Isolate each agent in a git worktree"),
+    repo: Optional[str] = typer.Option(None, "--repo", help="Git repo path (only with --workspace)"),
+    watcher: bool = typer.Option(True, "--watcher/--no-watcher", help="Spawn a sidecar that auto-injects new inbox messages (idle, etc.) into the leader's pane"),
+):
+    """Spawn every already-defined member of an existing team.
+
+    Use after `team create` + `team add-member`. Unlike `launch`, this does not
+    need a template and operates on whatever members the team currently has.
+
+    With ``--watcher`` (default), a background process keeps watch over the
+    leader's inbox. When workers report idle/blocked/etc, the new message is
+    consumed and a notification is injected directly into the leader's tmux
+    pane so the leader sees it without manually polling.
+    """
+    import os as _os
+
+    from clawteam.config import get_effective
+    from clawteam.spawn import get_backend
+    from clawteam.spawn.prompt import build_agent_prompt
+    from clawteam.team.manager import TeamManager
+
+    config = TeamManager.get_team(team)
+    if not config:
+        console.print(f"[red]Team '{team}' not found.[/red]")
+        raise typer.Exit(1)
+    if not config.members:
+        console.print(f"[red]Team '{team}' has no members. Add members with `clawteam team add-member`.[/red]")
+        raise typer.Exit(1)
+
+    be_name = backend or "tmux"
+    try:
+        be = get_backend(be_name)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+
+    sp_val, _ = get_effective("skip_permissions")
+    skip_permissions = str(sp_val).lower() not in ("false", "0", "no", "")
+
+    cmd_val, _ = get_effective("default_command")
+    cmd = [cmd_val] if cmd_val else ["claude"]
+
+    ws_mgr = None
+    if workspace:
+        from clawteam.workspace import get_workspace_manager
+        ws_mgr = get_workspace_manager(repo)
+        if ws_mgr is None:
+            console.print("[red]Not in a git repository. Use --repo or cd into a repo.[/red]")
+            raise typer.Exit(1)
+
+    leader_name = ""
+    for m in config.members:
+        if m.agent_id == config.lead_agent_id:
+            leader_name = m.name
+            break
+
+    spawned: list[dict[str, str]] = []
+    for member in config.members:
+        cwd = None
+        ws_branch = ""
+        if ws_mgr:
+            ws_info = ws_mgr.create_workspace(
+                team_name=team, agent_name=member.name, agent_id=member.agent_id,
+            )
+            cwd = ws_info.worktree_path
+            ws_branch = ws_info.branch_name
+
+        prompt = build_agent_prompt(
+            agent_name=member.name,
+            agent_id=member.agent_id,
+            agent_type=member.agent_type,
+            team_name=team,
+            leader_name=leader_name,
+            task=goal,
+            user=_os.environ.get("CLAWTEAM_USER", ""),
+            workspace_dir=cwd or "",
+            workspace_branch=ws_branch,
+            isolated_workspace=bool(cwd),
+        )
+
+        result = be.spawn(
+            command=cmd,
+            agent_name=member.name,
+            agent_id=member.agent_id,
+            agent_type=member.agent_type,
+            team_name=team,
+            prompt=prompt,
+            env=None,
+            cwd=cwd,
+            skip_permissions=skip_permissions,
+        )
+        spawned.append({
+            "name": member.name,
+            "id": member.agent_id,
+            "type": member.agent_type,
+            "result": result,
+        })
+
+    watcher_started = False
+    if watcher and be_name == "tmux" and leader_name:
+        import subprocess as _sp
+        import sys as _sys
+        try:
+            _sp.Popen(
+                [_sys.executable, "-m", "clawteam", "runtime", "watch", team, "--agent", leader_name],
+                stdout=_sp.DEVNULL,
+                stderr=_sp.DEVNULL,
+                start_new_session=True,
+            )
+            watcher_started = True
+        except OSError:
+            pass
+
+    out = {
+        "status": "started",
+        "team": team,
+        "backend": be_name,
+        "agents": [{"name": s["name"], "id": s["id"], "type": s["type"]} for s in spawned],
+        "watcherStarted": watcher_started,
+    }
+
+    def _human(_data):
+        console.print(f"\n[green bold]Team '{team}' started[/green bold]\n")
+        table = Table(title="Agents")
+        table.add_column("Name", style="cyan")
+        table.add_column("Type")
+        table.add_column("ID", style="dim")
+        for s in spawned:
+            table.add_row(s["name"], s["type"], s["id"])
+        console.print(table)
+        if be_name == "tmux":
+            console.print(f"\n[bold]Attach:[/bold] tmux attach -t clawteam-{team}")
+        if watcher_started:
+            console.print(
+                f"[dim]Auto-injecting new {leader_name} inbox messages into its tmux pane "
+                f"(disable with --no-watcher).[/dim]"
+            )
+
+    _output(out, _human)
+
+
 @team_app.command("discover")
 def team_discover():
     """List all teams (discoverTeams)."""

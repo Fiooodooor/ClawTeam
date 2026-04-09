@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+
+from clawteam.board.liveness import agents_online
 from clawteam.team.mailbox import MailboxManager
 from clawteam.team.manager import TeamManager
 from clawteam.team.tasks import TaskStore
@@ -48,12 +51,16 @@ class BoardCollector:
             if not leader_name and member.agent_id == config.lead_agent_id:
                 leader_name = member.name
 
+        online_map = agents_online(team_name, [m.name for m in config.members])
+        members_online = sum(1 for v in online_map.values() if v)
+
         tasks_total = len(store.list_tasks())
         return {
             "name": config.name,
             "description": config.description,
             "leader": leader_name,
             "members": len(config.members),
+            "membersOnline": members_online,
             "tasks": tasks_total,
             "pendingMessages": total_inbox,
         }
@@ -71,6 +78,7 @@ class BoardCollector:
         mailbox = MailboxManager(team_name)
         store = TaskStore(team_name)
         member_aliases = self._member_alias_index(config)
+        online_map = agents_online(team_name, [m.name for m in config.members])
 
         # Members with inbox counts
         members = []
@@ -84,6 +92,7 @@ class BoardCollector:
                 "memberKey": inbox_name,
                 "inboxName": inbox_name,
                 "inboxCount": mailbox.peek_count(inbox_name),
+                "isRunning": online_map.get(m.name, False),
             }
             if m.user:
                 entry["user"] = m.user
@@ -96,6 +105,8 @@ class BoardCollector:
             "in_progress": [],
             "completed": [],
             "blocked": [],
+            "awaiting_approval": [],
+            "verified": [],
         }
         for t in all_tasks:
             td = t.model_dump(mode="json", by_alias=True, exclude_none=True)
@@ -179,6 +190,7 @@ class BoardCollector:
                 "leaderName": leader_name,
                 "createdAt": config.created_at,
                 "budgetCents": config.budget_cents,
+                "membersOnline": sum(1 for v in online_map.values() if v),
             },
             "members": members,
             "tasks": grouped,
@@ -206,6 +218,7 @@ class BoardCollector:
                     "description": meta.get("description", ""),
                     "leader": "",
                     "members": meta.get("memberCount", 0),
+                    "membersOnline": 0,
                     "tasks": 0,
                     "pendingMessages": 0,
                 })
