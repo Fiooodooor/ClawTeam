@@ -4622,13 +4622,17 @@ def plane_sync(
 
     engine = PlaneSyncEngine(cfg)
 
-    if direction in ("push", "both"):
-        pushed = engine.push_all(team)
-        console.print(f"[green]Pushed {pushed} task(s) to Plane.[/green]")
+    try:
+        if direction in ("push", "both"):
+            pushed = engine.push_all(team)
+            console.print(f"[green]Pushed {pushed} task(s) to Plane.[/green]")
 
-    if direction in ("pull", "both"):
-        pulled = engine.pull_all(team)
-        console.print(f"[green]Pulled {pulled} item(s) from Plane.[/green]")
+        if direction in ("pull", "both"):
+            pulled = engine.pull_all(team)
+            console.print(f"[green]Pulled {pulled} item(s) from Plane.[/green]")
+    except Exception as exc:
+        console.print(f"[red]Sync failed: {exc}[/red]")
+        raise typer.Exit(1)
 
 
 @plane_app.command("webhook")
