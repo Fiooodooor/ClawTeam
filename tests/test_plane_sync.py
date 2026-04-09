@@ -94,3 +94,37 @@ def test_push_skips_when_sync_disabled(setup_team, mock_client):
 
     mock_client.create_work_item.assert_not_called()
     mock_client.update_work_item.assert_not_called()
+
+
+def test_event_hook_pushes_on_task_update(setup_team, plane_config, mock_client):
+    """AfterTaskUpdate event should trigger a push to Plane."""
+    mock_client.create_work_item.return_value = PlaneWorkItem(
+        id="plane-auto-1", name="Auto task", state="s-pending",
+    )
+    mock_client.update_work_item.return_value = PlaneWorkItem(
+        id="plane-auto-1", name="Auto task", state="s-progress",
+    )
+
+    from clawteam.plane import register_sync_hooks
+    from clawteam.events.bus import EventBus
+    from clawteam.events.types import AfterTaskUpdate
+
+    bus = EventBus()
+    engine = PlaneSyncEngine(plane_config, client=mock_client)
+    register_sync_hooks(bus, engine, setup_team)
+
+    from clawteam.store.file import FileTaskStore
+    store = FileTaskStore(setup_team)
+    task = store.create(subject="Auto task")
+    engine.push_task(setup_team, task)
+
+    store.update(task.id, status=TaskStatus.in_progress, caller="worker1")
+    bus.emit(AfterTaskUpdate(
+        team_name=setup_team,
+        task_id=task.id,
+        old_status="pending",
+        new_status="in_progress",
+        owner="worker1",
+    ))
+
+    assert mock_client.update_work_item.called
