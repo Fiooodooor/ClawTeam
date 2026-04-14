@@ -98,6 +98,8 @@ class BoardCollector:
             "in_progress": [],
             "completed": [],
             "blocked": [],
+            "awaiting_approval": [],
+            "verified": [],
         }
         for t in all_tasks:
             td = json.loads(t.model_dump_json(by_alias=True, exclude_none=True))

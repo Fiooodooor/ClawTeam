@@ -174,11 +174,13 @@ class BoardRenderer:
         return Panel(body, title=title, border_style="red" if high > 0 else "yellow")
 
     def _build_task_kanban(self, tasks: dict, summary: dict) -> Panel:
-        """Build the 4-column kanban task board."""
+        """Build the 6-column kanban task board."""
         columns_cfg = [
             ("PENDING", "pending", "yellow"),
+            ("AWAITING APPROVAL", "awaiting_approval", "magenta"),
             ("IN PROGRESS", "in_progress", "cyan"),
             ("COMPLETED", "completed", "green"),
+            ("VERIFIED", "verified", "bright_blue"),
             ("BLOCKED", "blocked", "red"),
         ]
 

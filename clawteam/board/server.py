@@ -160,6 +160,20 @@ class BoardHandler(BaseHTTPRequestHandler):
                 self.send_error(403, str(e))
             except Exception as e:
                 self.send_error(500, str(e))
+        elif path.startswith("/assets/"):
+            # Serve Vite-built JS/CSS assets
+            asset_path = path[1:]  # strip leading /
+            content_types = {
+                ".js": "application/javascript",
+                ".css": "text/css",
+                ".map": "application/json",
+                ".woff2": "font/woff2",
+                ".woff": "font/woff",
+                ".svg": "image/svg+xml",
+            }
+            ext = "." + asset_path.rsplit(".", 1)[-1] if "." in asset_path else ""
+            ct = content_types.get(ext, "application/octet-stream")
+            self._serve_static(asset_path, ct)
         else:
             self.send_error(404)
 
@@ -184,7 +198,92 @@ class BoardHandler(BaseHTTPRequestHandler):
                 except Exception as e:
                     self.send_error(400, str(e))
                 return
+        # POST /api/team/<name>/member — add agent to team
+        if path.startswith("/api/team/") and path.endswith("/member"):
+            parts = path.strip("/").split("/")
+            if len(parts) == 4 and parts[3] == "member":
+                team_name = parts[2]
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length).decode("utf-8")
+                try:
+                    payload = json.loads(body)
+                    from clawteam.team.manager import TeamManager
+                    name = payload.get("name", "")
+                    agent_type = payload.get("agentType", "general-purpose")
+                    if not name:
+                        self.send_error(400, "name is required")
+                        return
+                    TeamManager.add_member(team_name, name, agent_type=agent_type)
+                    self._serve_json({"status": "ok", "name": name})
+                except Exception as e:
+                    self.send_error(400, str(e))
+                return
+
+        # POST /api/team/<name>/message — send message to agent inbox
+        if path.startswith("/api/team/") and path.endswith("/message"):
+            parts = path.strip("/").split("/")
+            if len(parts) == 4 and parts[3] == "message":
+                team_name = parts[2]
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length).decode("utf-8")
+                try:
+                    payload = json.loads(body)
+                    from clawteam.team.mailbox import MailboxManager
+                    mailbox = MailboxManager(team_name)
+                    mailbox.send(
+                        from_agent=payload.get("from", "board-ui"),
+                        to=payload.get("to", ""),
+                        msg_type=payload.get("type", "message"),
+                        content=payload.get("content", ""),
+                        summary=payload.get("summary", ""),
+                    )
+                    self._serve_json({"status": "ok"})
+                except Exception as e:
+                    self.send_error(400, str(e))
+                return
+
         self.send_error(404)
+
+    def do_PATCH(self):
+        path = self.path.split("?")[0]
+        # PATCH /api/team/<name>/task/<id>
+        parts = path.strip("/").split("/")
+        if len(parts) == 5 and parts[0] == "api" and parts[1] == "team" and parts[3] == "task":
+            team_name = parts[2]
+            task_id = parts[4]
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length).decode("utf-8")
+            try:
+                payload = json.loads(body)
+                from clawteam.team.tasks import TaskStore
+                from clawteam.team.models import TaskStatus, TaskPriority
+                store = TaskStore(team_name)
+                kwargs = {}
+                if "status" in payload:
+                    kwargs["status"] = TaskStatus(payload["status"])
+                if "owner" in payload:
+                    kwargs["owner"] = payload["owner"]
+                if "subject" in payload:
+                    kwargs["subject"] = payload["subject"]
+                if "description" in payload:
+                    kwargs["description"] = payload["description"]
+                if "priority" in payload:
+                    kwargs["priority"] = TaskPriority(payload["priority"])
+                kwargs["force"] = True
+                store.update(task_id, **kwargs)
+                self._serve_json({"status": "ok", "task_id": task_id})
+            except Exception as e:
+                self.send_error(400, str(e))
+            return
+        self.send_error(404)
+
+    def do_OPTIONS(self):
+        """Handle CORS preflight for PATCH requests."""
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
 
     def _serve_static(self, filename: str, content_type: str):
         filepath = _STATIC_DIR / filename

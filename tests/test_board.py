@@ -337,3 +337,65 @@ def test_board_ui_escapes_attacker_controlled_fields():
     assert "escapeHtml(t.owner || 'Unassigned')" in html
     assert "t.blockedBy.map(v => escapeHtml(v)).join(', ')" in html
     assert "option.textContent =" in html
+
+
+def test_patch_task_updates_status(monkeypatch, tmp_path: Path):
+    import json as _json
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    from clawteam.team.models import TaskStatus
+    TeamManager.create_team(
+        name="ptest", leader_name="leader", leader_id="l001", description="test",
+    )
+    from clawteam.team.tasks import TaskStore
+    store = TaskStore("ptest")
+    task = store.create(subject="Drag me")
+
+    from clawteam.board.server import BoardHandler
+    from unittest.mock import MagicMock
+    handler = MagicMock(spec=BoardHandler)
+    handler.path = f"/api/team/ptest/task/{task.id}"
+
+    body = _json.dumps({"status": "in_progress"}).encode()
+    handler.headers = {"Content-Length": str(len(body))}
+    handler.rfile = io.BytesIO(body)
+
+    responses = []
+    def mock_serve_json(data):
+        responses.append(data)
+    handler._serve_json = mock_serve_json
+    handler.send_error = MagicMock()
+
+    BoardHandler.do_PATCH(handler)
+
+    assert len(responses) == 1
+    assert responses[0]["status"] == "ok"
+    assert responses[0]["task_id"] == task.id
+
+    updated = store.get(task.id)
+    assert updated.status == TaskStatus.in_progress
+
+
+def test_collect_team_groups_all_six_statuses(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    from clawteam.team.models import TaskStatus
+    TeamManager.create_team(
+        name="six", leader_name="leader", leader_id="l001", description="test",
+    )
+    from clawteam.team.tasks import TaskStore
+    store = TaskStore("six")
+    store.create(subject="t1")
+    store.create(subject="t2")
+    t3 = store.create(subject="t3")
+    store.update(t3.id, status=TaskStatus.awaiting_approval, force=True)
+    t4 = store.create(subject="t4")
+    store.update(t4.id, status=TaskStatus.completed, force=True)
+    t5 = store.create(subject="t5")
+    store.update(t5.id, status=TaskStatus.verified, force=True)
+
+    data = BoardCollector().collect_team("six")
+    assert "awaiting_approval" in data["tasks"]
+    assert "verified" in data["tasks"]
+    assert len(data["tasks"]["awaiting_approval"]) == 1
+    assert len(data["tasks"]["verified"]) == 1
+    assert "awaiting_approval" in data["taskSummary"]
+    assert "verified" in data["taskSummary"]
