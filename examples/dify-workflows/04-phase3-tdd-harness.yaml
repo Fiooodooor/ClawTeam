@@ -1,0 +1,453 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "NIC Porting — Phase 3: TDD Harness Setup"
+  mode: workflow
+  icon: "🧪"
+  icon_type: emoji
+  icon_background: "#FEE2E2"
+  description: >
+    Phase 3: Build the TDD test framework for NIC driver porting.
+    tdd-writer role generates: stub tests that pass, failing tests for each seam/subsystem,
+    build harness, CI gate scripts. Gate: all stub tests pass, all porting tests initially
+    fail (red), test runner produces structured JSON output.
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    viewport: {x: 0, y: 0, zoom: 0.85}
+    nodes:
+
+      # ── INPUT ──────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: {x: 30, y: 282}
+        data:
+          type: start
+          title: "Phase 3 Inputs"
+          variables:
+            - variable: driver_name
+              label: "Driver Name"
+              type: text-input
+              required: true
+              default: "ixgbe"
+            - variable: seam_headers
+              label: "Seam Headers JSON (from Phase 2)"
+              type: paragraph
+              required: true
+            - variable: api_mappings
+              label: "API Mappings JSON (from Phase 1)"
+              type: paragraph
+              required: true
+            - variable: subsystems
+              label: "Driver Subsystems JSON (from Phase 0)"
+              type: paragraph
+              required: true
+            - variable: target_os
+              label: "Target OS"
+              type: select
+              required: true
+              options:
+                - value: FreeBSD
+                  label: "FreeBSD"
+                - value: Windows
+                  label: "Windows (NDIS)"
+                - value: DPDK
+                  label: "DPDK"
+              default: FreeBSD
+            - variable: risk_register
+              label: "Risk Register JSON (shared across phases)"
+              type: paragraph
+              required: false
+
+      # ── TDD WRITER ─────────────────────────────────────────────────────────
+      - id: tdd_writer
+        type: custom
+        position: {x: 330, y: 282}
+        data:
+          type: llm
+          title: "tdd-writer — Generate TDD Harness"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.1
+              max_tokens: 12000
+          prompt_template:
+            - role: system
+              text: |
+                You are the tdd-writer agent for NIC driver porting.
+                Generate a complete TDD harness. CRITICAL TDD RULES:
+                1. Stub tests (infrastructure/build tests) MUST pass immediately
+                2. Porting tests MUST fail initially (red state) — they drive implementation
+                3. Every seam wrapper must have a corresponding test
+                4. Every API mapping must have a test that exercises the wrapper
+                5. Test output must be machine-parseable (JSON or TAP format)
+                6. Tests must build with: make test DRIVER={{#start.driver_name#}}
+                7. No tests may have external dependencies (must mock/stub OS calls)
+
+                Return ONLY valid JSON.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Seam headers to test: {{#start.seam_headers#}}
+                API mappings to test: {{#start.api_mappings#}}
+                Subsystems to cover: {{#start.subsystems#}}
+
+                Generate the full TDD harness JSON:
+                {
+                  "test_framework": "kyua|atf|check|custom",
+                  "build_command": "make test DRIVER=...",
+                  "ci_script": "#!/bin/sh\n...",
+
+                  "stub_tests": [
+                    {
+                      "test_id": "T-STUB-001",
+                      "file": "tests/stub/test_build.c",
+                      "description": "Verify test harness itself compiles",
+                      "expected_state": "PASS",
+                      "test_code": "#include ...\nATF_TC(...) {...}"
+                    }
+                  ],
+
+                  "porting_tests": [
+                    {
+                      "test_id": "T-PORT-001",
+                      "file": "tests/porting/test_mem_alloc.c",
+                      "seam_header": "nic_oal_mem.h",
+                      "api_under_test": "nic_malloc",
+                      "description": "Test native memory allocation wrapper",
+                      "expected_state": "FAIL",
+                      "failure_reason": "nic_oal_mem.h not yet implemented",
+                      "test_code": "ATF_TC(test_nic_malloc) { ... }"
+                    }
+                  ],
+
+                  "gate_script": "#!/bin/sh\n# Run stubs, verify all pass. Run porting, verify all fail.",
+                  "total_stub_tests": 0,
+                  "total_porting_tests": 0,
+                  "coverage_by_subsystem": {}
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── TDD HARNESS GATE ───────────────────────────────────────────────────
+      - id: tdd_harness_gate
+        type: custom
+        position: {x: 730, y: 282}
+        data:
+          type: code
+          title: "TDD Harness Gate — Validate Test Structure"
+          code_language: python3
+          code: |
+            import json
+
+            def main(harness_json: str, risk_register_json: str = "[]") -> dict:
+                results = []
+                passed = 0
+                failed = 0
+              try:
+                risk_register = json.loads(risk_register_json) if risk_register_json else []
+                if not isinstance(risk_register, list):
+                  risk_register = []
+              except Exception:
+                risk_register = []
+
+                def check(tid, ok, detail=""):
+                    nonlocal passed, failed
+                    status = "PASS" if ok else "FAIL"
+                    if ok:
+                        passed += 1
+                    else:
+                        failed += 1
+                    results.append({"test_id": tid, "status": status, "detail": str(detail)[:150]})
+
+                try:
+                    harness = json.loads(harness_json)
+                except Exception as e:
+                    return _fail(f"JSON parse: {e}")
+
+                stub_tests = harness.get("stub_tests") or []
+                porting_tests = harness.get("porting_tests") or []
+
+                # T01: Stub tests exist
+                check("T01-stub-tests-exist", len(stub_tests) >= 3, f"count={len(stub_tests)}")
+
+                # T02: Porting tests exist (one per seam/API)
+                check("T02-porting-tests-exist", len(porting_tests) >= 5,
+                      f"count={len(porting_tests)}")
+
+                # T03: All stub tests expected PASS
+                stub_fail = [t["test_id"] for t in stub_tests if t.get("expected_state") != "PASS"]
+                check("T03-stubs-expect-pass", len(stub_fail) == 0, f"wrong={stub_fail}")
+
+                # T04: All porting tests expected FAIL (red state)
+                port_wrong = [t["test_id"] for t in porting_tests
+                              if t.get("expected_state") != "FAIL"]
+                check("T04-porting-expect-fail", len(port_wrong) == 0, f"wrong={port_wrong}")
+
+                # T05: All tests have test_code
+                no_code = [t["test_id"] for t in stub_tests + porting_tests
+                           if not t.get("test_code", "").strip()]
+                check("T05-all-have-code", len(no_code) == 0, f"missing={no_code}")
+
+                # T06: All tests have test_id
+                no_id = [i for i, t in enumerate(stub_tests + porting_tests)
+                         if not t.get("test_id")]
+                check("T06-all-have-ids", len(no_id) == 0, f"idx={no_id}")
+
+                # T07: Build command present
+                check("T07-build-command", bool(harness.get("build_command", "").strip()))
+
+                # T08: Gate script present
+                check("T08-gate-script", bool(harness.get("gate_script", "").strip()))
+
+                # T09: CI script present
+                check("T09-ci-script", bool(harness.get("ci_script", "").strip()))
+
+                # T10: Coverage by subsystem populated
+                cov = harness.get("coverage_by_subsystem") or {}
+                check("T10-subsystem-coverage", len(cov) > 0, f"keys={list(cov.keys())}")
+
+                total = passed + failed
+                gate_score = round((passed / total) * 100, 1) if total else 0.0
+                fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
+                updated_risk_register = list(risk_register)
+                if failed != 0:
+                  updated_risk_register.append({
+                    "risk_id": f"RISK-{len(updated_risk_register) + 1:03d}",
+                    "phase_raised": "phase-3",
+                    "category": "maintenance",
+                    "description": f"Phase 3 TDD harness issues: {'; '.join(fail_ids)}",
+                    "severity": "medium",
+                    "status": "open",
+                    "mitigation_action": "Complete harness scaffolding and enforce red/green expectations",
+                    "mitigation_phase": "phase-3",
+                    "residual_risk": "medium"
+                  })
+
+                return {
+                    "all_passed": failed == 0,
+                    "passed_count": passed,
+                    "failed_count": failed,
+                    "gate_score": gate_score,
+                    "test_results": json.dumps(results),
+                    "fail_summary": "; ".join(fail_ids),
+                    "total_stub_tests": len(stub_tests),
+                    "total_porting_tests": len(porting_tests),
+                    "build_command": harness.get("build_command", ""),
+                    "ci_script": harness.get("ci_script", ""),
+                    "gate_script": harness.get("gate_script", ""),
+                    "stub_tests_json": json.dumps(stub_tests),
+                    "porting_tests_json": json.dumps(porting_tests),
+                    "coverage_by_subsystem": json.dumps(cov),
+                    "updated_risk_register": json.dumps(updated_risk_register),
+                    "replan_recommended": failed != 0,
+                }
+
+            def _fail(reason):
+                return {
+                    "all_passed": False, "passed_count": 0, "failed_count": 1,
+                    "gate_score": 0.0, "test_results": json.dumps([{"test_id": "parse", "status": "FAIL", "detail": reason}]),
+                    "fail_summary": reason, "total_stub_tests": 0, "total_porting_tests": 0,
+                    "build_command": "", "ci_script": "", "gate_script": "",
+                    "stub_tests_json": "[]", "porting_tests_json": "[]", "coverage_by_subsystem": "{}",
+                  "updated_risk_register": risk_register_json if risk_register_json else "[]",
+                  "replan_recommended": True
+                }
+          variables:
+            - variable: harness_json
+              value_selector: [tdd_writer, text]
+            - variable: risk_register_json
+              value_selector: [start, risk_register]
+          outputs:
+            all_passed: {type: boolean}
+            passed_count: {type: number}
+            failed_count: {type: number}
+            gate_score: {type: number}
+            test_results: {type: string}
+            fail_summary: {type: string}
+            total_stub_tests: {type: number}
+            total_porting_tests: {type: number}
+            build_command: {type: string}
+            ci_script: {type: string}
+            gate_script: {type: string}
+            stub_tests_json: {type: string}
+            porting_tests_json: {type: string}
+            coverage_by_subsystem: {type: string}
+            updated_risk_register: {type: string}
+            replan_recommended: {type: boolean}
+
+      # ── BRANCH ─────────────────────────────────────────────────────────────
+      - id: gate_branch
+        type: custom
+        position: {x: 1030, y: 282}
+        data:
+          type: if-else
+          title: "TDD Harness Gate Pass?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [tdd_harness_gate, all_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-harness-pass
+
+      # ── SUCCESS ────────────────────────────────────────────────────────────
+      - id: end_success
+        type: custom
+        position: {x: 1330, y: 120}
+        data:
+          type: end
+          title: "Phase 3 PASSED ✅ — TDD Harness Ready"
+          outputs:
+            - variable: gate_score
+              value_type: number
+              value_selector: [tdd_harness_gate, gate_score]
+            - variable: total_stub_tests
+              value_type: number
+              value_selector: [tdd_harness_gate, total_stub_tests]
+            - variable: total_porting_tests
+              value_type: number
+              value_selector: [tdd_harness_gate, total_porting_tests]
+            - variable: build_command
+              value_type: string
+              value_selector: [tdd_harness_gate, build_command]
+            - variable: stub_tests_json
+              value_type: string
+              value_selector: [tdd_harness_gate, stub_tests_json]
+            - variable: porting_tests_json
+              value_type: string
+              value_selector: [tdd_harness_gate, porting_tests_json]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_harness_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_harness_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_harness_gate, replan_recommended]
+
+      # ── REMEDIATION ────────────────────────────────────────────────────────
+      - id: remediation_llm
+        type: custom
+        position: {x: 1330, y: 500}
+        data:
+          type: llm
+          title: "Remediation — Fix TDD Harness Gaps"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.2
+              max_tokens: 10000
+          prompt_template:
+            - role: system
+              text: |
+                Fix the TDD harness to pass all gate checks. Ensure:
+                - Stub tests: expected_state=PASS
+                - Porting tests: expected_state=FAIL (they must be RED before implementation)
+                - All tests have working test_code
+                Return corrected harness JSON with same schema.
+            - role: user
+              text: |
+                Original harness: {{#tdd_writer.text#}}
+                Failed gate checks: {{#tdd_harness_gate.fail_summary#}}
+                Test details: {{#tdd_harness_gate.test_results#}}
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── FAIL OUTPUT ────────────────────────────────────────────────────────
+      - id: end_fail
+        type: custom
+        position: {x: 1630, y: 500}
+        data:
+          type: end
+          title: "Phase 3 FAILED ❌ — Remediated Harness"
+          outputs:
+            - variable: remediated_harness
+              value_type: string
+              value_selector: [remediation_llm, text]
+            - variable: fail_summary
+              value_type: string
+              value_selector: [tdd_harness_gate, fail_summary]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_harness_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_harness_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_harness_gate, replan_recommended]
+
+    edges:
+      - id: e-start-writer
+        source: start
+        target: tdd_writer
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-writer-gate
+        source: tdd_writer
+        target: tdd_harness_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-gate-branch
+        source: tdd_harness_gate
+        target: gate_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-success
+        source: gate_branch
+        target: end_success
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-fail
+        source: gate_branch
+        target: remediation_llm
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+
+      - id: e-remediation-end
+        source: remediation_llm
+        target: end_fail
+        sourceHandle: source
+        targetHandle: target
+        type: custom

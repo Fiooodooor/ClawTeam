@@ -1,0 +1,1253 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "NIC Porting - Master Orchestrator"
+  mode: workflow
+  icon: "🔧"
+  icon_type: emoji
+  icon_background: "#E0F2FE"
+  description: >
+    Executable top-level orchestration for the NIC porting pipeline. Phase 0 runs locally,
+    then phases 1-7 are invoked through HTTP-request nodes. Each phase returns structured
+    outputs, shared risk state, and a replan signal so the master can advance or fail fast.
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables:
+    - id: env-phase-auth-token
+      name: phase_auth_token
+      value: ""
+      value_type: string
+      description: "Bearer token for phase workflow endpoints"
+      selector:
+        - environment
+        - phase_auth_token
+    - id: env-phase1-url
+      name: phase1_url
+      value: ""
+      value_type: string
+      description: "HTTP endpoint for Phase 1 workflow"
+      selector:
+        - environment
+        - phase1_url
+    - id: env-phase2-url
+      name: phase2_url
+      value: ""
+      value_type: string
+      description: "HTTP endpoint for Phase 2 workflow"
+      selector:
+        - environment
+        - phase2_url
+    - id: env-phase3-url
+      name: phase3_url
+      value: ""
+      value_type: string
+      description: "HTTP endpoint for Phase 3 workflow"
+      selector:
+        - environment
+        - phase3_url
+    - id: env-phase4-url
+      name: phase4_url
+      value: ""
+      value_type: string
+      description: "HTTP endpoint for Phase 4 workflow"
+      selector:
+        - environment
+        - phase4_url
+    - id: env-phase5-url
+      name: phase5_url
+      value: ""
+      value_type: string
+      description: "HTTP endpoint for Phase 5 workflow"
+      selector:
+        - environment
+        - phase5_url
+    - id: env-phase6-url
+      name: phase6_url
+      value: ""
+      value_type: string
+      description: "HTTP endpoint for Phase 6 workflow"
+      selector:
+        - environment
+        - phase6_url
+    - id: env-phase7-url
+      name: phase7_url
+      value: ""
+      value_type: string
+      description: "HTTP endpoint for Phase 7 workflow"
+      selector:
+        - environment
+        - phase7_url
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    viewport: {x: 0, y: 0, zoom: 0.34}
+    nodes:
+      - id: start
+        type: custom
+        position: {x: 30, y: 520}
+        data:
+          type: start
+          title: "Porting Mission Inputs"
+          variables:
+            - variable: driver_name
+              label: "Driver Name"
+              type: text-input
+              required: true
+              default: "ixgbe"
+            - variable: goal
+              label: "Porting Goal"
+              type: paragraph
+              required: true
+              default: "Native OAL data-plane port: Linux ixgbe -> FreeBSD"
+            - variable: linux_driver_path
+              label: "Linux Driver Path"
+              type: text-input
+              required: true
+              default: "drivers/net/ethernet/intel/ixgbe"
+            - variable: freebsd_target_path
+              label: "FreeBSD Target Path"
+              type: text-input
+              required: true
+              default: "sys/dev/ixgbe"
+            - variable: target_os
+              label: "Target OS"
+              type: select
+              required: true
+              options:
+                - value: FreeBSD
+                  label: "FreeBSD"
+                - value: Windows
+                  label: "Windows"
+                - value: DPDK
+                  label: "DPDK"
+              default: FreeBSD
+            - variable: team_name
+              label: "Team Name"
+              type: text-input
+              required: true
+              default: "nic-port-v2"
+            - variable: slice_focus
+              label: "Phase 4 Micro-slice Focus"
+              type: text-input
+              required: true
+              default: "memory-allocation"
+            - variable: upstream_branch
+              label: "Upstream Branch"
+              type: text-input
+              required: true
+              default: "main"
+            - variable: porting_branch
+              label: "Porting Branch"
+              type: text-input
+              required: true
+              default: "port/ixgbe-freebsd"
+            - variable: extension_targets
+              label: "Extension Targets"
+              type: text-input
+              required: true
+              default: "Windows,DPDK"
+      - id: phase0_llm
+        type: custom
+        position: {x: 320, y: 520}
+        data:
+          type: llm
+          title: "Phase 0 - Scope and Baseline"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.1
+              max_tokens: 5000
+          prompt_template:
+            - role: system
+              text: |
+                You are the Phase 0 linux-analyst.
+                Produce only valid JSON with baseline scope, constraints, subsystems, and risks.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Goal: {{#start.goal#}}
+                Linux path: {{#start.linux_driver_path#}}
+                FreeBSD path: {{#start.freebsd_target_path#}}
+
+                Output:
+                {
+                  "baseline_commit": "string",
+                  "hard_constraints": ["..."],
+                  "acceptance_gates": ["..."],
+                  "critical_kernel_apis": ["..."],
+                  "subsystems": ["..."],
+                  "risk_items": [{"severity": "medium", "description": "", "mitigation": ""}],
+                  "scope_approved": true,
+                  "gate_score": 0
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+      - id: gate0
+        type: custom
+        position: {x: 620, y: 520}
+        data:
+          type: code
+          title: "Gate 0 - Scope Approval"
+          code_language: python3
+          code: |
+            import json
+
+            def main(llm_output: str) -> dict:
+                try:
+                    data = json.loads(llm_output)
+                except Exception as exc:
+                    return {
+                        "passed": False,
+                        "score": 0.0,
+                        "baseline_commit": "",
+                        "hard_constraints": "[]",
+                        "critical_kernel_apis": "[]",
+                        "subsystems": "[]",
+                        "updated_risk_register": "[]",
+                        "reason": f"Invalid JSON from Phase 0: {exc}",
+                    }
+
+                score = float(data.get("gate_score", 0))
+                approved = data.get("scope_approved") is True
+                risk_register = []
+                for index, item in enumerate(data.get("risk_items") or [], start=1):
+                    risk_register.append({
+                        "risk_id": f"RISK-{index:03d}",
+                        "phase_raised": "phase-0",
+                        "category": "portability",
+                        "description": item.get("description", "phase-0 risk"),
+                        "severity": item.get("severity", "medium"),
+                        "status": "open",
+                        "mitigation_action": item.get("mitigation", "review required"),
+                        "mitigation_phase": "phase-0",
+                        "residual_risk": "unknown",
+                    })
+
+                return {
+                    "passed": approved and score >= 80.0,
+                    "score": score,
+                    "baseline_commit": data.get("baseline_commit", ""),
+                    "hard_constraints": json.dumps(data.get("hard_constraints", [])),
+                    "critical_kernel_apis": json.dumps(data.get("critical_kernel_apis", [])),
+                    "subsystems": json.dumps(data.get("subsystems", [])),
+                    "updated_risk_register": json.dumps(risk_register),
+                    "reason": "" if approved and score >= 80.0 else f"scope_approved={approved}, score={score}",
+                }
+          variables:
+            - variable: llm_output
+              value_selector: [phase0_llm, text]
+          outputs:
+            passed: {type: boolean}
+            score: {type: number}
+            baseline_commit: {type: string}
+            hard_constraints: {type: string}
+            critical_kernel_apis: {type: string}
+            subsystems: {type: string}
+            updated_risk_register: {type: string}
+            reason: {type: string}
+      - id: gate0_branch
+        type: custom
+        position: {x: 900, y: 520}
+        data:
+          type: if-else
+          title: "Gate 0 Passed?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [gate0, passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-gate0-pass
+      - id: gate0_fail
+        type: custom
+        position: {x: 1150, y: 860}
+        data:
+          type: end
+          title: "Phase 0 FAILED"
+          outputs:
+            - variable: fail_summary
+              value_type: string
+              value_selector: [gate0, reason]
+      - id: phase1_http
+        type: custom
+        position: {x: 1180, y: 200}
+        data:
+          type: http-request
+          title: "Run Phase 1 Workflow"
+          method: POST
+          url: "{{#environment.phase1_url#}}"
+          authorization:
+            type: no-auth
+          headers: |
+            Content-Type: application/json
+            Authorization: Bearer {{#environment.phase_auth_token#}}
+          params: ""
+          body:
+            type: json
+            data:
+              - key: driver_name
+                type: text
+                value: "{{#start.driver_name#}}"
+              - key: critical_kernel_apis
+                type: text
+                value: "{{#gate0.critical_kernel_apis#}}"
+              - key: hard_constraints
+                type: text
+                value: "{{#gate0.hard_constraints#}}"
+              - key: subsystems
+                type: text
+                value: "{{#gate0.subsystems#}}"
+              - key: target_os
+                type: text
+                value: "{{#start.target_os#}}"
+              - key: risk_register
+                type: text
+                value: "{{#gate0.updated_risk_register#}}"
+          timeout:
+            connect: 10
+            read: 120
+            write: 30
+      - id: phase1_eval
+        type: custom
+        position: {x: 1460, y: 200}
+        data:
+          type: code
+          title: "Phase 1 Branch Evaluation"
+          code_language: python3
+          code: |
+            import json
+
+            def _outputs(body: str):
+                payload = json.loads(body) if body else {}
+                outputs = ((payload.get("data") or {}).get("outputs") or payload.get("outputs") or payload)
+                if isinstance(outputs, str):
+                    try:
+                        outputs = json.loads(outputs)
+                    except Exception:
+                        outputs = {"raw": outputs}
+                return outputs if isinstance(outputs, dict) else {}
+
+            def main(status_code: float, body: str) -> dict:
+                outputs = _outputs(body)
+                return {
+                    "phase_passed": int(status_code) < 400 and not bool(outputs.get("replan_recommended", False)),
+                    "fail_summary": outputs.get("fail_summary", ""),
+                    "api_mappings": outputs.get("api_mappings", "[]"),
+                    "updated_risk_register": outputs.get("updated_risk_register", "[]"),
+                }
+          variables:
+            - variable: status_code
+              value_selector: [phase1_http, status_code]
+            - variable: body
+              value_selector: [phase1_http, body]
+          outputs:
+            phase_passed: {type: boolean}
+            fail_summary: {type: string}
+            api_mappings: {type: string}
+            updated_risk_register: {type: string}
+      - id: phase1_branch
+        type: custom
+        position: {x: 1740, y: 200}
+        data:
+          type: if-else
+          title: "Phase 1 Advance?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [phase1_eval, phase_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-phase1-pass
+      - id: phase1_fail
+        type: custom
+        position: {x: 2020, y: 60}
+        data:
+          type: end
+          title: "Phase 1 FAILED"
+          outputs:
+            - variable: fail_summary
+              value_type: string
+              value_selector: [phase1_eval, fail_summary]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [phase1_eval, updated_risk_register]
+      - id: phase2_http
+        type: custom
+        position: {x: 2020, y: 200}
+        data:
+          type: http-request
+          title: "Run Phase 2 Workflow"
+          method: POST
+          url: "{{#environment.phase2_url#}}"
+          authorization:
+            type: no-auth
+          headers: |
+            Content-Type: application/json
+            Authorization: Bearer {{#environment.phase_auth_token#}}
+          params: ""
+          body:
+            type: json
+            data:
+              - key: driver_name
+                type: text
+                value: "{{#start.driver_name#}}"
+              - key: api_mappings
+                type: text
+                value: "{{#phase1_eval.api_mappings#}}"
+              - key: hard_constraints
+                type: text
+                value: "{{#gate0.hard_constraints#}}"
+              - key: target_os
+                type: text
+                value: "{{#start.target_os#}}"
+              - key: risk_register
+                type: text
+                value: "{{#phase1_eval.updated_risk_register#}}"
+          timeout:
+            connect: 10
+            read: 120
+            write: 30
+      - id: phase2_eval
+        type: custom
+        position: {x: 2300, y: 200}
+        data:
+          type: code
+          title: "Phase 2 Branch Evaluation"
+          code_language: python3
+          code: |
+            import json
+
+            def _outputs(body: str):
+                payload = json.loads(body) if body else {}
+                outputs = ((payload.get("data") or {}).get("outputs") or payload.get("outputs") or payload)
+                if isinstance(outputs, str):
+                    try:
+                        outputs = json.loads(outputs)
+                    except Exception:
+                        outputs = {"raw": outputs}
+                return outputs if isinstance(outputs, dict) else {}
+
+            def main(status_code: float, body: str) -> dict:
+                outputs = _outputs(body)
+                return {
+                    "phase_passed": int(status_code) < 400 and not bool(outputs.get("replan_recommended", False)),
+                    "fail_summary": outputs.get("fail_summary", ""),
+                    "seam_headers": outputs.get("seam_headers", "[]"),
+                    "updated_risk_register": outputs.get("updated_risk_register", "[]"),
+                }
+          variables:
+            - variable: status_code
+              value_selector: [phase2_http, status_code]
+            - variable: body
+              value_selector: [phase2_http, body]
+          outputs:
+            phase_passed: {type: boolean}
+            fail_summary: {type: string}
+            seam_headers: {type: string}
+            updated_risk_register: {type: string}
+      - id: phase2_branch
+        type: custom
+        position: {x: 2580, y: 200}
+        data:
+          type: if-else
+          title: "Phase 2 Advance?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [phase2_eval, phase_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-phase2-pass
+      - id: phase2_fail
+        type: custom
+        position: {x: 2860, y: 60}
+        data:
+          type: end
+          title: "Phase 2 FAILED"
+          outputs:
+            - variable: fail_summary
+              value_type: string
+              value_selector: [phase2_eval, fail_summary]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [phase2_eval, updated_risk_register]
+      - id: phase3_http
+        type: custom
+        position: {x: 2860, y: 200}
+        data:
+          type: http-request
+          title: "Run Phase 3 Workflow"
+          method: POST
+          url: "{{#environment.phase3_url#}}"
+          authorization:
+            type: no-auth
+          headers: |
+            Content-Type: application/json
+            Authorization: Bearer {{#environment.phase_auth_token#}}
+          params: ""
+          body:
+            type: json
+            data:
+              - key: driver_name
+                type: text
+                value: "{{#start.driver_name#}}"
+              - key: seam_headers
+                type: text
+                value: "{{#phase2_eval.seam_headers#}}"
+              - key: api_mappings
+                type: text
+                value: "{{#phase1_eval.api_mappings#}}"
+              - key: subsystems
+                type: text
+                value: "{{#gate0.subsystems#}}"
+              - key: target_os
+                type: text
+                value: "{{#start.target_os#}}"
+              - key: risk_register
+                type: text
+                value: "{{#phase2_eval.updated_risk_register#}}"
+          timeout:
+            connect: 10
+            read: 120
+            write: 30
+      - id: phase3_eval
+        type: custom
+        position: {x: 3140, y: 200}
+        data:
+          type: code
+          title: "Phase 3 Branch Evaluation"
+          code_language: python3
+          code: |
+            import json
+
+            def _outputs(body: str):
+                payload = json.loads(body) if body else {}
+                outputs = ((payload.get("data") or {}).get("outputs") or payload.get("outputs") or payload)
+                if isinstance(outputs, str):
+                    try:
+                        outputs = json.loads(outputs)
+                    except Exception:
+                        outputs = {"raw": outputs}
+                return outputs if isinstance(outputs, dict) else {}
+
+            def main(status_code: float, body: str) -> dict:
+                outputs = _outputs(body)
+                return {
+                    "phase_passed": int(status_code) < 400 and not bool(outputs.get("replan_recommended", False)),
+                    "fail_summary": outputs.get("fail_summary", ""),
+                    "porting_tests_json": outputs.get("porting_tests_json", "[]"),
+                    "test_results": outputs.get("test_results", "[]"),
+                    "updated_risk_register": outputs.get("updated_risk_register", "[]"),
+                }
+          variables:
+            - variable: status_code
+              value_selector: [phase3_http, status_code]
+            - variable: body
+              value_selector: [phase3_http, body]
+          outputs:
+            phase_passed: {type: boolean}
+            fail_summary: {type: string}
+            porting_tests_json: {type: string}
+            test_results: {type: string}
+            updated_risk_register: {type: string}
+      - id: phase3_branch
+        type: custom
+        position: {x: 3420, y: 200}
+        data:
+          type: if-else
+          title: "Phase 3 Advance?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [phase3_eval, phase_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-phase3-pass
+      - id: phase3_fail
+        type: custom
+        position: {x: 3700, y: 60}
+        data:
+          type: end
+          title: "Phase 3 FAILED"
+          outputs:
+            - variable: fail_summary
+              value_type: string
+              value_selector: [phase3_eval, fail_summary]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [phase3_eval, updated_risk_register]
+      - id: phase4_http
+        type: custom
+        position: {x: 3700, y: 200}
+        data:
+          type: http-request
+          title: "Run Phase 4 Workflow"
+          method: POST
+          url: "{{#environment.phase4_url#}}"
+          authorization:
+            type: no-auth
+          headers: |
+            Content-Type: application/json
+            Authorization: Bearer {{#environment.phase_auth_token#}}
+          params: ""
+          body:
+            type: json
+            data:
+              - key: driver_name
+                type: text
+                value: "{{#start.driver_name#}}"
+              - key: porting_tests_json
+                type: text
+                value: "{{#phase3_eval.porting_tests_json#}}"
+              - key: seam_headers
+                type: text
+                value: "{{#phase2_eval.seam_headers#}}"
+              - key: api_mappings
+                type: text
+                value: "{{#phase1_eval.api_mappings#}}"
+              - key: target_os
+                type: text
+                value: "{{#start.target_os#}}"
+              - key: slice_focus
+                type: text
+                value: "{{#start.slice_focus#}}"
+              - key: risk_register
+                type: text
+                value: "{{#phase3_eval.updated_risk_register#}}"
+          timeout:
+            connect: 10
+            read: 120
+            write: 30
+      - id: phase4_eval
+        type: custom
+        position: {x: 3980, y: 200}
+        data:
+          type: code
+          title: "Phase 4 Branch Evaluation"
+          code_language: python3
+          code: |
+            import json
+
+            def _outputs(body: str):
+                payload = json.loads(body) if body else {}
+                outputs = ((payload.get("data") or {}).get("outputs") or payload.get("outputs") or payload)
+                if isinstance(outputs, str):
+                    try:
+                        outputs = json.loads(outputs)
+                    except Exception:
+                        outputs = {"raw": outputs}
+                return outputs if isinstance(outputs, dict) else {}
+
+            def main(status_code: float, body: str) -> dict:
+                outputs = _outputs(body)
+                return {
+                    "phase_passed": int(status_code) < 400 and not bool(outputs.get("replan_recommended", False)),
+                    "fail_summary": outputs.get("fail_summary", ""),
+                    "ported_code_summary": outputs.get("ported_code_summary", "{}"),
+                    "test_results": outputs.get("test_results", "[]"),
+                    "updated_risk_register": outputs.get("updated_risk_register", "[]"),
+                }
+          variables:
+            - variable: status_code
+              value_selector: [phase4_http, status_code]
+            - variable: body
+              value_selector: [phase4_http, body]
+          outputs:
+            phase_passed: {type: boolean}
+            fail_summary: {type: string}
+            ported_code_summary: {type: string}
+            test_results: {type: string}
+            updated_risk_register: {type: string}
+      - id: phase4_branch
+        type: custom
+        position: {x: 4260, y: 200}
+        data:
+          type: if-else
+          title: "Phase 4 Advance?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [phase4_eval, phase_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-phase4-pass
+      - id: phase4_fail
+        type: custom
+        position: {x: 4540, y: 60}
+        data:
+          type: end
+          title: "Phase 4 FAILED"
+          outputs:
+            - variable: fail_summary
+              value_type: string
+              value_selector: [phase4_eval, fail_summary]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [phase4_eval, updated_risk_register]
+      - id: phase5_http
+        type: custom
+        position: {x: 4540, y: 200}
+        data:
+          type: http-request
+          title: "Run Phase 5 Workflow"
+          method: POST
+          url: "{{#environment.phase5_url#}}"
+          authorization:
+            type: no-auth
+          headers: |
+            Content-Type: application/json
+            Authorization: Bearer {{#environment.phase_auth_token#}}
+          params: ""
+          body:
+            type: json
+            data:
+              - key: driver_name
+                type: text
+                value: "{{#start.driver_name#}}"
+              - key: target_os
+                type: text
+                value: "{{#start.target_os#}}"
+              - key: ported_code_summary
+                type: text
+                value: "{{#phase4_eval.ported_code_summary#}}"
+              - key: tdd_test_results
+                type: text
+                value: "{{#phase4_eval.test_results#}}"
+              - key: api_mappings
+                type: text
+                value: "{{#phase1_eval.api_mappings#}}"
+              - key: seam_headers
+                type: text
+                value: "{{#phase2_eval.seam_headers#}}"
+              - key: risk_register
+                type: text
+                value: "{{#phase4_eval.updated_risk_register#}}"
+          timeout:
+            connect: 10
+            read: 120
+            write: 30
+      - id: phase5_eval
+        type: custom
+        position: {x: 4820, y: 200}
+        data:
+          type: code
+          title: "Phase 5 Branch Evaluation"
+          code_language: python3
+          code: |
+            import json
+
+            def _outputs(body: str):
+                payload = json.loads(body) if body else {}
+                outputs = ((payload.get("data") or {}).get("outputs") or payload.get("outputs") or payload)
+                if isinstance(outputs, str):
+                    try:
+                        outputs = json.loads(outputs)
+                    except Exception:
+                        outputs = {"raw": outputs}
+                return outputs if isinstance(outputs, dict) else {}
+
+            def main(status_code: float, body: str) -> dict:
+                outputs = _outputs(body)
+                return {
+                    "phase_passed": int(status_code) < 400 and not bool(outputs.get("replan_recommended", False)),
+                    "fail_summary": outputs.get("fail_summary", ""),
+                    "phase5_gate_results_json": outputs.get("phase5_gate_results_json", json.dumps(outputs)),
+                    "updated_risk_register": outputs.get("updated_risk_register", "[]"),
+                }
+          variables:
+            - variable: status_code
+              value_selector: [phase5_http, status_code]
+            - variable: body
+              value_selector: [phase5_http, body]
+          outputs:
+            phase_passed: {type: boolean}
+            fail_summary: {type: string}
+            phase5_gate_results_json: {type: string}
+            updated_risk_register: {type: string}
+      - id: phase5_branch
+        type: custom
+        position: {x: 5100, y: 200}
+        data:
+          type: if-else
+          title: "Phase 5 Advance?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [phase5_eval, phase_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-phase5-pass
+      - id: phase5_fail
+        type: custom
+        position: {x: 5380, y: 60}
+        data:
+          type: end
+          title: "Phase 5 FAILED"
+          outputs:
+            - variable: fail_summary
+              value_type: string
+              value_selector: [phase5_eval, fail_summary]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [phase5_eval, updated_risk_register]
+      - id: phase6_http
+        type: custom
+        position: {x: 5380, y: 200}
+        data:
+          type: http-request
+          title: "Run Phase 6 Workflow"
+          method: POST
+          url: "{{#environment.phase6_url#}}"
+          authorization:
+            type: no-auth
+          headers: |
+            Content-Type: application/json
+            Authorization: Bearer {{#environment.phase_auth_token#}}
+          params: ""
+          body:
+            type: json
+            data:
+              - key: driver_name
+                type: text
+                value: "{{#start.driver_name#}}"
+              - key: target_os
+                type: text
+                value: "{{#start.target_os#}}"
+              - key: phase5_gate_results
+                type: text
+                value: "{{#phase5_eval.phase5_gate_results_json#}}"
+              - key: ported_code_summary
+                type: text
+                value: "{{#phase4_eval.ported_code_summary#}}"
+              - key: baseline_commit
+                type: text
+                value: "{{#gate0.baseline_commit#}}"
+              - key: upstream_branch
+                type: text
+                value: "{{#start.upstream_branch#}}"
+              - key: porting_branch
+                type: text
+                value: "{{#start.porting_branch#}}"
+              - key: risk_register
+                type: text
+                value: "{{#phase5_eval.updated_risk_register#}}"
+          timeout:
+            connect: 10
+            read: 120
+            write: 30
+      - id: phase6_eval
+        type: custom
+        position: {x: 5660, y: 200}
+        data:
+          type: code
+          title: "Phase 6 Branch Evaluation"
+          code_language: python3
+          code: |
+            import json
+
+            def _outputs(body: str):
+                payload = json.loads(body) if body else {}
+                outputs = ((payload.get("data") or {}).get("outputs") or payload.get("outputs") or payload)
+                if isinstance(outputs, str):
+                    try:
+                        outputs = json.loads(outputs)
+                    except Exception:
+                        outputs = {"raw": outputs}
+                return outputs if isinstance(outputs, dict) else {}
+
+            def main(status_code: float, body: str) -> dict:
+                outputs = _outputs(body)
+                return {
+                    "phase_passed": int(status_code) < 400 and not bool(outputs.get("replan_recommended", False)),
+                    "fail_summary": outputs.get("fail_summary", ""),
+                    "phase6_merge_results_json": json.dumps(outputs),
+                    "updated_risk_register": outputs.get("updated_risk_register", "[]"),
+                }
+          variables:
+            - variable: status_code
+              value_selector: [phase6_http, status_code]
+            - variable: body
+              value_selector: [phase6_http, body]
+          outputs:
+            phase_passed: {type: boolean}
+            fail_summary: {type: string}
+            phase6_merge_results_json: {type: string}
+            updated_risk_register: {type: string}
+      - id: phase6_branch
+        type: custom
+        position: {x: 5940, y: 200}
+        data:
+          type: if-else
+          title: "Phase 6 Advance?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [phase6_eval, phase_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-phase6-pass
+      - id: phase6_fail
+        type: custom
+        position: {x: 6220, y: 60}
+        data:
+          type: end
+          title: "Phase 6 FAILED"
+          outputs:
+            - variable: fail_summary
+              value_type: string
+              value_selector: [phase6_eval, fail_summary]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [phase6_eval, updated_risk_register]
+      - id: phase7_http
+        type: custom
+        position: {x: 6220, y: 200}
+        data:
+          type: http-request
+          title: "Run Phase 7 Workflow"
+          method: POST
+          url: "{{#environment.phase7_url#}}"
+          authorization:
+            type: no-auth
+          headers: |
+            Content-Type: application/json
+            Authorization: Bearer {{#environment.phase_auth_token#}}
+          params: ""
+          body:
+            type: json
+            data:
+              - key: driver_name
+                type: text
+                value: "{{#start.driver_name#}}"
+              - key: primary_target_os
+                type: text
+                value: "{{#start.target_os#}}"
+              - key: extension_targets
+                type: text
+                value: "{{#start.extension_targets#}}"
+              - key: seam_headers
+                type: text
+                value: "{{#phase2_eval.seam_headers#}}"
+              - key: api_mappings
+                type: text
+                value: "{{#phase1_eval.api_mappings#}}"
+              - key: phase5_gate_results
+                type: text
+                value: "{{#phase5_eval.phase5_gate_results_json#}}"
+              - key: phase6_merge_results
+                type: text
+                value: "{{#phase6_eval.phase6_merge_results_json#}}"
+              - key: risk_register
+                type: text
+                value: "{{#phase6_eval.updated_risk_register#}}"
+          timeout:
+            connect: 10
+            read: 120
+            write: 30
+      - id: phase7_eval
+        type: custom
+        position: {x: 6500, y: 200}
+        data:
+          type: code
+          title: "Phase 7 Branch Evaluation"
+          code_language: python3
+          code: |
+            import json
+
+            def _outputs(body: str):
+                payload = json.loads(body) if body else {}
+                outputs = ((payload.get("data") or {}).get("outputs") or payload.get("outputs") or payload)
+                if isinstance(outputs, str):
+                    try:
+                        outputs = json.loads(outputs)
+                    except Exception:
+                        outputs = {"raw": outputs}
+                return outputs if isinstance(outputs, dict) else {}
+
+            def main(status_code: float, body: str) -> dict:
+                outputs = _outputs(body)
+                return {
+                    "phase_passed": int(status_code) < 400 and not bool(outputs.get("replan_recommended", False)),
+                    "fail_summary": outputs.get("fail_summary", ""),
+                    "final_outputs_json": json.dumps(outputs),
+                    "updated_risk_register": outputs.get("updated_risk_register", "[]"),
+                }
+          variables:
+            - variable: status_code
+              value_selector: [phase7_http, status_code]
+            - variable: body
+              value_selector: [phase7_http, body]
+          outputs:
+            phase_passed: {type: boolean}
+            fail_summary: {type: string}
+            final_outputs_json: {type: string}
+            updated_risk_register: {type: string}
+      - id: phase7_branch
+        type: custom
+        position: {x: 6780, y: 200}
+        data:
+          type: if-else
+          title: "Phase 7 Advance?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [phase7_eval, phase_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-phase7-pass
+      - id: phase7_fail
+        type: custom
+        position: {x: 7060, y: 60}
+        data:
+          type: end
+          title: "Phase 7 FAILED"
+          outputs:
+            - variable: fail_summary
+              value_type: string
+              value_selector: [phase7_eval, fail_summary]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [phase7_eval, updated_risk_register]
+      - id: end_success
+        type: custom
+        position: {x: 7060, y: 420}
+        data:
+          type: end
+          title: "Porting Workflow Completed"
+          outputs:
+            - variable: baseline_commit
+              value_type: string
+              value_selector: [gate0, baseline_commit]
+            - variable: final_outputs_json
+              value_type: string
+              value_selector: [phase7_eval, final_outputs_json]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [phase7_eval, updated_risk_register]
+    edges:
+      - id: e-start-phase0
+        source: start
+        target: phase0_llm
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase0-gate
+        source: phase0_llm
+        target: gate0
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-gate0-branch
+        source: gate0
+        target: gate0_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-gate0-pass
+        source: gate0_branch
+        target: phase1_http
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+      - id: e-gate0-fail
+        source: gate0_branch
+        target: gate0_fail
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+      - id: e-phase1-http-eval
+        source: phase1_http
+        target: phase1_eval
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase1-eval-branch
+        source: phase1_eval
+        target: phase1_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase1-pass
+        source: phase1_branch
+        target: phase2_http
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+      - id: e-phase1-fail
+        source: phase1_branch
+        target: phase1_fail
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+      - id: e-phase2-http-eval
+        source: phase2_http
+        target: phase2_eval
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase2-eval-branch
+        source: phase2_eval
+        target: phase2_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase2-pass
+        source: phase2_branch
+        target: phase3_http
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+      - id: e-phase2-fail
+        source: phase2_branch
+        target: phase2_fail
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+      - id: e-phase3-http-eval
+        source: phase3_http
+        target: phase3_eval
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase3-eval-branch
+        source: phase3_eval
+        target: phase3_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase3-pass
+        source: phase3_branch
+        target: phase4_http
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+      - id: e-phase3-fail
+        source: phase3_branch
+        target: phase3_fail
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+      - id: e-phase4-http-eval
+        source: phase4_http
+        target: phase4_eval
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase4-eval-branch
+        source: phase4_eval
+        target: phase4_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase4-pass
+        source: phase4_branch
+        target: phase5_http
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+      - id: e-phase4-fail
+        source: phase4_branch
+        target: phase4_fail
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+      - id: e-phase5-http-eval
+        source: phase5_http
+        target: phase5_eval
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase5-eval-branch
+        source: phase5_eval
+        target: phase5_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase5-pass
+        source: phase5_branch
+        target: phase6_http
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+      - id: e-phase5-fail
+        source: phase5_branch
+        target: phase5_fail
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+      - id: e-phase6-http-eval
+        source: phase6_http
+        target: phase6_eval
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase6-eval-branch
+        source: phase6_eval
+        target: phase6_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase6-pass
+        source: phase6_branch
+        target: phase7_http
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+      - id: e-phase6-fail
+        source: phase6_branch
+        target: phase6_fail
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+      - id: e-phase7-http-eval
+        source: phase7_http
+        target: phase7_eval
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase7-eval-branch
+        source: phase7_eval
+        target: phase7_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+      - id: e-phase7-pass
+        source: phase7_branch
+        target: end_success
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+      - id: e-phase7-fail
+        source: phase7_branch
+        target: phase7_fail
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom

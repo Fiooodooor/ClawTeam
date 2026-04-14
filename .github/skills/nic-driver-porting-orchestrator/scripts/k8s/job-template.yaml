@@ -1,0 +1,82 @@
+---
+# Alternative: K8s Job template — spawned on-demand by Jenkins per analysis request.
+# Use this if you prefer ephemeral pods over an always-running Deployment.
+#
+# Jenkins creates this Job via kubectl, waits for completion, and reads the
+# analysis report from the shared PVC or from the pod logs.
+#
+# Usage from Jenkins (example):
+#   kubectl create -f - <<EOF
+#   ... (this manifest with BUILD_NUM / PROJECT / RING_TYPE substituted)
+#   EOF
+#   kubectl wait --for=condition=complete job/debug-assistant-<build> -n default --timeout=600s
+#   kubectl logs job/debug-assistant-<build> -n default
+#
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: debug-assistant-BUILD_NUM  # replaced by Jenkins
+  namespace: default
+  labels:
+    app: debug-assistant
+    type: analysis-job
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600  # auto-cleanup after 1h
+  activeDeadlineSeconds: 900     # 15 min max runtime
+  template:
+    metadata:
+      labels:
+        app: debug-assistant
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: saopenaiipuk8s
+      restartPolicy: Never
+      containers:
+        - name: analyzer
+          image: YOUR_REGISTRY/debug-assistant:latest
+          command:
+            - python3
+            - -m
+            - agent.analyze_build
+          args:
+            - "--build-num"
+            - "BUILD_NUM"       # replaced by Jenkins
+            - "--project"
+            - "PROJECT_NAME"    # replaced by Jenkins
+            - "--ring-type"
+            - "RING_TYPE"       # replaced by Jenkins
+            - "--output-path"
+            - "/output"
+          env:
+            - name: HTTP_PROXY
+              value: "http://proxy-igk.intel.com:912"
+            - name: HTTPS_PROXY
+              value: "http://proxy-igk.intel.com:912"
+            - name: http_proxy
+              value: "http://proxy-igk.intel.com:912"
+            - name: https_proxy
+              value: "http://proxy-igk.intel.com:912"
+            - name: NO_PROXY
+              value: "intel.com,.intel.com,localhost,127.0.0.1,192.168.0.0/16"
+            - name: no_proxy
+              value: "intel.com,.intel.com,localhost,127.0.0.1,192.168.0.0/16"
+          envFrom:
+            - configMapRef:
+                name: debug-assistant-config
+            - secretRef:
+                name: debug-assistant-secrets
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          volumeMounts:
+            - name: output
+              mountPath: /output
+      volumes:
+        - name: output
+          emptyDir:
+            sizeLimit: 2Gi

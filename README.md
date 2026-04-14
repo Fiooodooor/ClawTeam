@@ -25,7 +25,7 @@
 
 Human provides the goal. The Agent Team orchestrates everything else.
 
-Full compatibility with [Claude Code](https://claude.ai/claude-code), [Codex](https://openai.com/codex), [OpenClaw](https://github.com/openclaw/openclaw), [nanobot](https://github.com/HKUDS/nanobot), [Cursor](https://cursor.com), and any CLI agent.&nbsp;&nbsp;[**中文文档**](README_CN.md) | [**한국어**](README_KR.md)
+Full compatibility with [Claude Code](https://claude.ai/claude-code), [Codex](https://openai.com/codex), [OpenClaw](https://github.com/openclaw/openclaw), [nanobot](https://github.com/HKUDS/nanobot), [Cursor](https://cursor.com), and any CLI agent.&nbsp;&nbsp;[**Chinese Docs**](README_CN.md) | [**Korean Docs**](README_KR.md)
 
 ---
 
@@ -172,7 +172,8 @@ ClawTeam unlocks **Agent Swarm Intelligence** — where AI agents self-organize 
 
 • **🔄 Adapts strategies dynamically** — reallocates resources and redirects efforts
 
-#### ✨ The Result?
+### ✨ The Result?
+
 You set the vision. The swarm executes with collective intelligence.
 
 <p align="center">
@@ -250,6 +251,7 @@ Based on [@karpathy's autoresearch](https://github.com/karpathy/autoresearch).
 #### Human input: "Optimize this LLM training setup using 8 GPUs"
 
 The Agent Team handles everything else:
+
 - Spawns 8 specialized research agents across H100s
 - Designs 2000+ autonomous experiments
 - Achieves breakthrough improvements (val_bpb: 1.044→0.977)
@@ -554,18 +556,21 @@ Vertex, use `profile` + `preset` and then spawn with `--profile`.
 <td width="50%">
 
 ### 🦞 Agent Self-Organization
+
 - Leader agents spawn and manage worker agents
 - **Auto-injected coordination prompt** — zero manual setup
 - Workers self-report status, results, and idle state
 - Works with any CLI agent: Claude Code, Codex, OpenClaw, custom
 
 ### 🌳 Workspace Isolation
+
 - Each agent gets its own **git worktree** (separate branch)
 - No merge conflicts between parallel agents
 - Checkpoint, merge, and cleanup commands
 - Branch naming: `oh/{team}/{agent}`
 
 ### 📋 Task Tracking with Dependencies
+
 - Shared kanban: `pending` → `in_progress` → `completed` / `blocked`
 - `--blocked-by` dependency chains — **auto-unblock on completion**
 - `task wait` blocks until all tasks complete
@@ -575,12 +580,14 @@ Vertex, use `profile` + `preset` and then spawn with `--profile`.
 <td width="50%">
 
 ### 💬 Inter-Agent Messaging
+
 - Point-to-point **inboxes** (send, receive, peek)
 - **Broadcast** to all team members
 - File-based (default) or ZeroMQ P2P transport with offline fallback
 - Agents discover messages via `inbox receive`
 
 ### 📊 Monitoring & Dashboards
+
 - `board show` — terminal kanban board
 - `board live` — auto-refreshing dashboard
 - `board attach` — **tiled tmux view** of all agents working
@@ -614,7 +621,7 @@ Vertex, use `profile` + `preset` and then spawn with `--profile`.
 
 When an agent is spawned via `oh spawn`, it receives an **auto-injected coordination prompt**:
 
-```
+```text
 ## Coordination Protocol (auto-injected into every spawned agent)
 
 - 📋 Check your tasks: oh task list <team> --owner <your-name>
@@ -632,8 +639,7 @@ This means **any CLI agent** can participate in a ClawTeam team — it just need
 
 ## 📖 Command Reference
 
-<details open>
-<summary><h3>🔧 Core Commands</h3></summary>
+<details><summary><h3>🔧 Core Commands</h3></summary>
 
 ```bash
 # 🏗️ Team lifecycle
@@ -667,8 +673,7 @@ oh board serve --port 8080          # web UI
 
 </details>
 
-<details>
-<summary><h3>🌳 Workspace, 📝 Plan, 🔄 Lifecycle, ⚙️ Config</h3></summary>
+<details><summary><h3>🌳 Workspace, 📝 Plan, 🔄 Lifecycle, ⚙️ Config</h3></summary>
 
 ```bash
 # 🌳 Workspace (git worktree management)
@@ -711,7 +716,7 @@ oh config health
 
 ## 🏗️ Architecture
 
-```
+```text
   Human: "Optimize this LLM"
          │
          ▼
@@ -766,7 +771,7 @@ All state lives in `~/.clawteam/` as JSON files. No database, no server, no clou
 ## 🗺️ Roadmap
 
 | Phase | Version | What | Status |
-|-------|---------|------|--------|
+| ----- | ------- | ---- | ------ |
 | **Current** | v0.3 | File + P2P (ZeroMQ) transport, Web UI, multi-user, team templates | ✅ Shipped |
 | **Phase 1** | v0.4 | Redis Transport — cross-machine messaging | 🔜 Planned |
 | **Phase 2** | v0.5 | Shared State Layer — team config and tasks across machines | 🔜 Planned |
@@ -777,7 +782,7 @@ All state lives in `~/.clawteam/` as JSON files. No database, no server, no clou
 ### Milestones
 
 | Milestone | Status | Notes |
-|---|---|---|
+| - | - | - |
 | v0.1.x | ✅ Shipped | Core CLI, team/task/inbox flows, board, templates, packaging. |
 | v0.2.0 | ✅ Released | Stabilization, docs refresh, spawn/workspace fixes, and release packaging. |
 | v0.3 | 📍 Roadmap baseline | File + P2P transport, Web UI, multi-user workflow, team templates. |

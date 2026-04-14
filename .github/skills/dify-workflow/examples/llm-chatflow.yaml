@@ -1,0 +1,101 @@
+###############################################################################
+# LLM Chatflow — Dify DSL v0.6.0
+#
+# Basic conversational chatflow: start → LLM (with memory) → answer.
+# Uses advanced-chat mode for multi-turn conversation support.
+###############################################################################
+version: "0.6.0"
+kind: app
+app:
+  name: "LLM Chatflow"
+  mode: advanced-chat
+  icon: "💬"
+  icon_type: emoji
+  icon_background: "#E3F2FD"
+  description: "Simple LLM chatflow with conversation memory"
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: "Hello! How can I help you today?"
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+      - "What can you do?"
+      - "Tell me about yourself"
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - id: start-to-llm
+        source: start
+        sourceHandle: source
+        target: llm
+        targetHandle: target
+        type: custom
+      - id: llm-to-answer
+        source: llm
+        sourceHandle: source
+        target: answer
+        targetHandle: target
+        type: custom
+    nodes:
+      - id: start
+        type: custom
+        position: { x: 80, y: 282 }
+        data:
+          type: start
+          title: "Start"
+          variables: []
+
+      - id: llm
+        type: custom
+        position: { x: 380, y: 282 }
+        data:
+          type: llm
+          title: "LLM"
+          model:
+            provider: openai
+            name: gpt-4
+            mode: chat
+            completion_params:
+              temperature: 0.7
+              max_tokens: 4096
+          prompt_template:
+            - role: system
+              text: >-
+                You are a helpful, friendly assistant. Answer questions clearly
+                and concisely. If you don't know something, say so.
+            - role: user
+              text: "{{#sys.query#}}"
+          context:
+            enabled: false
+            variable_selector: []
+          memory:
+            window:
+              enabled: true
+              size: 50
+          vision:
+            enabled: false
+
+      - id: answer
+        type: custom
+        position: { x: 680, y: 282 }
+        data:
+          type: answer
+          title: "Answer"
+          answer: "{{#llm.text#}}"
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1

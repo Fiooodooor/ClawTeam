@@ -1,0 +1,45 @@
+---
+applyTo: "**"
+---
+# ClawTeam Project Standards
+
+## Python Standards
+- Follow PEP 8. Use type hints on all function signatures.
+- Use 4-space indentation. Maximum line length 120.
+- Use `snake_case` for variables, functions, modules. `PascalCase` for classes.
+- Prefix private members with underscore (`_`).
+- Use `ALL_CAPS` for constants.
+- Use `pathlib.Path` over `os.path` for file operations.
+- All file writes must be atomic (tmp + rename pattern).
+
+## Error Handling
+- Use try/except with specific exception types, never bare `except`.
+- Always log errors with contextual information (`logger.error` with exc_info).
+- Validate at system boundaries only — do not over-guard internal calls.
+
+## Testing
+- Use `pytest` with fixtures from `conftest.py`.
+- TDD order: failing test first, implementation second, green validation third.
+- Test files mirror source layout: `clawteam/foo.py` → `tests/test_foo.py`.
+
+## NIC Porting Orchestration Rules
+When working on NIC driver porting tasks, enforce these non-negotiable rules:
+- **TDD-first**: Failing tests before any implementation.
+- **Phase gates**: Every phase must produce build artifacts + passing tests + gate summary.
+- **Minimal source changes**: Touch only OS-specific calls. Prefer `#ifdef`, inline wrappers, weak symbols.
+- **No frameworks beyond LinuxKPI/iflib**: No DPDK, no eBPF/XDP, no NDIS, no third-party libraries.
+- **Zero-copy enforcement**: No `memcpy` in hot paths where LinuxKPI or native bus_dma supports direct attachment.
+- **Gate thresholds**: native_score >= 98, portability_score >= 95, test_pass_rate = 100%, critical_risks = 0.
+- **Role discipline**: Orchestrator plans/routes only. Workers implement. Checkers verify. Risk-auditor vetoes.
+
+## ClawTeam CLI Conventions
+- All commands support `--json` for machine-readable output.
+- `inbox receive` is destructive; use `inbox peek` for non-destructive reads.
+- Workers keep polling tasks/inbox after initial task instead of exiting.
+- Use `--profile` for non-default providers/models.
+- Use `context inject` and `context conflicts` for cross-worktree handoffs.
+
+## Commit Messages
+- Format: `type(scope): description` (e.g., `fix(spawn): clean stale session files`).
+- Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`.
+- Imperative mood, no trailing period, max 72 chars for subject line.

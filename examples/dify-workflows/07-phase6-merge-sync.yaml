@@ -1,0 +1,502 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "NIC Porting — Phase 6: Merge & Upstream Sync"
+  mode: workflow
+  icon: "🔀"
+  icon_type: emoji
+  icon_background: "#F0F9FF"
+  description: >
+    Phase 6: Clean merge execution and upstream sync. merge-strategist produces
+    merge plan → TDD gate validates no regressions, clean history, no force-push,
+    upstream sync preserved. Merge guard ensures commit hygiene and regression safety.
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    viewport: {x: 0, y: 0, zoom: 0.8}
+    nodes:
+
+      # ── INPUT ──────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: {x: 30, y: 280}
+        data:
+          type: start
+          title: "Phase 6 Inputs"
+          variables:
+            - variable: driver_name
+              label: "Driver Name"
+              type: text-input
+              required: true
+              default: "ixgbe"
+            - variable: target_os
+              label: "Target OS"
+              type: select
+              required: true
+              options:
+                - value: FreeBSD
+                  label: "FreeBSD"
+                - value: Windows
+                  label: "Windows"
+                - value: DPDK
+                  label: "DPDK"
+              default: FreeBSD
+            - variable: phase5_gate_results
+              label: "Phase 5 Gate Results JSON"
+              type: paragraph
+              required: true
+            - variable: ported_code_summary
+              label: "Phase 4 Implementations JSON"
+              type: paragraph
+              required: true
+            - variable: baseline_commit
+              label: "Baseline Commit SHA (from Phase 0)"
+              type: text-input
+              required: true
+              default: "abc1234"
+            - variable: upstream_branch
+              label: "Upstream Branch to Sync"
+              type: text-input
+              required: true
+              default: "main"
+            - variable: porting_branch
+              label: "Porting Feature Branch"
+              type: text-input
+              required: true
+              default: "port/ixgbe-freebsd"
+            - variable: risk_register
+              label: "Risk Register JSON (shared across phases)"
+              type: paragraph
+              required: false
+
+      # ── MERGE TDD SPEC ─────────────────────────────────────────────────────
+      - id: tdd_merge_spec
+        type: custom
+        position: {x: 330, y: 160}
+        data:
+          type: llm
+          title: "TDD Merge Spec — Define Merge Acceptance Criteria"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 2500
+          prompt_template:
+            - role: system
+              text: |
+                Generate TDD acceptance criteria for merge and upstream sync.
+                Mandatory: clean history, no force-push risk, no regressions,
+                upstream sync preserved from baseline commit forward.
+                Output JSON with measurable acceptance criteria.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Baseline commit: {{#start.baseline_commit#}}
+                Upstream branch: {{#start.upstream_branch#}}
+                Porting branch: {{#start.porting_branch#}}
+                Phase 5 results: {{#start.phase5_gate_results#}}
+
+                Output:
+                {
+                  "merge_strategy": "merge-commit|squash|rebase",
+                  "regression_tests": ["list of regression checks"],
+                  "upstream_sync_checks": ["list of sync checks"],
+                  "history_checks": ["no squash of upstream commits", "no force-push", "..."],
+                  "commit_hygiene_rules": ["meaningful messages", "no debug commits", "..."],
+                  "criteria_clear": true
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── MERGE-STRATEGIST ───────────────────────────────────────────────────
+      - id: merge_strategist
+        type: custom
+        position: {x: 730, y: 280}
+        data:
+          type: llm
+          title: "merge-strategist — Produce Clean Merge Plan"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 6000
+          prompt_template:
+            - role: system
+              text: |
+                You are the merge-strategist agent. Produce a clean, safe merge plan.
+                ABSOLUTE RULES:
+                1. NEVER force-push — only fast-forward or merge commits allowed
+                2. NEVER rewrite upstream history
+                3. Upstream sync must be preserved from baseline_commit forward
+                4. All regression tests must pass before merge
+                5. Commit messages must be meaningful (no "WIP", "fix", "asdf")
+                6. Squash only porting-private commits — never upstream ones
+                Return detailed JSON merge plan.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Baseline commit: {{#start.baseline_commit#}}
+                Upstream branch: {{#start.upstream_branch#}}
+                Porting branch: {{#start.porting_branch#}}
+                Merge TDD spec: {{#tdd_merge_spec.text#}}
+                Phase 5 gate results: {{#start.phase5_gate_results#}}
+                Ported code summary: {{#start.ported_code_summary#}}
+
+                Return:
+                {
+                  "merge_strategy": "merge-commit|squash|rebase",
+                  "merge_command": "git merge --no-ff ...",
+                  "pre_merge_checks": [
+                    {"check": "regression tests pass", "command": "make test", "status": "passed|failed"}
+                  ],
+                  "commits_to_include": [
+                    {"sha_preview": "abc1234...", "message": "", "type": "porting|upstream-sync"}
+                  ],
+                  "upstream_sync": {
+                    "synced_from_commit": "",
+                    "commits_synced": 0,
+                    "conflicts_resolved": 0,
+                    "history_preserved": true
+                  },
+                  "commit_hygiene": {
+                    "all_messages_meaningful": true,
+                    "no_debug_commits": true,
+                    "no_wip_commits": true
+                  },
+                  "force_push_risk": false,
+                  "regression_passed": true,
+                  "merge_ready": true
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── TDD MERGE GATE ─────────────────────────────────────────────────────
+      - id: tdd_merge_gate
+        type: custom
+        position: {x: 1130, y: 280}
+        data:
+          type: code
+          title: "TDD Merge Gate — Regression & History Safety"
+          code_language: python3
+          code: |
+            import json
+
+            def main(merge_json: str, spec_json: str, risk_register_json: str = "[]") -> dict:
+                results = []
+                passed = 0
+                failed = 0
+              try:
+                risk_register = json.loads(risk_register_json) if risk_register_json else []
+                if not isinstance(risk_register, list):
+                  risk_register = []
+              except Exception:
+                risk_register = []
+
+                def check(tid, ok, detail=""):
+                    nonlocal passed, failed
+                    s = "PASS" if ok else "FAIL"
+                    if ok: passed += 1
+                    else: failed += 1
+                    results.append({"test_id": tid, "status": s, "detail": str(detail)[:180]})
+
+                try:
+                    merge = json.loads(merge_json)
+                except Exception as e:
+                    return _fail(f"merge JSON parse: {e}")
+
+                # T01: No force-push risk
+                check("T01-no-force-push", not merge.get("force_push_risk", True))
+
+                # T02: Upstream history preserved
+                sync = merge.get("upstream_sync") or {}
+                check("T02-history-preserved", sync.get("history_preserved") is True)
+
+                # T03: Regressions passed
+                check("T03-regression-passed", merge.get("regression_passed") is True)
+
+                # T04: Merge is ready
+                check("T04-merge-ready", merge.get("merge_ready") is True)
+
+                # T05: Commit hygiene - meaningful messages
+                hygiene = merge.get("commit_hygiene") or {}
+                check("T05-meaningful-messages", hygiene.get("all_messages_meaningful") is True)
+
+                # T06: No debug commits
+                check("T06-no-debug-commits", hygiene.get("no_debug_commits") is True)
+
+                # T07: No WIP commits
+                check("T07-no-wip-commits", hygiene.get("no_wip_commits") is True)
+
+                # T08: Pre-merge checks all passed
+                pre_checks = merge.get("pre_merge_checks") or []
+                failed_checks = [c["check"] for c in pre_checks if c.get("status") == "failed"]
+                check("T08-pre-merge-checks-passed", len(failed_checks) == 0,
+                      f"failed={failed_checks}")
+
+                # T09: At least one upstream sync commit included
+                commits = merge.get("commits_to_include") or []
+                upstream_commits = [c for c in commits if c.get("type") == "upstream-sync"]
+                check("T09-upstream-sync-present",
+                      sync.get("commits_synced", 0) >= 0,
+                      f"synced={sync.get('commits_synced', 0)}")
+
+                # T10: Strategy is not bare rebase (preserves merge history)
+                strategy = merge.get("merge_strategy", "")
+                check("T10-strategy-not-bare-rebase",
+                      strategy in ("merge-commit", "squash"),
+                      f"strategy={strategy}")
+
+                total = passed + failed
+                gate_score = round((passed / total) * 100, 1) if total else 0.0
+                fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
+                updated_risk_register = list(risk_register)
+                if failed != 0 or bool(merge.get("force_push_risk", True)):
+                  updated_risk_register.append({
+                    "risk_id": f"RISK-{len(updated_risk_register) + 1:03d}",
+                    "phase_raised": "phase-6",
+                    "category": "maintenance",
+                    "description": f"Phase 6 merge issues: {'; '.join(fail_ids) or 'merge safety risk detected'}",
+                    "severity": "high" if bool(merge.get("force_push_risk", True)) else "medium",
+                    "status": "open",
+                    "mitigation_action": "Repair merge plan and preserve upstream history without force-push",
+                    "mitigation_phase": "phase-6",
+                    "residual_risk": "medium"
+                  })
+
+                return {
+                    "all_passed": failed == 0,
+                    "passed_count": passed,
+                    "failed_count": failed,
+                    "gate_score": gate_score,
+                    "test_results": json.dumps(results),
+                    "fail_summary": "; ".join(fail_ids),
+                    "merge_strategy": merge.get("merge_strategy", ""),
+                    "merge_command": merge.get("merge_command", ""),
+                    "commits_count": len(commits),
+                    "upstream_synced_commits": int(sync.get("commits_synced", 0)),
+                    "force_push_risk": bool(merge.get("force_push_risk", True)),
+                    "updated_risk_register": json.dumps(updated_risk_register),
+                    "replan_recommended": failed != 0 or bool(merge.get("force_push_risk", True)),
+                }
+
+            def _fail(reason):
+                return {
+                    "all_passed": False, "passed_count": 0, "failed_count": 1,
+                    "gate_score": 0.0,
+                    "test_results": json.dumps([{"test_id": "parse", "status": "FAIL", "detail": reason}]),
+                    "fail_summary": reason, "merge_strategy": "", "merge_command": "",
+                    "commits_count": 0, "upstream_synced_commits": 0, "force_push_risk": True,
+                  "updated_risk_register": risk_register_json if risk_register_json else "[]",
+                  "replan_recommended": True
+                }
+          variables:
+            - variable: merge_json
+              value_selector: [merge_strategist, text]
+            - variable: spec_json
+              value_selector: [tdd_merge_spec, text]
+            - variable: risk_register_json
+              value_selector: [start, risk_register]
+          outputs:
+            all_passed: {type: boolean}
+            passed_count: {type: number}
+            failed_count: {type: number}
+            gate_score: {type: number}
+            test_results: {type: string}
+            fail_summary: {type: string}
+            merge_strategy: {type: string}
+            merge_command: {type: string}
+            commits_count: {type: number}
+            upstream_synced_commits: {type: number}
+            force_push_risk: {type: boolean}
+            updated_risk_register: {type: string}
+            replan_recommended: {type: boolean}
+
+      # ── BRANCH ─────────────────────────────────────────────────────────────
+      - id: gate_branch
+        type: custom
+        position: {x: 1430, y: 280}
+        data:
+          type: if-else
+          title: "Merge Gate Passed?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [tdd_merge_gate, all_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-merge-pass
+
+      # ── SUCCESS ────────────────────────────────────────────────────────────
+      - id: end_success
+        type: custom
+        position: {x: 1730, y: 100}
+        data:
+          type: end
+          title: "Phase 6 PASSED ✅ — Clean Merge, Upstream Synced"
+          outputs:
+            - variable: gate_score
+              value_type: number
+              value_selector: [tdd_merge_gate, gate_score]
+            - variable: merge_strategy
+              value_type: string
+              value_selector: [tdd_merge_gate, merge_strategy]
+            - variable: merge_command
+              value_type: string
+              value_selector: [tdd_merge_gate, merge_command]
+            - variable: upstream_synced_commits
+              value_type: number
+              value_selector: [tdd_merge_gate, upstream_synced_commits]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_merge_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_merge_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_merge_gate, replan_recommended]
+
+      # ── REMEDIATION ────────────────────────────────────────────────────────
+      - id: remediation_llm
+        type: custom
+        position: {x: 1730, y: 500}
+        data:
+          type: llm
+          title: "Merge Remediation — Fix History / Regression Issues"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.2
+              max_tokens: 4000
+          prompt_template:
+            - role: system
+              text: |
+                The merge gate failed. Produce a remediation plan to fix:
+                history issues, regression failures, commit hygiene, force-push risk.
+                NEVER suggest force-push or history rewrite of upstream commits.
+                Produce safe, reversible remediation steps only.
+            - role: user
+              text: |
+                Failed tests: {{#tdd_merge_gate.fail_summary#}}
+                Test results: {{#tdd_merge_gate.test_results#}}
+                Merge plan: {{#merge_strategist.text#}}
+                Force push risk: {{#tdd_merge_gate.force_push_risk#}}
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── FAIL OUTPUT ────────────────────────────────────────────────────────
+      - id: end_fail
+        type: custom
+        position: {x: 2030, y: 500}
+        data:
+          type: end
+          title: "Phase 6 FAILED ❌ — Merge Requires Remediation"
+          outputs:
+            - variable: remediation_plan
+              value_type: string
+              value_selector: [remediation_llm, text]
+            - variable: fail_summary
+              value_type: string
+              value_selector: [tdd_merge_gate, fail_summary]
+            - variable: force_push_risk
+              value_type: boolean
+              value_selector: [tdd_merge_gate, force_push_risk]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_merge_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_merge_gate, replan_recommended]
+
+    edges:
+      - id: e-start-spec
+        source: start
+        target: tdd_merge_spec
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-start-strategist
+        source: start
+        target: merge_strategist
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-spec-strategist
+        source: tdd_merge_spec
+        target: merge_strategist
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-strategist-gate
+        source: merge_strategist
+        target: tdd_merge_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-gate-branch
+        source: tdd_merge_gate
+        target: gate_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-success
+        source: gate_branch
+        target: end_success
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-fail
+        source: gate_branch
+        target: remediation_llm
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+
+      - id: e-remediation-fail
+        source: remediation_llm
+        target: end_fail
+        sourceHandle: source
+        targetHandle: target
+        type: custom

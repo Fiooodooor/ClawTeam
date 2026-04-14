@@ -1,0 +1,562 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "NIC Porting — Phase 1: API Mapping (TDD-Concurrent)"
+  mode: workflow
+  icon: "🗺️"
+  icon_type: emoji
+  icon_background: "#DCFCE7"
+  description: >
+    Phase 1: Map every Linux kernel API used by the driver to native FreeBSD/target-OS
+    primitives. Concurrent fan-out: api-mapper and kpi-auditor run in parallel.
+    TDD gate: every mapped API must have a test stub and zero LinuxKPI contamination detected.
+    Gate: mapping_completeness≥95 AND framework_contamination_count=0.
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    viewport: {x: 0, y: 0, zoom: 0.85}
+    nodes:
+
+      # ── INPUT ──────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: {x: 30, y: 282}
+        data:
+          type: start
+          title: "Phase 1 Inputs"
+          variables:
+            - variable: driver_name
+              label: "Driver Name"
+              type: text-input
+              required: true
+              default: "ixgbe"
+            - variable: critical_kernel_apis
+              label: "Critical Kernel APIs (JSON from Phase 0)"
+              type: paragraph
+              required: true
+            - variable: hard_constraints
+              label: "Hard Constraints (JSON from Phase 0)"
+              type: paragraph
+              required: true
+            - variable: subsystems
+              label: "Driver Subsystems (JSON from Phase 0)"
+              type: paragraph
+              required: true
+            - variable: target_os
+              label: "Target OS"
+              type: select
+              required: true
+              options:
+                - value: FreeBSD
+                  label: "FreeBSD (iflib)"
+                - value: Windows
+                  label: "Windows (NDIS)"
+                - value: DPDK
+                  label: "DPDK PMD"
+              default: FreeBSD
+            - variable: risk_register
+              label: "Risk Register JSON (shared across phases)"
+              type: paragraph
+              required: false
+
+      # ── TDD SPEC: Generate API mapping test cases ───────────────────────────
+      - id: tdd_api_spec
+        type: custom
+        position: {x: 330, y: 30}
+        data:
+          type: llm
+          title: "TDD — API Mapping Test Specifications"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 2048
+          prompt_template:
+            - role: system
+              text: |
+                Generate TDD test specifications for Phase 1 API mapping.
+                Each test: {test_id, description, assertion}
+                Assertions must be machine-checkable against the mapper output JSON.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                APIs to map: {{#start.critical_kernel_apis#}}
+                Constraints: {{#start.hard_constraints#}}
+
+                Generate test specs covering:
+                1. Every API has a native_equivalent (not null, not "LinuxKPI.*")
+                2. No mapping uses LinuxKPI or compat shims
+                3. Every API has a test_stub_name
+                4. Memory allocation APIs mapped to native allocators
+                5. Lock APIs mapped to native synchronization primitives
+                6. DMA APIs mapped to native bus_dma or equivalent
+                7. IRQ apis mapped to native interrupt handlers
+                8. Ethtool/stats mapped to native sysctl/ifmedia
+                9. mapping_completeness >= 95%
+                10. All mappings have estimated_overhead: "zero"
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── CONCURRENT FAN-OUT: api-mapper ─────────────────────────────────────
+      - id: api_mapper
+        type: custom
+        position: {x: 330, y: 282}
+        data:
+          type: llm
+          title: "api-mapper — Linux→Native API Mapping"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.1
+              max_tokens: 8192
+          prompt_template:
+            - role: system
+              text: |
+                You are the api-mapper agent. Map every Linux kernel API to native {{#start.target_os#}} primitives.
+                CRITICAL CONSTRAINT: Zero LinuxKPI. All mappings must be to native OS APIs only.
+                Work step by step:
+                1. Categorize each Linux API by subsystem type.
+                2. Choose the closest native {{#start.target_os#}} primitive.
+                3. Define a test stub for each mapping.
+                4. Flag ambiguities or APIs needing seam wrappers.
+                5. Emit only valid JSON.
+                Return ONLY valid JSON.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Critical APIs to map: {{#start.critical_kernel_apis#}}
+                Subsystems: {{#start.subsystems#}}
+
+                Produce JSON:
+                {
+                  "api_mappings": [
+                    {
+                      "linux_api": "name",
+                      "linux_header": "include/...",
+                      "category": "memory|lock|dma|irq|network|timer|pci|other",
+                      "native_equivalent": "native API name (NEVER LinuxKPI)",
+                      "native_header": "sys/... or similar",
+                      "test_stub_name": "test_map_<linux_api>",
+                      "estimated_overhead": "zero",
+                      "implementation_notes": "any special considerations",
+                      "uses_linuxkpi": false
+                    }
+                  ],
+                  "unmapped_apis": ["list of any that could not be mapped natively"],
+                  "mapping_completeness": 0.0,
+                  "framework_contamination_count": 0
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── CONCURRENT FAN-OUT: kpi-auditor ────────────────────────────────────
+      - id: kpi_auditor
+        type: custom
+        position: {x: 330, y: 534}
+        data:
+          type: llm
+          title: "kpi-auditor — Mapping Completeness Audit"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 4096
+          prompt_template:
+            - role: system
+              text: |
+                You are the kpi-auditor agent. Audit API mapping completeness and detect
+                any LinuxKPI/framework contamination. You are the checker role — be strict.
+                Perform an independent checker pass:
+                1. Compare required APIs against mapper coverage.
+                2. Detect contamination or compat-shim leakage.
+                3. Verify each mapping has a test stub and zero-overhead claim.
+                4. Score coverage and emit remediation items.
+                Return ONLY valid JSON.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Required APIs to cover: {{#start.critical_kernel_apis#}}
+                Hard constraints: {{#start.hard_constraints#}}
+
+                Produce an independent audit JSON:
+                {
+                  "audit_findings": [
+                    {"api": "name", "status": "covered|missing|contaminated", "issue": "string or null"}
+                  ],
+                  "linuxkpi_violations": ["list of any LinuxKPI usages detected"],
+                  "framework_contamination_count": 0,
+                  "coverage_percentage": 0.0,
+                  "audit_passed": true,
+                  "remediation_required": [],
+                  "kpi_score": 0.0
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── FAN-IN: TDD Gate ────────────────────────────────────────────────────
+      - id: tdd_fanin_gate
+        type: custom
+        position: {x: 730, y: 282}
+        data:
+          type: code
+          title: "TDD Fan-In Gate — Merge & Validate Both Agents"
+          code_language: python3
+          code: |
+            import json
+
+            def main(mapper_json: str, auditor_json: str, test_specs_json: str, risk_register_json: str = "[]") -> dict:
+                results = []
+                passed = 0
+                failed = 0
+              try:
+                risk_register = json.loads(risk_register_json) if risk_register_json else []
+                if not isinstance(risk_register, list):
+                  risk_register = []
+              except Exception:
+                risk_register = []
+
+                # Parse outputs
+                try:
+                    mapper = json.loads(mapper_json)
+                except Exception as e:
+                    return _fail(f"api-mapper JSON parse error: {e}")
+
+                try:
+                    auditor = json.loads(auditor_json)
+                except Exception as e:
+                    return _fail(f"kpi-auditor JSON parse error: {e}")
+
+                def check(tid, ok, detail=""):
+                    nonlocal passed, failed
+                    if ok:
+                        passed += 1
+                        results.append({"test_id": tid, "status": "PASS", "detail": detail})
+                    else:
+                        failed += 1
+                        results.append({"test_id": tid, "status": "FAIL", "detail": detail})
+
+                # T01: api_mappings is non-empty list
+                mappings = mapper.get("api_mappings") or []
+                check("T01-mappings-exist", isinstance(mappings, list) and len(mappings) > 0,
+                      f"count={len(mappings)}")
+
+                # T02: No uses_linuxkpi=true
+                linuxkpi_violations = [m["linux_api"] for m in mappings if m.get("uses_linuxkpi")]
+                check("T02-no-linuxkpi", len(linuxkpi_violations) == 0,
+                      f"violations={linuxkpi_violations}")
+
+                # T03: framework_contamination_count == 0
+                contamination = int(mapper.get("framework_contamination_count", 0))
+                check("T03-zero-contamination", contamination == 0, f"count={contamination}")
+
+                # T04: mapping_completeness >= 95
+                completeness = float(mapper.get("mapping_completeness", 0))
+                check("T04-completeness-gte95", completeness >= 95.0, f"value={completeness}")
+
+                # T05: Every mapping has estimated_overhead == "zero"
+                overhead_violations = [m["linux_api"] for m in mappings
+                                       if m.get("estimated_overhead", "zero") != "zero"]
+                check("T05-zero-overhead", len(overhead_violations) == 0,
+                      f"violations={overhead_violations}")
+
+                # T06: Every mapping has native_equivalent (non-empty)
+                no_native = [m["linux_api"] for m in mappings if not m.get("native_equivalent")]
+                check("T06-all-have-native", len(no_native) == 0, f"missing={no_native}")
+
+                # T07: Every mapping has test_stub_name
+                no_stub = [m["linux_api"] for m in mappings if not m.get("test_stub_name")]
+                check("T07-all-have-stubs", len(no_stub) == 0, f"missing={no_stub}")
+
+                # T08: Auditor passed
+                check("T08-auditor-passed", auditor.get("audit_passed") is True,
+                      f"auditor_score={auditor.get('kpi_score', 0)}")
+
+                # T09: Auditor finds zero contamination
+                audit_contamination = int(auditor.get("framework_contamination_count", 0))
+                check("T09-auditor-zero-contamination", audit_contamination == 0,
+                      f"count={audit_contamination}")
+
+                # T10: Coverage from auditor >= 95%
+                coverage = float(auditor.get("coverage_percentage", 0))
+                check("T10-auditor-coverage-gte95", coverage >= 95.0, f"value={coverage}")
+
+                total = passed + failed
+                score = round((passed / total) * 100, 1) if total else 0.0
+                all_pass = failed == 0
+                fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
+                updated_risk_register = list(risk_register)
+                if (not all_pass) or linuxkpi_violations or float(auditor.get("kpi_score", 0)) < 95.0:
+                  updated_risk_register.append({
+                    "risk_id": f"RISK-{len(updated_risk_register) + 1:03d}",
+                    "phase_raised": "phase-1",
+                    "category": "portability",
+                    "description": f"Phase 1 mapping gate failed: {'; '.join(fail_ids) or 'mapping risk detected'}",
+                    "severity": "high" if linuxkpi_violations else "medium",
+                    "status": "open",
+                    "mitigation_action": "Correct native API mappings and remove framework contamination",
+                    "mitigation_phase": "phase-1",
+                    "residual_risk": "medium"
+                  })
+
+                return {
+                    "all_passed": all_pass,
+                    "passed_count": passed,
+                    "failed_count": failed,
+                    "gate_score": score,
+                    "test_results": json.dumps(results),
+                    "fail_summary": "; ".join(fail_ids),
+                    "api_mappings": json.dumps(mappings),
+                    "unmapped_apis": json.dumps(mapper.get("unmapped_apis", [])),
+                    "mapping_completeness": completeness,
+                    "linuxkpi_violations": json.dumps(linuxkpi_violations),
+                    "kpi_score": float(auditor.get("kpi_score", 0)),
+                    "updated_risk_register": json.dumps(updated_risk_register),
+                    "replan_recommended": (not all_pass) or completeness < 95.0 or float(auditor.get("kpi_score", 0)) < 95.0,
+                }
+
+            def _fail(reason):
+                return {
+                    "all_passed": False, "passed_count": 0, "failed_count": 1,
+                    "gate_score": 0.0, "test_results": json.dumps([{"test_id": "parse", "status": "FAIL", "detail": reason}]),
+                    "fail_summary": reason, "api_mappings": "[]", "unmapped_apis": "[]",
+                    "mapping_completeness": 0.0, "linuxkpi_violations": "[]", "kpi_score": 0.0,
+                    "updated_risk_register": risk_register_json if risk_register_json else "[]",
+                    "replan_recommended": True
+                }
+          variables:
+            - variable: mapper_json
+              value_selector: [api_mapper, text]
+            - variable: auditor_json
+              value_selector: [kpi_auditor, text]
+            - variable: test_specs_json
+              value_selector: [tdd_api_spec, text]
+            - variable: risk_register_json
+              value_selector: [start, risk_register]
+          outputs:
+            all_passed: {type: boolean}
+            passed_count: {type: number}
+            failed_count: {type: number}
+            gate_score: {type: number}
+            test_results: {type: string}
+            fail_summary: {type: string}
+            api_mappings: {type: string}
+            unmapped_apis: {type: string}
+            mapping_completeness: {type: number}
+            linuxkpi_violations: {type: string}
+            kpi_score: {type: number}
+            updated_risk_register: {type: string}
+            replan_recommended: {type: boolean}
+
+      # ── GATE BRANCH ────────────────────────────────────────────────────────
+      - id: gate_branch
+        type: custom
+        position: {x: 1030, y: 282}
+        data:
+          type: if-else
+          title: "All Phase 1 TDD Tests Pass?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [tdd_fanin_gate, all_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-phase1-pass
+
+      # ── SUCCESS ────────────────────────────────────────────────────────────
+      - id: end_success
+        type: custom
+        position: {x: 1330, y: 120}
+        data:
+          type: end
+          title: "Phase 1 PASSED ✅"
+          outputs:
+            - variable: gate_score
+              value_type: number
+              value_selector: [tdd_fanin_gate, gate_score]
+            - variable: api_mappings
+              value_type: string
+              value_selector: [tdd_fanin_gate, api_mappings]
+            - variable: mapping_completeness
+              value_type: number
+              value_selector: [tdd_fanin_gate, mapping_completeness]
+            - variable: kpi_score
+              value_type: number
+              value_selector: [tdd_fanin_gate, kpi_score]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_fanin_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_fanin_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_fanin_gate, replan_recommended]
+
+      # ── FAIL REMEDIATION ───────────────────────────────────────────────────
+      - id: remediation_llm
+        type: custom
+        position: {x: 1330, y: 500}
+        data:
+          type: llm
+          title: "Remediation — Fix Mapping Violations"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.2
+              max_tokens: 6000
+          prompt_template:
+            - role: system
+              text: |
+                You are a NIC porting remediation assistant for Phase 1 API mapping.
+                Fix all LinuxKPI violations and incomplete mappings.
+                Return a corrected api_mapper JSON with the same schema.
+            - role: user
+              text: |
+                Mapper output (broken): {{#api_mapper.text#}}
+                Auditor findings: {{#kpi_auditor.text#}}
+                Failed tests: {{#tdd_fanin_gate.fail_summary#}}
+                LinuxKPI violations: {{#tdd_fanin_gate.linuxkpi_violations#}}
+                Unmapped APIs: {{#tdd_fanin_gate.unmapped_apis#}}
+                Target OS: {{#start.target_os#}}
+
+                Produce a fully corrected JSON with uses_linuxkpi=false for all entries,
+                native FreeBSD equivalents for all APIs, and mapping_completeness >= 95.
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── FAIL OUTPUT ────────────────────────────────────────────────────────
+      - id: end_fail
+        type: custom
+        position: {x: 1630, y: 500}
+        data:
+          type: end
+          title: "Phase 1 FAILED ❌ — Remediation Output"
+          outputs:
+            - variable: remediated_mappings
+              value_type: string
+              value_selector: [remediation_llm, text]
+            - variable: fail_summary
+              value_type: string
+              value_selector: [tdd_fanin_gate, fail_summary]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_fanin_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_fanin_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_fanin_gate, replan_recommended]
+
+    edges:
+      - id: e-start-tddspec
+        source: start
+        target: tdd_api_spec
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-start-mapper
+        source: start
+        target: api_mapper
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-start-auditor
+        source: start
+        target: kpi_auditor
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-tddspec-fanin
+        source: tdd_api_spec
+        target: tdd_fanin_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-mapper-fanin
+        source: api_mapper
+        target: tdd_fanin_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-auditor-fanin
+        source: kpi_auditor
+        target: tdd_fanin_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-fanin-branch
+        source: tdd_fanin_gate
+        target: gate_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-success
+        source: gate_branch
+        target: end_success
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-fail
+        source: gate_branch
+        target: remediation_llm
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+
+      - id: e-remediation-fail
+        source: remediation_llm
+        target: end_fail
+        sourceHandle: source
+        targetHandle: target
+        type: custom

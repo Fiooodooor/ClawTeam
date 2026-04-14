@@ -1,0 +1,8 @@
+# Jenkins Health Agent Dependencies
+# Compatible with existing DB infrastructure in CI_Tools/NEW_CI_XML_PARSER
+
+requests>=2.25.0
+urllib3>=1.26.0
+prometheus-client>=0.14.0
+mysql-connector-python==8.4.0  # Compatible with existing DB_Tools multi parameter usage
+cryptography>=3.4.8

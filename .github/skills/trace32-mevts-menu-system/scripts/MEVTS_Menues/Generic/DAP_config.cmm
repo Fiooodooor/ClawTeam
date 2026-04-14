@@ -1,0 +1,72 @@
+; Start-Up script for project Mount Evans (Intel)
+
+  &ERRCNT = 0. // error catch counter
+
+  IF System.Up()
+  (
+    SYStem.Down
+  )
+
+
+  SYStem.CPU CortexA53
+  SYStem.CONFIG CoreNumber 2
+  CORE.ASSIGN 1 ; "CORE.ASSIGN 1 2" to debug both cores
+
+
+  SYStem.CONFIG APBAP1.Base DP:0x10000
+
+  SYStem.CONFIG COREDEBUG.Base APB:0x1410000 APB:0x1510000
+  SYStem.CONFIG CTI.Base APB:0x1420000 APB:0x1520000
+
+  SYStem.CONFIG BMC.BASE                 APB:0x01430000 APB:0x01530000
+  SYStem.CONFIG ETM.BASE                 APB:0x01440000 APB:0x01540000
+  SYStem.CONFIG ETF1.BASE                APB:0x01010000 APB:0x01020000
+  SYStem.CONFIG ETF1.ATBSource           ETM
+  SYStem.CONFIG FUNNEL1.Base             APB:0x02070000
+  SYStem.CONFIG FUNNEL1.ATBSource        ETF.0 0 ETF.1 1
+  SYStem.CONFIG REPLICATOR1.Base         APB:0x02060000
+  SYStem.CONFIG REPLICATOR1.ATBSource    FUNNEL1
+  SYStem.CONFIG TPIU1.Base               APB:0x02040000
+  SYStem.CONFIG TPIU1.ATBSource          REPlicatorA1
+  SYStem.CONFIG ETR1.Base                APB:0x02050000
+  SYStem.CONFIG ETR1.ATBSource           REPlicatorB1
+  SYStem.CONFIG.ETF16.Base APB:0x030e0000
+
+  ON ERROR GOSUB errorCatch // Catch script error
+  GOSUB tryAttach
+
+  TrOnchip.Set RESET ON
+  TrOnChip.state
+  ON ERROR inherit // Turn off error catch again
+  Echo
+  SYStem.Down
+
+  PRINT %COLOR.GREEN "IMPORTANT: Please remember to attach to the core before listing the code!!!"
+
+  ENDDO
+
+tryAttach:
+  SYStem.Attach
+  RETURN
+
+errorCatch:
+  IF !SYStem.Up()
+  (
+    IF &ERRCNT<1.
+    (
+      PRINT %ERROR "Attach failed &ERRCNT - Trying to attach again..."
+      &ERRCNT=&ERRCNT+1
+      GOSUB tryAttach
+    )
+    ELSE
+    (
+      PRINT %ERROR "Error: Attach failed!!!"
+      ;PRINT %ERROR "Please try to run the script again."
+      STOP
+    )
+  )   
+  ELSE
+  (
+      PRINT %ERROR "Error: DAP config failed !!!"
+  )
+  RETURN

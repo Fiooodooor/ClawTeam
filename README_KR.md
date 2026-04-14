@@ -1,25 +1,10 @@
-<h1 align="center"><img src="assets/icon.png" alt="" width="64" style="vertical-align: middle;">&nbsp; ClawTeam: 에이전트 스웜 인텔리전스</h1>
+# ClawTeam Korean README (English Fallback)
 
-<p align="center">
-  <strong>AI 에이전트의 진화 🚀: 솔로 🤖 → 스웜 🦞🤖🤖🤖<br>
-  ClawTeam은 AI 에이전트가 무리를 이뤄 함께 생각하고 일하며 더 빠르게 결과를 내도록 돕습니다</strong>
-</p>
+This file is kept for backward compatibility of links and repository structure.
 
-<p align="center">
-  <a href="#-빠른-시작"><img src="https://img.shields.io/badge/Quick_Start-3_min-blue?style=for-the-badge" alt="Quick Start"></a>
-  <a href="#-활용-사례"><img src="https://img.shields.io/badge/Use_Cases-3_Demos-green?style=for-the-badge" alt="Use Cases"></a>
-  <a href="#-기능"><img src="https://img.shields.io/badge/Features-12+-purple?style=for-the-badge" alt="Features"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License"></a>
-</p>
+The canonical English documentation is available in:
 
-<p align="center">
-  <img src="https://img.shields.io/badge/python-≥3.10-blue?logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/typer-CLI-green" alt="Typer">
-  <img src="https://img.shields.io/badge/agents-Claude_Code_%7C_Codex_%7C_Any_CLI-blueviolet" alt="Agents">
-  <img src="https://img.shields.io/badge/transport-File_%7C_ZeroMQ_P2P-orange" alt="Transport">
-  <a href="https://github.com/HKUDS/.github/blob/main/profile/README.md"><img src="https://img.shields.io/badge/Feishu-Group-E9DBFC?style=flat&logo=feishu&logoColor=white" alt="Feishu"></a>
-  <a href="https://github.com/HKUDS/.github/blob/main/profile/README.md"><img src="https://img.shields.io/badge/WeChat-Group-C5EAB4?style=flat&logo=wechat&logoColor=white" alt="WeChat"></a>
-</p>
+- [README.md](README.md)
 
 **명령 한 줄이면 끝. 완전 자동화.** 에이전트가 스스로 스웜을 만들고, 작업을 나누고, 결과를 내놓습니다.
 

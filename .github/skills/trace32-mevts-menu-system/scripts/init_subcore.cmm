@@ -1,0 +1,239 @@
+;--------------------------------------------------------------------------
+;   T32/scripts/init_subcore.cmm
+;   TRACE32 configuration for Intel SoC secondary debugger
+;   Configures Trace32 to debug a core that is part of an Intel SoC
+;
+;   use:
+;     init_subcore.cmm [socid] [NAME=Corename] [DEBUGPORT=<sys.config.debugport option>]
+;     - [socid] is the second argument to 'system.option.intelSOC on [socid]'
+;                    To find the socid, run 'sys.detect.cltapchain' in the main T32 debugger with sys.cpu set to your target name.
+;                    (it doesn't need to _actually_ read the idcodes correctly, so you can do this connected to any target at all)
+;     - [NAME=corename] the corename value is used as the Title of the GUI if provided.
+;     - DEBUGPORT defaults to "GTL0", but could be any valid option of system.config.debugport. it needs to match the master instance's setting.
+;
+;   
+;   28 March 2017   
+;--------------------------------------------------------------------------
+local &args &NAME &NAME_index &core_index &cpu &debugport &extraconfig ; declare some local variables
+entry %line &args                               ; grab the input arguments as a whole line
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Parse command-line args
+;
+; parse the optional 'NAME' parameter
+&NAME=STRING.Scanandextract("&args", "NAME=", "")
+; if 'NAME=' is the first argument, then we don't have a core number param.
+&NAME_index=STRing.SCAN("&args", "NAME=",0)
+if (&NAME_index==0)
+(
+    &core_index=""
+)
+else
+(
+    &core_index=STRing.SPLIT("&args", " ", 0)     ; first token is the core index.
+)
+&cpu=STRING.Scanandextract("&args", "CPU=", "")
+; parse the optional 'DEBUGPORT' parameter
+if interface.hostmci()
+(
+    &debugport=STRING.Scanandextract("&args", "DEBUGPORT=", "GTL0")
+    sys.config.debugport &debugport    ; must be done before system.gtl commands.
+)
+; parse and extract the optional 'EXTRACONFIG' parameter
+&extraconfig=STRING.Scanandextract("&args", "EXTRACONFIG=", "")
+
+; determine whether or not we're in TARGSIM mode. (if so, we'll attach automatically)
+&TARGSIM=SYStem.GTL.VENDORID()=="INTEL_TARGSIM"
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Common GUI setup
+if ("&NAME"!="")
+(
+    title "Trace32 for &NAME"
+)
+area
+; set up Intel menu items
+if !interface.hostmci()||&TARGSIM
+(
+    do ~~/scripts/open_windows.cmm
+)
+
+;;;;;;;;;;;;;;;
+; Common probe configuration
+;
+if !simulator()
+(
+    sys.JTAGCLOCK 5.0mhz
+    sys.config.tapstate RunTestIdle     ; T32 should park taps in run-test/idle
+)
+IF ("&cpu"!="")
+(
+    system.cpu &cpu
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Architecture-specific GUI configuration
+;
+if (cpufamily()=="ARC")
+(
+    print "Setting break.IMPLementation to onchip"
+    print "Using hardware breakpoints to avoid problems writing to uninitialized memory for software breakpoints."
+    break.IMPLementation program onchip
+    MENU.ReProgram ~~/scripts/menus/intelarc   ; loads Intel ARC menu (intelarc.men)
+    ; sys.cpu is usually detected, not specified
+    IF interface.hostmci()
+    (
+        ; in emulation, disable some auto-detection to simplify the sys.m.a flow.
+        IF ("&cpu"=="")
+        (
+            system.cpu ARC600  ; an ok default for emulation, usually
+        )
+        system.option resetdetection NONE
+    )
+)
+else if (cpufamily()=="I386")
+(
+    ; x86 config
+    if (cpuis64bit())
+    (
+        ; 
+    )
+    else
+    (
+        ; 32-bit - probably a Lakemont
+        IF ("&cpu"=="")
+        (
+            sys.cpu LAKEMONT
+            ; RCM has had surprising behavior on enough platforms' Lakemont,
+            ; so we bypass it and have T32 deal with the Lakemont tap directly
+            SYSTEM.OPTION JTAGDIRECTCPU ON
+        )
+        MENU.ReProgram ~~/scripts/menus/intelpsh   ; loads Intel PSH menu (intelpsh.men)
+        sys.jtagclock 3.0MHz  ; TODO make this a parameter. This is a workaround for 1 IP on 1 program
+        IF interface.hostmci()
+        (
+            SYSTEM.OPTION INSTRSUBMITTIMEOUT  55000000. ; submitPIR timeout in <us>. Default is 500 ms.
+            if &TARGSIM
+            (
+                  ;run targsim-specific configuration
+                  SYSTEM.OPTION INSTRSUBMITTIMEOUT 0
+                  SYSTEM.OPTION JTAGDIRECTCPU ON
+                  print "Configured T32 for targsim: " system.cpu()
+            )
+        )
+        if lcp()
+        (
+            ; request an interactive license for the low-cost-probe.
+            LICENSE.REQuest "t32.lcpfull.x86"
+        )
+    )
+)
+else if (cpufamily()=="I51")
+(
+    ; 8051 config
+    if OS.FILE(~~/scripts/menus/intel8051.men)
+    (
+        MENU.ReProgram ~~/scripts/menus/intel8051.men   ; loads Intel 8051 menu (intel8051.men)
+    )
+    sys.o.trapen off
+    IF ("&cpu"=="")
+    (
+        system.cpu i8051
+    )
+)
+else if (cpufamily()=="XTENSA")
+(
+    ; tensilica core config
+    MENU.ReProgram ~~/scripts/menus/intelaud   ; loads Intel AUD menu (intelaud.men)
+    system.option Endianess Little
+    ; program breakpoint set to onchip
+    break.select PROGRAM ONCHIP
+    ;forbid access to certain memory regions 
+    ;  TODO - should this be set for _all_ xtensa cores, or just on certain SoCs?
+    ; map.denyaccess 0xFF328000--0xFF32C000
+    IF interface.hostmci()
+    (
+        ; Trace32 does a lot of auto-detection of available xtensa registers, features, etc.
+        ; In emulation, this takes too long, and system.mode.attach makes T32 become unresponsive.
+        ; so take some shortcuts in emulation only. These should _not_ be run in silicon
+        ; run 'diag' in t32mxtensa for details.
+        print "[scripts/init_subcore.cmm] Disabling Automatic detection of arch features because emulation is slow."
+        diag 0x3040 0xf7 ; restrict automatic detection of Architectural Options.
+        diag 0x3043 0    ; don't use/detect Debug Instruction Array
+        SYStem.Option.WinRegOption OFF    ; undocumented? Thomas Rasmussen @lauterbach said to turn this off for speed.
+    )
+)
+else if (cpufamily()=="APS3")
+(
+    MENU.ReProgram ~~/scripts/menus/intelaps   ; loads Intel APS menu (intelaps.men)
+    SYStem.Option.MonType Custom
+    SYStem.Option.MonBase 0x8C
+    break.select PROGRAM ONCHIP
+)
+else if (cpufamily()=="ARM")
+(
+    MENU.ReProgram ~~/demo/arm/MEVTS_Menues/menues   ; loads Intel APS menu (menues.men)
+)
+else if (cpufamily()=="ARM64")
+(
+)
+else
+(
+    print %warning "WARNING - unknown cpufamily: " cpufamily()
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;  Configure Probe and connect to target
+IF simulator()
+(
+    if "&extraconfig"!=""
+    (
+       do &extraconfig
+    )
+    ; T32 instruction set simulator
+    system.mode.UP    ; reset simulator, attach, halt at reset vector
+)
+ELSE
+(
+    ; Silicon or system-level emulation
+    sys.o.intelsoc on &core_index
+    
+    IF interface.hostmci()
+    (
+        if "&extraconfig"!=""
+        (
+            do &extraconfig
+        )
+        if &TARGSIM
+        (
+            ; Now we attach only in targsim mode
+            system.mode.attach
+        )
+        else
+        (
+             ; emulation configuration
+             do ~~/emu/common/init_emu_defaults.cmm DEBUGPORT=&debugport
+        )
+    )
+    ELSE
+    (
+        if "&extraconfig"!=""
+        (
+            do &extraconfig
+        )
+        ; silicon configuration
+        ON ERROR CONTINUE
+        system.mode.attach      ;
+        if (cpufamily()=="I386")   ; standby mode is only available for i386 family for some reason
+        (            
+            ; automatically reattach if power goes away and comes back
+            system.option.standbyattach on
+            system.mode.standby
+        )
+        ON ERROR DEFAULT
+    )
+)
+ENDDO
+

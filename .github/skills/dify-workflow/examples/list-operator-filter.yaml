@@ -1,0 +1,222 @@
+###############################################################################
+# List Operator Filter Pipeline — Dify DSL v0.6.0
+#
+# Pattern: Code node generates a structured list, list-operator filters and
+# sorts it, then an LLM presents the refined results.
+#
+# Use case: search-result post-processing, priority filtering, de-duplication.
+#
+# Key features demonstrated:
+#   - code node returning an array field
+#   - list-operator with filter_by (key equality) and order_by (score desc)
+#   - extract_by limiting results to top-N
+#   - feeding filtered results into an LLM template
+###############################################################################
+version: "0.6.0"
+kind: app
+app:
+  name: "List Operator Filter Pipeline"
+  mode: workflow
+  icon: "🔍"
+  icon_type: emoji
+  icon_background: "#E8EAF6"
+  description: "Filters and ranks a list of items, then summarises the top results via LLM"
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+
+  graph:
+    edges:
+      - id: start-to-code
+        source: start
+        sourceHandle: source
+        target: generate-list
+        targetHandle: target
+        type: custom
+
+      - id: code-to-filter
+        source: generate-list
+        sourceHandle: source
+        target: filter-top
+        targetHandle: target
+        type: custom
+
+      - id: filter-to-llm
+        source: filter-top
+        sourceHandle: source
+        target: summariser
+        targetHandle: target
+        type: custom
+
+      - id: llm-to-end
+        source: summariser
+        sourceHandle: source
+        target: output
+        targetHandle: target
+        type: custom
+
+    nodes:
+      # ── Start ────────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: { x: 80, y: 300 }
+        data:
+          type: start
+          title: "Start"
+          variables:
+            - variable: topic
+              label: "Search Topic"
+              type: text-input
+              required: true
+              max_length: 200
+              options: []
+            - variable: min_score
+              label: "Minimum Score (0-100)"
+              type: text-input
+              required: false
+              max_length: 3
+              options: []
+
+      # ── Code: generate candidate list ─────────────────────────────────────
+      - id: generate-list
+        type: custom
+        position: { x: 320, y: 300 }
+        data:
+          type: code
+          title: "Generate Candidate Results"
+          code_language: python3
+          code: |
+            import json, random
+
+            def main(topic: str, min_score: str) -> dict:
+                # Simulates a search returning scored results.
+                # In production: call an external API or DB query here.
+                candidates = [
+                    {"title": f"{topic} — Introduction",        "category": "tutorial", "score": 85},
+                    {"title": f"{topic} — Advanced Patterns",   "category": "article",  "score": 92},
+                    {"title": f"{topic} — Quick Reference",     "category": "tutorial", "score": 70},
+                    {"title": f"{topic} — Deep Dive",           "category": "article",  "score": 95},
+                    {"title": f"{topic} — Common Pitfalls",     "category": "guide",    "score": 60},
+                    {"title": f"{topic} — FAQ",                 "category": "guide",    "score": 55},
+                    {"title": f"{topic} — Case Study",          "category": "article",  "score": 88},
+                ]
+                threshold = int(min_score) if min_score and min_score.isdigit() else 65
+                return {
+                    "results": candidates,
+                    "threshold": threshold,
+                    "topic": topic,
+                }
+          outputs:
+            - variable: results
+              children: null
+              type: array[object]
+            - variable: threshold
+              children: null
+              type: number
+            - variable: topic
+              children: null
+              type: string
+
+      # ── List Operator: filter by score ≥ threshold, sort desc, top 3 ─────
+      - id: filter-top
+        type: custom
+        position: { x: 600, y: 300 }
+        data:
+          type: list-operator
+          title: "Filter & Rank"
+          variable:
+            - generate-list
+            - results
+          # Filter: keep items where score >= threshold
+          filter_by:
+            enabled: true
+            conditions:
+              - variable: score
+                comparison_operator: ">="
+                value:
+                  type: selector
+                  value_selector:
+                    - generate-list
+                    - threshold
+          # Sort: highest score first
+          order_by:
+            enabled: true
+            value: score
+            order: desc
+          # Keep only top 3
+          limit:
+            enabled: true
+            size: 3
+          # Extract just title and score for downstream use
+          extract_by:
+            enabled: false
+
+      # ── LLM: summarise filtered results ───────────────────────────────────
+      - id: summariser
+        type: custom
+        position: { x: 880, y: 300 }
+        data:
+          type: llm
+          title: "Result Summariser"
+          model:
+            provider: openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.4
+              max_tokens: 512
+          prompt_template:
+            - role: system
+              text: >-
+                You are a content curator. Present the following top search
+                results to the user in a concise, friendly format. For each
+                result: show its title, category tag, and score (out of 100).
+                End with a brief recommendation.
+            - role: user
+              text: |
+                Topic: {{#generate-list.topic#}}
+                Top results: {{#filter-top.result#}}
+          memory:
+            window:
+              enabled: false
+          context:
+            enabled: false
+          vision:
+            enabled: false
+
+      # ── End ──────────────────────────────────────────────────────────────
+      - id: output
+        type: custom
+        position: { x: 1160, y: 300 }
+        data:
+          type: end
+          title: "Output"
+          outputs:
+            - variable: summary
+              value_type: string
+              value_selector:
+                - summariser
+                - text
+
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1

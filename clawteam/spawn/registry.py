@@ -31,6 +31,7 @@ def register_agent(
     block_id: str = "",
     pid: int = 0,
     command: list[str] | None = None,
+    log_path: str = "",
 ) -> None:
     """Record spawn info for an agent (atomic + locked write)."""
     path = _registry_path(team_name)
@@ -42,6 +43,7 @@ def register_agent(
             "block_id": block_id,
             "pid": pid,
             "command": command or [],
+            "log_path": log_path,
             "spawned_at": time.time(),
         }
         _save(path, registry)
