@@ -90,7 +90,7 @@ export function Sidebar({
           />
         </span>
         <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-          {isConnected ? "Live" : "Offline"}
+          Stream {isConnected ? "live" : "offline"}
         </span>
       </div>
     </aside>

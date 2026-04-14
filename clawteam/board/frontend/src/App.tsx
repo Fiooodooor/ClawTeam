@@ -10,6 +10,7 @@ import { SetContextDialog } from "@/components/modals/set-context"
 import { AddAgentDialog } from "@/components/modals/add-agent"
 import { SendMessageDialog } from "@/components/modals/send-message"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { useTeamStream } from "@/hooks/use-team-stream"
 import type { TeamData } from "@/types"
 
@@ -89,6 +90,33 @@ export default function App() {
                     <span className="font-mono normal-case tracking-normal">
                       {data.members.length} agents
                     </span>
+                    <span className="size-1 rounded-full bg-muted-foreground/60" />
+                    {(() => {
+                      const online = data.team.membersOnline ?? 0
+                      const total = data.members.length
+                      const allOnline = total > 0 && online === total
+                      const noneOnline = online === 0
+                      return (
+                        <Badge
+                          variant="secondary"
+                          className="gap-1.5 font-mono text-[10px] normal-case tracking-normal"
+                        >
+                          <span
+                            className={
+                              "size-1.5 rounded-full " +
+                              (noneOnline
+                                ? "bg-muted-foreground/70"
+                                : allOnline
+                                ? "bg-emerald-400"
+                                : "bg-amber-400")
+                            }
+                          />
+                          {noneOnline
+                            ? `No agents — run clawteam launch ${teamName}`
+                            : `${online}/${total} online`}
+                        </Badge>
+                      )
+                    })()}
                   </div>
                   <h1 className="mt-3 text-4xl font-semibold leading-none tracking-tight text-foreground">
                     {data.team.name}

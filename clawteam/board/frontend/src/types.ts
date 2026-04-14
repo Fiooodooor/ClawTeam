@@ -5,12 +5,14 @@ export interface TeamOverview {
   members: number
   tasks: number
   pendingMessages: number
+  membersOnline?: number
 }
 
 export interface TeamInfo {
   name: string
   leaderName: string
   description: string
+  membersOnline?: number
 }
 
 export interface Member {
@@ -22,6 +24,7 @@ export interface Member {
   inboxName: string
   inboxCount: number
   user?: string
+  isRunning?: boolean
 }
 
 export interface Task {
