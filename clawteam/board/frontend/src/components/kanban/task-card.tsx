@@ -1,5 +1,7 @@
 import { useSortable } from "@dnd-kit/react/sortable"
 import { AgentAvatar } from "@/components/agent-registry"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import type { Task, TaskStatus } from "@/types"
 import { STATUS_COLORS } from "@/types"
 
@@ -22,37 +24,37 @@ export function TaskCard({ task, index, column, onPeek }: TaskCardProps) {
   const color = STATUS_COLORS[column]
 
   return (
-    <div
+    <Card
       ref={ref}
       onClick={() => onPeek(task.id)}
-      className="cursor-pointer rounded border border-zinc-800 bg-zinc-900/60 p-3.5 transition-all hover:border-zinc-700 hover:bg-zinc-900"
-      style={{
-        boxShadow: "0 0 0 0px transparent",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = `0 0 12px -4px ${color}`
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "0 0 0 0px transparent"
-      }}
+      size="sm"
+      className="cursor-pointer gap-2 bg-card/60 py-3 ring-1 ring-border/60 transition-all hover:bg-card hover:ring-border hover:shadow-[0_0_14px_-4px_var(--task-glow)]"
+      style={{ ["--task-glow" as never]: color }}
     >
-      <div className="mb-1.5 font-mono text-[11px] text-zinc-600">
-        #{task.id.substring(0, 8)}
-      </div>
-      <div className="text-sm font-medium leading-snug text-zinc-200">
-        {task.subject}
-      </div>
-      {task.owner && (
-        <div className="mt-2.5 flex items-center gap-2 text-xs text-zinc-400">
-          <AgentAvatar name={task.owner} />
-          {task.owner}
+      <CardHeader className="gap-1">
+        <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70">
+          #{task.id.substring(0, 8)}
         </div>
-      )}
-      {column === "blocked" && task.blockedBy?.length > 0 && (
-        <div className="mt-2 inline-block rounded bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-400">
-          Blocked by: {task.blockedBy.join(", ")}
-        </div>
-      )}
-    </div>
+        <CardTitle className="text-sm font-medium leading-snug text-foreground">
+          {task.subject}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        {task.owner && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <AgentAvatar name={task.owner} />
+            {task.owner}
+          </div>
+        )}
+        {column === "blocked" && task.blockedBy && task.blockedBy.length > 0 && (
+          <Badge
+            variant="destructive"
+            className="self-start text-[11px]"
+          >
+            Blocked by: {task.blockedBy.join(", ")}
+          </Badge>
+        )}
+      </CardContent>
+    </Card>
   )
 }

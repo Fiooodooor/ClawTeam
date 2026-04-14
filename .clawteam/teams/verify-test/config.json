@@ -1,0 +1,16 @@
+{
+  "name": "verify-test",
+  "description": "验收测试",
+  "leadAgentId": "500c0cf2ebf5",
+  "createdAt": "2026-04-13T13:06:56.543991+00:00",
+  "members": [
+    {
+      "name": "leader",
+      "user": "",
+      "agentId": "500c0cf2ebf5",
+      "agentType": "leader",
+      "joinedAt": "2026-04-13T13:06:56.543971+00:00"
+    }
+  ],
+  "budgetCents": 0.0
+}

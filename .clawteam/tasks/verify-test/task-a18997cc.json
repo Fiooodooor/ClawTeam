@@ -1,0 +1,18 @@
+{
+  "id": "a18997cc",
+  "subject": "来自Plane的任务：优化数据库查询",
+  "description": "<p class=\"editor-paragraph-block\" data-id=\"103bf904-2835-49b0-9be7-41f5fa43e0d1\">请优化用户查询接口的响应时间</p>",
+  "status": "pending",
+  "priority": "high",
+  "owner": "worker1",
+  "lockedBy": "",
+  "lockedAt": "",
+  "blocks": [],
+  "blockedBy": [],
+  "startedAt": "",
+  "createdAt": "2026-04-13T13:07:33.287368+00:00",
+  "updatedAt": "2026-04-13T13:07:33.287378+00:00",
+  "metadata": {
+    "plane_issue_id": "49317a37-7615-4cb7-82a9-e119c72ed589"
+  }
+}

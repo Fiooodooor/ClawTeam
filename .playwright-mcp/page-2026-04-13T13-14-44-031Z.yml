@@ -1,0 +1,1288 @@
+- generic [ref=e1]:
+  - generic:
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive":
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive":
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+  - generic:
+    - region "Notifications"
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - button "Open workspace switcher" [ref=e8] [cursor=pointer]:
+          - generic [ref=e9]:
+            - generic [ref=e10]: C
+            - heading "ClawTeam" [level=4] [ref=e11]
+          - img [ref=e12]
+        - button [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+          - textbox "Search commands..." [ref=e21]
+        - generic [ref=e23]:
+          - link [ref=e24] [cursor=pointer]:
+            - /url: /clawteam/notifications/
+            - img [ref=e27]
+          - button [ref=e30] [cursor=pointer]:
+            - button [ref=e31]:
+              - img [ref=e33]
+          - link "Star us on GitHub" [ref=e36] [cursor=pointer]:
+            - /url: https://github.com/makeplane/plane
+            - img [ref=e37]
+            - generic [ref=e38]: Star us on GitHub
+          - button "B" [ref=e41] [cursor=pointer]:
+            - button "B" [ref=e42]:
+              - generic [ref=e45]: B
+      - generic [ref=e48]:
+        - generic [ref=e979]:
+          - generic [ref=e980]:
+            - generic [ref=e981]:
+              - button [ref=e982] [cursor=pointer]:
+                - img [ref=e983]
+              - link [ref=e985] [cursor=pointer]:
+                - /url: /clawteam/browse/CLAW-5/
+                - img [ref=e986]
+              - button [ref=e992] [cursor=pointer]:
+                - button [ref=e993]:
+                  - img [ref=e994]
+            - generic [ref=e997]:
+              - generic [ref=e999]: Saved
+              - generic [ref=e1000]:
+                - button "Subscribe" [ref=e1002] [cursor=pointer]:
+                  - img [ref=e1003]
+                  - generic [ref=e1006]: Subscribe
+                - button [ref=e1007] [cursor=pointer]:
+                  - img [ref=e1008]
+                - button [ref=e1012] [cursor=pointer]:
+                  - button [ref=e1013]:
+                    - img [ref=e1014]
+          - generic [ref=e1019]:
+            - generic [ref=e1020]:
+              - button "CLAW-5" [ref=e1023] [cursor=pointer]
+              - generic [ref=e1025]:
+                - textbox "Work item title" [ref=e1026]: Deploy to staging
+                - generic: 17/255
+              - generic [ref=e1030]:
+                - generic [ref=e1031]:
+                  - paragraph [ref=e1032]: Press '/' for commands
+                  - paragraph [ref=e1033]
+                - generic:
+                  - button:
+                    - generic:
+                      - img
+                    - generic:
+                      - img
+              - generic [ref=e1034]:
+                - button [ref=e1036] [cursor=pointer]:
+                  - button [ref=e1038]:
+                    - img [ref=e1039]
+                - button "Last edited by admin about 2 hours ago" [disabled] [ref=e1045]:
+                  - generic [ref=e1046]:
+                    - img [ref=e1048]
+                    - paragraph [ref=e1052]: Last edited by admin about 2 hours ago
+            - generic [ref=e1055]:
+              - button "Add sub-work item" [ref=e1057] [cursor=pointer]:
+                - button "Add sub-work item" [ref=e1058]:
+                  - img [ref=e1059]
+                  - generic [ref=e1062]: Add sub-work item
+              - button "Add relation" [ref=e1064] [cursor=pointer]:
+                - button "Add relation" [ref=e1065]:
+                  - img [ref=e1066]
+                  - generic [ref=e1068]: Add relation
+              - button "Add link" [ref=e1069] [cursor=pointer]:
+                - button "Add link" [ref=e1070]:
+                  - img [ref=e1071]
+                  - generic [ref=e1073]: Add link
+              - button "Choose File Attach" [ref=e1075] [cursor=pointer]:
+                - button "Choose File" [ref=e1076]
+                - button "Attach" [ref=e1077]:
+                  - img [ref=e1078]
+                  - generic [ref=e1081]: Attach
+            - generic [ref=e1082]:
+              - heading "Properties" [level=6] [ref=e1083]
+              - generic [ref=e1084]:
+                - generic [ref=e1085]:
+                  - generic [ref=e1086]:
+                    - img [ref=e1087]
+                    - generic [ref=e1090]: State
+                  - button "Todo" [ref=e1093] [cursor=pointer]:
+                    - button "Todo" [ref=e1094]:
+                      - img [ref=e1095]
+                      - generic [ref=e1112]: Todo
+                - generic [ref=e1113]:
+                  - generic [ref=e1114]:
+                    - img [ref=e1115]
+                    - generic [ref=e1117]: Assignees
+                  - button "Add assignees" [ref=e1120] [cursor=pointer]:
+                    - button "Add assignees" [ref=e1121]:
+                      - generic [ref=e1122]: Add assignees
+                      - img [ref=e1321]
+                - generic [ref=e1123]:
+                  - generic [ref=e1124]:
+                    - img [ref=e1125]
+                    - generic [ref=e1127]: Priority
+                  - button "Low" [ref=e1130] [cursor=pointer]:
+                    - generic [ref=e1131]:
+                      - img [ref=e1133]
+                      - generic [ref=e1134]: Low
+                - generic [ref=e1135]:
+                  - generic [ref=e1136]:
+                    - img [ref=e1137]
+                    - generic [ref=e1140]: Created by
+                  - generic [ref=e1141]:
+                    - generic [ref=e1143]: A
+                    - generic [ref=e1144]: admin
+                - generic [ref=e1145]:
+                  - generic [ref=e1146]:
+                    - img [ref=e1147]
+                    - generic [ref=e1149]: Start date
+                  - button "Add start date" [ref=e1152] [cursor=pointer]:
+                    - button "Add start date" [ref=e1153]:
+                      - generic [ref=e1154]: Add start date
+                - generic [ref=e1155]:
+                  - generic [ref=e1156]:
+                    - img [ref=e1157]
+                    - generic [ref=e1159]: Due date
+                  - button "Add due date" [ref=e1163] [cursor=pointer]:
+                    - button "Add due date" [ref=e1164]:
+                      - generic [ref=e1165]: Add due date
+                - generic [ref=e1166]:
+                  - generic [ref=e1167]:
+                    - img [ref=e1168]
+                    - generic [ref=e1172]: Parent
+                  - button "Add parent work item" [ref=e1174] [cursor=pointer]:
+                    - generic [ref=e1175]: Add parent work item
+                    - img [ref=e1177]
+                - generic [ref=e1180]:
+                  - generic [ref=e1181]:
+                    - img [ref=e1182]
+                    - generic [ref=e1186]: Labels
+                  - button "Add labels" [ref=e1190] [cursor=pointer]:
+                    - img [ref=e1191]
+                    - generic [ref=e1193]: Add labels
+            - generic [ref=e1194]:
+              - generic [ref=e1195]:
+                - generic [ref=e1196]: Activity
+                - generic [ref=e1197]:
+                  - button [ref=e1198] [cursor=pointer]:
+                    - img [ref=e1199]
+                  - button [ref=e1203] [cursor=pointer]:
+                    - button [ref=e1204]:
+                      - img [ref=e1205]
+              - generic [ref=e1208]:
+                - generic [ref=e1209]:
+                  - generic [ref=e1210]:
+                    - img [ref=e1213]
+                    - generic [ref=e1215]:
+                      - link "admin" [ref=e1216] [cursor=pointer]:
+                        - /url: /clawteam/profile/01e1a68a-a535-4c80-962a-75fc490c8c18/
+                      - generic [ref=e1217]: created the work item.
+                      - generic [ref=e1219]: about 2 hours ago
+                  - generic [ref=e1220]:
+                    - img [ref=e1223]
+                    - generic [ref=e1224]:
+                      - link "admin" [ref=e1225] [cursor=pointer]:
+                        - /url: /clawteam/profile/01e1a68a-a535-4c80-962a-75fc490c8c18/
+                      - generic [ref=e1226]: updated the description.
+                      - generic [ref=e1228]: 5 minutes ago
+                - generic [ref=e1230]:
+                  - paragraph [ref=e1238]: Add comment
+                  - generic [ref=e1241]:
+                    - generic [ref=e1242]:
+                      - generic [ref=e1243]:
+                        - button [ref=e1244] [cursor=pointer]:
+                          - img [ref=e1245]
+                        - button [ref=e1247] [cursor=pointer]:
+                          - img [ref=e1248]
+                        - button [ref=e1250] [cursor=pointer]:
+                          - img [ref=e1251]
+                        - button [ref=e1253] [cursor=pointer]:
+                          - img [ref=e1254]
+                      - generic [ref=e1257]:
+                        - button [ref=e1258] [cursor=pointer]:
+                          - img [ref=e1259]
+                        - button [ref=e1260] [cursor=pointer]:
+                          - img [ref=e1261]
+                        - button [ref=e1262] [cursor=pointer]:
+                          - img [ref=e1263]
+                      - generic [ref=e1264]:
+                        - button [ref=e1265] [cursor=pointer]:
+                          - img [ref=e1266]
+                        - button [ref=e1269] [cursor=pointer]:
+                          - img [ref=e1270]
+                        - button [ref=e1271] [cursor=pointer]:
+                          - img [ref=e1272]
+                      - generic [ref=e1275]:
+                        - button [ref=e1276] [cursor=pointer]:
+                          - img [ref=e1277]
+                        - button [ref=e1278] [cursor=pointer]:
+                          - img [ref=e1279]
+                      - button [ref=e1284] [cursor=pointer]:
+                        - img [ref=e1285]
+                    - generic [ref=e1289]:
+                      - button "Comment" [disabled]
+        - generic [ref=e50]:
+          - complementary "Main sidebar" [ref=e51]:
+            - complementary [ref=e52]:
+              - generic [ref=e53]:
+                - generic [ref=e54]:
+                  - generic [ref=e55]:
+                    - generic [ref=e56]: Projects
+                    - generic [ref=e57]:
+                      - button [ref=e58] [cursor=pointer]:
+                        - img [ref=e59]
+                      - button [ref=e61] [cursor=pointer]:
+                        - img [ref=e62]
+                  - button "New work item" [ref=e65] [cursor=pointer]:
+                    - img [ref=e66]
+                    - generic [ref=e68]: New work item
+                - generic [ref=e69]:
+                  - link "Home" [ref=e70] [cursor=pointer]:
+                    - /url: /clawteam/
+                    - generic [ref=e72]:
+                      - img [ref=e73]
+                      - paragraph [ref=e75]: Home
+                  - link "Drafts" [ref=e76] [cursor=pointer]:
+                    - /url: /clawteam/drafts/
+                    - generic [ref=e78]:
+                      - img [ref=e79]
+                      - paragraph [ref=e81]: Drafts
+                  - link "Your work" [ref=e82] [cursor=pointer]:
+                    - /url: /clawteam/profile/1d6d232e-e5f1-4cd7-93d5-3938a2b4ce70/
+                    - generic [ref=e84]:
+                      - img [ref=e85]
+                      - paragraph [ref=e88]: Your work
+                  - link "Stickies" [ref=e89] [cursor=pointer]:
+                    - /url: /clawteam/stickies/
+                    - generic [ref=e91]:
+                      - img [ref=e92]
+                      - paragraph [ref=e94]: Stickies
+                - generic [ref=e95]:
+                  - generic [ref=e96]:
+                    - button "aria_labels.app_sidebar.close_workspace_menu" [expanded] [ref=e97] [cursor=pointer]:
+                      - generic [ref=e98]: Workspace
+                    - generic:
+                      - button "aria_labels.app_sidebar.close_workspace_menu" [expanded]:
+                        - img
+                  - generic [ref=e100]:
+                    - link "Projects" [ref=e101] [cursor=pointer]:
+                      - /url: /clawteam/projects/
+                      - generic [ref=e103]:
+                        - img [ref=e104]
+                        - paragraph [ref=e106]: Projects
+                    - button "aria_labels.app_sidebar.open_extended_sidebar" [ref=e108] [cursor=pointer]:
+                      - img [ref=e109]
+                      - generic [ref=e113]: More
+                - generic [ref=e115]:
+                  - generic [ref=e116]:
+                    - button "Close projects menu" [expanded] [ref=e117] [cursor=pointer]:
+                      - generic [ref=e118]: Projects
+                    - button "Close projects menu" [ref=e120] [cursor=pointer]:
+                      - img [ref=e121]
+                  - generic [ref=e127]:
+                    - generic [ref=e129]:
+                      - link "Close project menu" [ref=e130] [cursor=pointer]:
+                        - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/issues
+                        - button "Close project menu" [ref=e131]:
+                          - paragraph [ref=e134]: ClawTeam Board
+                      - generic [ref=e135]:
+                        - generic:
+                          - button "Toggle quick actions menu":
+                            - button:
+                              - img
+                    - generic [ref=e137]:
+                      - link "Work items" [ref=e139] [cursor=pointer]:
+                        - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/issues/
+                        - generic [ref=e142]:
+                          - img [ref=e143]
+                          - generic [ref=e145]: Work items
+                      - link "Pages" [ref=e146] [cursor=pointer]:
+                        - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/pages/
+                        - generic [ref=e149]:
+                          - img [ref=e150]
+                          - generic [ref=e152]: Pages
+                - button "Open paid plans' modal" [ref=e155] [cursor=pointer]: Community
+              - separator "Resize sidebar" [ref=e156]
+          - complementary "Sidebar peek view":
+            - complementary:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic: Projects
+                    - generic:
+                      - button:
+                        - img
+                      - button:
+                        - img
+                  - generic:
+                    - button "New work item":
+                      - img
+                      - generic: New work item
+                - generic:
+                  - link "Home":
+                    - /url: /clawteam/
+                    - generic:
+                      - generic:
+                        - img
+                        - paragraph: Home
+                  - link "Drafts":
+                    - /url: /clawteam/drafts/
+                    - generic:
+                      - generic:
+                        - img
+                        - paragraph: Drafts
+                  - link "Your work":
+                    - /url: /clawteam/profile/1d6d232e-e5f1-4cd7-93d5-3938a2b4ce70/
+                    - generic:
+                      - generic:
+                        - img
+                        - paragraph: Your work
+                  - link "Stickies":
+                    - /url: /clawteam/stickies/
+                    - generic:
+                      - generic:
+                        - img
+                        - paragraph: Stickies
+                - generic:
+                  - generic:
+                    - button "aria_labels.app_sidebar.close_workspace_menu" [expanded]:
+                      - generic: Workspace
+                    - generic:
+                      - button "aria_labels.app_sidebar.close_workspace_menu" [expanded]:
+                        - img
+                  - generic:
+                    - generic:
+                      - link "Projects":
+                        - /url: /clawteam/projects/
+                        - generic:
+                          - generic:
+                            - img
+                            - paragraph: Projects
+                      - generic:
+                        - button "aria_labels.app_sidebar.open_extended_sidebar":
+                          - img
+                          - generic: More
+                - generic:
+                  - generic:
+                    - generic:
+                      - button "Close projects menu" [expanded]:
+                        - generic: Projects
+                      - generic:
+                        - button "Close projects menu":
+                          - img
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - link "Close project menu":
+                                - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/issues
+                                - button "Close project menu":
+                                  - paragraph: ClawTeam Board
+                              - generic:
+                                - generic:
+                                  - button "Toggle quick actions menu":
+                                    - button:
+                                      - img
+                            - generic:
+                              - generic:
+                                - link "Work items":
+                                  - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/issues/
+                                  - generic:
+                                    - generic:
+                                      - generic:
+                                        - img
+                                        - generic: Work items
+                                - link "Pages":
+                                  - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/pages/
+                                  - generic:
+                                    - generic:
+                                      - generic:
+                                        - img
+                                        - generic: Pages
+                - generic:
+                  - button "Open paid plans' modal": Community
+              - separator "Resize sidebar"
+          - main [ref=e157]:
+            - generic [ref=e161]:
+              - generic [ref=e163]:
+                - generic [ref=e164]:
+                  - button "..." [ref=e167] [cursor=pointer]:
+                    - button "..." [ref=e168]:
+                      - generic [ref=e169]: ...
+                    - img [ref=e173]
+                  - link "Work Items" [ref=e177] [cursor=pointer]:
+                    - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/issues/
+                    - generic [ref=e178]:
+                      - img [ref=e180]
+                      - generic [ref=e182]: Work Items
+                - generic [ref=e183]: "10"
+              - generic [ref=e184]:
+                - generic [ref=e185]:
+                  - button [ref=e188] [cursor=pointer]:
+                    - button [ref=e189]:
+                      - img [ref=e190]
+                      - img [ref=e192]
+                  - button [ref=e197] [cursor=pointer]:
+                    - img [ref=e199]
+                  - button [ref=e203] [cursor=pointer]:
+                    - img [ref=e204]
+                  - button [ref=e205] [cursor=pointer]:
+                    - img [ref=e207]
+                - button "Add work item" [ref=e208] [cursor=pointer]:
+                  - generic [ref=e209]: Add work item
+            - generic [ref=e218]:
+              - generic [ref=e220]:
+                - img [ref=e222]
+                - generic [ref=e231] [cursor=pointer]:
+                  - generic [ref=e232]: All work items
+                  - generic [ref=e233]: "10"
+                - img [ref=e235] [cursor=pointer]
+              - generic [ref=e237]:
+                - generic [ref=e238]:
+                  - link "CLAW-10 实现用户登录功能 Verified" [ref=e242] [cursor=pointer]:
+                    - /url: /clawteam/browse/CLAW-10/
+                    - generic [ref=e243]:
+                      - generic [ref=e245]:
+                        - button "CLAW-10" [disabled] [ref=e249]
+                        - paragraph [ref=e251]: 实现用户登录功能
+                      - generic [ref=e252]:
+                        - generic [ref=e253]:
+                          - button "Verified" [ref=e256]:
+                            - button "Verified" [ref=e257]:
+                              - img [ref=e258]
+                              - generic [ref=e260]: Verified
+                          - button [ref=e263]:
+                            - img [ref=e266]
+                          - button [ref=e269]:
+                            - button [ref=e270]:
+                              - img [ref=e271]
+                          - button [ref=e275]:
+                            - button [ref=e276]:
+                              - img [ref=e277]
+                          - button [ref=e281]:
+                            - button [ref=e282]:
+                              - img [ref=e283]
+                          - button [ref=e287]:
+                            - img [ref=e289]
+                        - button [ref=e295]:
+                          - img [ref=e296]
+                  - link "CLAW-9 需要审批：删除旧数据库 Awaiting Approval" [ref=e303] [cursor=pointer]:
+                    - /url: /clawteam/browse/CLAW-9/
+                    - generic [ref=e304]:
+                      - generic [ref=e306]:
+                        - button "CLAW-9" [disabled] [ref=e310]
+                        - paragraph [ref=e312]: 需要审批：删除旧数据库
+                      - generic [ref=e313]:
+                        - generic [ref=e314]:
+                          - button "Awaiting Approval" [ref=e317]:
+                            - button "Awaiting Approval" [ref=e318]:
+                              - img [ref=e319]
+                              - generic [ref=e321]: Awaiting Approval
+                          - button [ref=e324]:
+                            - img [ref=e327]
+                          - button [ref=e331]:
+                            - button [ref=e332]:
+                              - img [ref=e333]
+                          - button [ref=e337]:
+                            - button [ref=e338]:
+                              - img [ref=e339]
+                          - button [ref=e343]:
+                            - button [ref=e344]:
+                              - img [ref=e345]
+                          - button [ref=e349]:
+                            - img [ref=e351]
+                        - button [ref=e357]:
+                          - img [ref=e358]
+                  - link "CLAW-8 来自Plane的任务：优化数据库查询 Todo B" [ref=e365] [cursor=pointer]:
+                    - /url: /clawteam/browse/CLAW-8/
+                    - generic [ref=e366]:
+                      - generic [ref=e368]:
+                        - button "CLAW-8" [disabled] [ref=e372]
+                        - paragraph [ref=e374]: 来自Plane的任务：优化数据库查询
+                      - generic [ref=e375]:
+                        - generic [ref=e376]:
+                          - button "Todo" [ref=e379]:
+                            - button "Todo" [ref=e380]:
+                              - img [ref=e381]
+                              - generic [ref=e398]: Todo
+                          - button [ref=e401]:
+                            - img [ref=e404]
+                          - button [ref=e407]:
+                            - button [ref=e408]:
+                              - img [ref=e409]
+                          - button [ref=e413]:
+                            - button [ref=e414]:
+                              - img [ref=e415]
+                          - button "B" [ref=e419]:
+                            - button "B" [ref=e420]:
+                              - generic [ref=e424]: B
+                          - button [ref=e427]:
+                            - img [ref=e429]
+                        - button [ref=e435]:
+                          - img [ref=e436]
+                  - link "CLAW-7 请审批：发布 v1.0 到生产环境 Todo" [ref=e443] [cursor=pointer]:
+                    - /url: /clawteam/browse/CLAW-7/
+                    - generic [ref=e444]:
+                      - generic [ref=e446]:
+                        - button "CLAW-7" [disabled] [ref=e450]
+                        - paragraph [ref=e452]: 请审批：发布 v1.0 到生产环境
+                      - generic [ref=e453]:
+                        - generic [ref=e454]:
+                          - button "Todo" [ref=e457]:
+                            - button "Todo" [ref=e458]:
+                              - img [ref=e459]
+                              - generic [ref=e476]: Todo
+                          - button [ref=e479]:
+                            - img [ref=e482]
+                          - button [ref=e485]:
+                            - button [ref=e486]:
+                              - img [ref=e487]
+                          - button [ref=e491]:
+                            - button [ref=e492]:
+                              - img [ref=e493]
+                          - button [ref=e497]:
+                            - button [ref=e498]:
+                              - img [ref=e499]
+                          - button [ref=e503]:
+                            - img [ref=e505]
+                        - button [ref=e511]:
+                          - img [ref=e512]
+                  - link "CLAW-6 Review integration design Todo" [ref=e519] [cursor=pointer]:
+                    - /url: /clawteam/browse/CLAW-6/
+                    - generic [ref=e520]:
+                      - generic [ref=e522]:
+                        - button "CLAW-6" [disabled] [ref=e526]
+                        - paragraph [ref=e528]: Review integration design
+                      - generic [ref=e529]:
+                        - generic [ref=e530]:
+                          - button "Todo" [ref=e533]:
+                            - button "Todo" [ref=e534]:
+                              - img [ref=e535]
+                              - generic [ref=e552]: Todo
+                          - button [ref=e555]:
+                            - img [ref=e558]
+                          - button [ref=e561]:
+                            - button [ref=e562]:
+                              - img [ref=e563]
+                          - button [ref=e567]:
+                            - button [ref=e568]:
+                              - img [ref=e569]
+                          - button [ref=e573]:
+                            - button [ref=e574]:
+                              - img [ref=e575]
+                          - button [ref=e579]:
+                            - img [ref=e581]
+                        - button [ref=e587]:
+                          - img [ref=e588]
+                  - link "CLAW-5 Deploy to staging Todo" [ref=e595] [cursor=pointer]:
+                    - /url: /clawteam/browse/CLAW-5/
+                    - generic [ref=e596]:
+                      - generic [ref=e598]:
+                        - button "CLAW-5" [disabled] [ref=e602]
+                        - paragraph [ref=e604]: Deploy to staging
+                      - generic [ref=e605]:
+                        - generic [ref=e606]:
+                          - button "Todo" [ref=e609]:
+                            - button "Todo" [ref=e610]:
+                              - img [ref=e611]
+                              - generic [ref=e628]: Todo
+                          - button [ref=e631]:
+                            - img [ref=e634]
+                          - button [ref=e637]:
+                            - button [ref=e638]:
+                              - img [ref=e639]
+                          - button [ref=e643]:
+                            - button [ref=e644]:
+                              - img [ref=e645]
+                          - button [ref=e649]:
+                            - button [ref=e650]:
+                              - img [ref=e651]
+                          - button [ref=e655]:
+                            - img [ref=e657]
+                        - button [ref=e663]:
+                          - img [ref=e664]
+                  - link "CLAW-4 Write unit tests Todo" [ref=e671] [cursor=pointer]:
+                    - /url: /clawteam/browse/CLAW-4/
+                    - generic [ref=e672]:
+                      - generic [ref=e674]:
+                        - button "CLAW-4" [disabled] [ref=e678]
+                        - paragraph [ref=e680]: Write unit tests
+                      - generic [ref=e681]:
+                        - generic [ref=e682]:
+                          - button "Todo" [ref=e685]:
+                            - button "Todo" [ref=e686]:
+                              - img [ref=e687]
+                              - generic [ref=e704]: Todo
+                          - button [ref=e707]:
+                            - img [ref=e710]
+                          - button [ref=e713]:
+                            - button [ref=e714]:
+                              - img [ref=e715]
+                          - button [ref=e719]:
+                            - button [ref=e720]:
+                              - img [ref=e721]
+                          - button [ref=e725]:
+                            - button [ref=e726]:
+                              - img [ref=e727]
+                          - button [ref=e731]:
+                            - img [ref=e733]
+                        - button [ref=e739]:
+                          - img [ref=e740]
+                  - link "CLAW-3 Test item Todo" [ref=e747] [cursor=pointer]:
+                    - /url: /clawteam/browse/CLAW-3/
+                    - generic [ref=e748]:
+                      - generic [ref=e750]:
+                        - button "CLAW-3" [disabled] [ref=e754]
+                        - paragraph [ref=e756]: Test item
+                      - generic [ref=e757]:
+                        - generic [ref=e758]:
+                          - button "Todo" [ref=e761]:
+                            - button "Todo" [ref=e762]:
+                              - img [ref=e763]
+                              - generic [ref=e780]: Todo
+                          - button [ref=e783]:
+                            - img [ref=e786]
+                          - button [ref=e789]:
+                            - button [ref=e790]:
+                              - img [ref=e791]
+                          - button [ref=e795]:
+                            - button [ref=e796]:
+                              - img [ref=e797]
+                          - button [ref=e801]:
+                            - button [ref=e802]:
+                              - img [ref=e803]
+                          - button [ref=e807]:
+                            - img [ref=e809]
+                        - button [ref=e815]:
+                          - img [ref=e816]
+                  - link "CLAW-2 2 Todo" [ref=e823] [cursor=pointer]:
+                    - /url: /clawteam/browse/CLAW-2/
+                    - generic [ref=e824]:
+                      - generic [ref=e826]:
+                        - button "CLAW-2" [disabled] [ref=e830]
+                        - paragraph [ref=e832]: "2"
+                      - generic [ref=e833]:
+                        - generic [ref=e834]:
+                          - button "Todo" [ref=e837]:
+                            - button "Todo" [ref=e838]:
+                              - img [ref=e839]
+                              - generic [ref=e856]: Todo
+                          - button [ref=e859]:
+                            - img [ref=e862]
+                          - button [ref=e865]:
+                            - button [ref=e866]:
+                              - img [ref=e867]
+                          - button [ref=e871]:
+                            - button [ref=e872]:
+                              - img [ref=e873]
+                          - button [ref=e877]:
+                            - button [ref=e878]:
+                              - img [ref=e879]
+                          - button [ref=e883]:
+                            - img [ref=e885]
+                        - button [ref=e891]:
+                          - img [ref=e892]
+                  - link "CLAW-1 smoke test Todo" [ref=e899] [cursor=pointer]:
+                    - /url: /clawteam/browse/CLAW-1/
+                    - generic [ref=e900]:
+                      - generic [ref=e902]:
+                        - button "CLAW-1" [disabled] [ref=e906]
+                        - paragraph [ref=e908]: smoke test
+                      - generic [ref=e909]:
+                        - generic [ref=e910]:
+                          - button "Todo" [ref=e913]:
+                            - button "Todo" [ref=e914]:
+                              - img [ref=e915]
+                              - generic [ref=e932]: Todo
+                          - button [ref=e935]:
+                            - img [ref=e938]
+                          - button [ref=e941]:
+                            - button [ref=e942]:
+                              - img [ref=e943]
+                          - button [ref=e947]:
+                            - button [ref=e948]:
+                              - img [ref=e949]
+                          - button [ref=e953]:
+                            - button [ref=e954]:
+                              - img [ref=e955]
+                          - button [ref=e959]:
+                            - img [ref=e961]
+                        - button [ref=e967]:
+                          - img [ref=e968]
+                - generic [ref=e975] [cursor=pointer]:
+                  - img [ref=e976]
+                  - generic [ref=e978]: New work item
+  - listbox:
+    - generic [ref=e1324]:
+      - generic [ref=e1325]:
+        - img [ref=e1326]
+        - combobox "Search" [active] [ref=e1328]
+      - generic [ref=e1329]:
+        - option "B You" [ref=e1330] [cursor=pointer]:
+          - generic [ref=e1332]:
+            - generic [ref=e1335]: B
+            - generic [ref=e1336]: You
+        - option "L leader" [ref=e1337] [cursor=pointer]:
+          - generic [ref=e1339]:
+            - generic [ref=e1342]: L
+            - generic [ref=e1343]: leader
+        - option "W worker1" [ref=e1344] [cursor=pointer]:
+          - generic [ref=e1346]:
+            - generic [ref=e1349]: W
+            - generic [ref=e1350]: worker1
+        - option "W worker2" [ref=e1351] [cursor=pointer]:
+          - generic [ref=e1353]:
+            - generic [ref=e1356]: W
+            - generic [ref=e1357]: worker2

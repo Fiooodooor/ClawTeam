@@ -8,6 +8,13 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { addMember } from "@/lib/api"
 
 const AGENT_TYPES = [
@@ -67,17 +74,16 @@ export function AddAgentDialog({
           </div>
           <div>
             <Label className="text-zinc-400">Type</Label>
-            <select
-              value={agentType}
-              onChange={(e) => setAgentType(e.target.value)}
-              className="mt-1.5 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
-            >
-              {AGENT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t.charAt(0).toUpperCase() + t.slice(1).replace("-", " ")}
-                </option>
-              ))}
-            </select>
+            <Select value={agentType} onValueChange={(v) => { if (v) setAgentType(v) }}>
+              <SelectTrigger className="mt-1.5 w-full border-zinc-800 bg-zinc-900 text-zinc-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="border-zinc-800 bg-zinc-900">
+                {AGENT_TYPES.map((t) => (
+                  <SelectItem key={t} value={t} className="text-zinc-200">{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex justify-end gap-3">
             <Button

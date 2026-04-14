@@ -51,53 +51,63 @@ export default function App() {
 
   return (
     <TeamContext.Provider value={{ teamName, data, isConnected }}>
-      <div className="flex h-screen bg-[#09090b]">
+      <div className="flex h-screen bg-background text-foreground">
         <Sidebar
           selectedTeam={teamName}
           onTeamChange={setTeamName}
           isConnected={isConnected}
         />
-        <main className="flex-1 overflow-y-auto p-10">
+        <main className="atmosphere dot-grid relative flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-[1600px] px-10 py-12">
           {!teamName ? (
-            <div className="flex h-full flex-col items-center justify-center text-zinc-500">
-              <p className="text-2xl font-semibold text-zinc-300">
-                ClawTeam Nexus
-              </p>
-              <p className="mt-2 text-sm">
-                Select a swarm to begin monitoring.
+            <div className="flex h-[80vh] flex-col items-center justify-center text-center">
+              <div className="text-[11px] font-medium uppercase tracking-[0.3em] text-muted-foreground">
+                ClawTeam
+              </div>
+              <h1 className="mt-4 text-5xl font-semibold tracking-tight text-foreground">
+                Mission Control
+              </h1>
+              <p className="mt-3 max-w-md text-sm text-muted-foreground">
+                Select an active swarm from the sidebar to begin observing agent
+                coordination in real time.
               </p>
             </div>
           ) : !data ? (
-            <div className="flex h-full items-center justify-center text-zinc-500">
-              Connecting...
+            <div className="flex h-[80vh] items-center justify-center text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-2">
+                <span className="size-1.5 animate-pulse rounded-full bg-foreground/60" />
+                Connecting to {teamName}…
+              </span>
             </div>
           ) : (
-            <div className="space-y-8">
-              <header className="flex items-start justify-between">
+            <div className="flex flex-col gap-10">
+              <header className="flex items-end justify-between gap-6 border-b border-border pb-8">
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight text-zinc-100">
+                  <div className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.3em] text-muted-foreground">
+                    <span>Swarm</span>
+                    <span className="size-1 rounded-full bg-muted-foreground/60" />
+                    <span className="font-mono normal-case tracking-normal">
+                      {data.members.length} agents
+                    </span>
+                  </div>
+                  <h1 className="mt-3 text-4xl font-semibold leading-none tracking-tight text-foreground">
                     {data.team.name}
                   </h1>
-                  <p className="mt-1 text-sm text-zinc-500">
-                    Led by {data.team.leaderName} &middot;{" "}
-                    {data.members.length} members &middot;{" "}
-                    {data.team.description}
+                  <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
+                    Led by{" "}
+                    <span className="text-foreground">{data.team.leaderName}</span>
+                    {data.team.description ? ` · ${data.team.description}` : ""}
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
                     onClick={() => setContextDialogOpen(true)}
-                    className="border-emerald-800 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
                   >
                     Set Context
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setTaskDialogOpen(true)}
-                    className="border-blue-800 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
-                  >
-                    + New Task
+                  <Button onClick={() => setTaskDialogOpen(true)}>
+                    New Task
                   </Button>
                 </div>
               </header>
@@ -119,6 +129,7 @@ export default function App() {
               />
             </div>
           )}
+          </div>
         </main>
         <PeekPanel
           task={peekTask}

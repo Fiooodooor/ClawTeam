@@ -1,0 +1,21 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e6]
+      - generic [ref=e10]: ClawTeam
+    - generic [ref=e11]:
+      - generic [ref=e12]: Active Swarm
+      - combobox [expanded] [ref=e13]:
+        - generic [ref=e14]: Select team
+        - img: ▼
+      - listbox [ref=e26]:
+        - option "board-test" [active] [ref=e27]:
+          - generic [ref=e28]: board-test
+        - option "verify-test" [ref=e29]:
+          - generic [ref=e30]: verify-test
+      - textbox [ref=e15]
+    - generic [ref=e18]: Disconnected
+  - main [ref=e19]:
+    - generic [ref=e20]:
+      - paragraph [ref=e21]: ClawTeam Nexus
+      - paragraph [ref=e22]: Select a swarm to begin monitoring.

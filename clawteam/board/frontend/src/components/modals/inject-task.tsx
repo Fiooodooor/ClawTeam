@@ -8,6 +8,13 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { createTask } from "@/lib/api"
 import type { Member } from "@/types"
 
@@ -63,18 +70,22 @@ export function InjectTaskDialog({
           </div>
           <div>
             <Label className="text-zinc-400">Assign to</Label>
-            <select
-              value={owner}
-              onChange={(e) => setOwner(e.target.value)}
-              className="mt-1.5 w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+            <Select
+              value={owner || "__unassigned__"}
+              onValueChange={(v) => { if (v !== null) setOwner(v === "__unassigned__" ? "" : v) }}
             >
-              <option value="">Unassigned</option>
-              {members.map((m) => (
-                <option key={m.name} value={m.name}>
-                  {m.name} ({m.agentType})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="mt-1.5 w-full border-zinc-800 bg-zinc-900 text-zinc-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="border-zinc-800 bg-zinc-900">
+                <SelectItem value="__unassigned__" className="text-zinc-200">Unassigned</SelectItem>
+                {members.map((m) => (
+                  <SelectItem key={m.name} value={m.name} className="text-zinc-200">
+                    {m.name} ({m.agentType})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex justify-end gap-3">
             <Button

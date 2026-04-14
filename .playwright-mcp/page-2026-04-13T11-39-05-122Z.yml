@@ -1,0 +1,299 @@
+- generic [ref=e1]:
+  - generic:
+    - region "Notifications"
+  - main [ref=e3]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - button "Open workspace switcher" [ref=e12] [cursor=pointer]:
+          - generic [ref=e13]:
+            - generic [ref=e14]: C
+            - heading "ClawTeam" [level=4] [ref=e15]
+          - img [ref=e16]
+        - button [ref=e22] [cursor=pointer]:
+          - img [ref=e23]
+          - textbox "Search commands..." [ref=e25]
+        - generic [ref=e27]:
+          - link [ref=e28] [cursor=pointer]:
+            - /url: /clawteam/notifications/
+            - img [ref=e31]
+          - button [ref=e34] [cursor=pointer]:
+            - button [ref=e35]:
+              - img [ref=e37]
+          - link "Star us on GitHub" [ref=e40] [cursor=pointer]:
+            - /url: https://github.com/makeplane/plane
+            - img [ref=e41]
+            - generic [ref=e42]: Star us on GitHub
+          - button "B" [ref=e45] [cursor=pointer]:
+            - button "B" [ref=e46]:
+              - generic [ref=e49]: B
+      - generic [ref=e54]:
+        - complementary "Main sidebar" [ref=e55]:
+          - complementary [ref=e56]:
+            - generic [ref=e57]:
+              - generic [ref=e58]:
+                - generic [ref=e59]:
+                  - generic [ref=e60]: Projects
+                  - generic [ref=e61]:
+                    - button [ref=e62] [cursor=pointer]:
+                      - img [ref=e63]
+                    - button [ref=e65] [cursor=pointer]:
+                      - img [ref=e66]
+                - button "New work item" [ref=e69] [cursor=pointer]:
+                  - img [ref=e70]
+                  - generic [ref=e72]: New work item
+              - generic [ref=e73]:
+                - link "Home" [ref=e74] [cursor=pointer]:
+                  - /url: /clawteam/
+                  - generic [ref=e76]:
+                    - img [ref=e77]
+                    - paragraph [ref=e79]: Home
+                - link "Drafts" [ref=e80] [cursor=pointer]:
+                  - /url: /clawteam/drafts/
+                  - generic [ref=e82]:
+                    - img [ref=e83]
+                    - paragraph [ref=e85]: Drafts
+                - link "Your work" [ref=e86] [cursor=pointer]:
+                  - /url: /clawteam/profile/1d6d232e-e5f1-4cd7-93d5-3938a2b4ce70/
+                  - generic [ref=e88]:
+                    - img [ref=e89]
+                    - paragraph [ref=e92]: Your work
+                - link "Stickies" [ref=e93] [cursor=pointer]:
+                  - /url: /clawteam/stickies/
+                  - generic [ref=e95]:
+                    - img [ref=e96]
+                    - paragraph [ref=e98]: Stickies
+              - generic [ref=e99]:
+                - generic [ref=e100]:
+                  - button "aria_labels.app_sidebar.close_workspace_menu" [expanded] [ref=e101] [cursor=pointer]:
+                    - generic [ref=e102]: Workspace
+                  - generic:
+                    - button "aria_labels.app_sidebar.close_workspace_menu" [expanded]:
+                      - img
+                - generic [ref=e104]:
+                  - link "Projects" [ref=e105] [cursor=pointer]:
+                    - /url: /clawteam/projects/
+                    - generic [ref=e107]:
+                      - img [ref=e108]
+                      - paragraph [ref=e110]: Projects
+                  - button "aria_labels.app_sidebar.open_extended_sidebar" [ref=e112] [cursor=pointer]:
+                    - img [ref=e113]
+                    - generic [ref=e117]: More
+              - generic [ref=e119]:
+                - generic [ref=e120]:
+                  - button "Close projects menu" [expanded] [ref=e121] [cursor=pointer]:
+                    - generic [ref=e122]: Projects
+                  - button "Close projects menu" [ref=e124] [cursor=pointer]:
+                    - img [ref=e125]
+                - generic [ref=e131]:
+                  - generic [ref=e133]:
+                    - button [ref=e355]:
+                      - button [ref=e356]:
+                        - img [ref=e357]
+                        - img [ref=e361]
+                    - link "Close project menu" [ref=e365] [cursor=pointer]:
+                      - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/issues
+                      - button "Close project menu" [expanded] [active] [ref=e366]:
+                        - paragraph [ref=e138]: ClawTeam Board
+                    - generic [ref=e139]:
+                      - button "Toggle quick actions menu" [ref=e368] [cursor=pointer]:
+                        - button [ref=e369]:
+                          - img [ref=e370]
+                      - button "Close project menu" [ref=e374] [cursor=pointer]:
+                        - img [ref=e375]
+                  - generic [ref=e379]:
+                    - link "Work items" [ref=e381] [cursor=pointer]:
+                      - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/issues/
+                      - generic [ref=e384]:
+                        - img [ref=e385]
+                        - generic [ref=e387]: Work items
+                    - link "Pages" [ref=e388] [cursor=pointer]:
+                      - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/pages/
+                      - generic [ref=e391]:
+                        - img [ref=e392]
+                        - generic [ref=e394]: Pages
+              - button "Open paid plans' modal" [ref=e142] [cursor=pointer]: Community
+            - separator "Resize sidebar" [ref=e143]
+        - complementary "Sidebar peek view":
+          - complementary:
+            - generic:
+              - generic:
+                - generic:
+                  - generic: Projects
+                  - generic:
+                    - button:
+                      - img
+                    - button:
+                      - img
+                - generic:
+                  - button "New work item":
+                    - img
+                    - generic: New work item
+              - generic:
+                - link "Home":
+                  - /url: /clawteam/
+                  - generic:
+                    - generic:
+                      - img
+                      - paragraph: Home
+                - link "Drafts":
+                  - /url: /clawteam/drafts/
+                  - generic:
+                    - generic:
+                      - img
+                      - paragraph: Drafts
+                - link "Your work":
+                  - /url: /clawteam/profile/1d6d232e-e5f1-4cd7-93d5-3938a2b4ce70/
+                  - generic:
+                    - generic:
+                      - img
+                      - paragraph: Your work
+                - link "Stickies":
+                  - /url: /clawteam/stickies/
+                  - generic:
+                    - generic:
+                      - img
+                      - paragraph: Stickies
+              - generic:
+                - generic:
+                  - button "aria_labels.app_sidebar.close_workspace_menu" [expanded]:
+                    - generic: Workspace
+                  - generic:
+                    - button "aria_labels.app_sidebar.close_workspace_menu" [expanded]:
+                      - img
+                - generic:
+                  - generic:
+                    - link "Projects":
+                      - /url: /clawteam/projects/
+                      - generic:
+                        - generic:
+                          - img
+                          - paragraph: Projects
+                    - generic:
+                      - button "aria_labels.app_sidebar.open_extended_sidebar":
+                        - img
+                        - generic: More
+              - generic:
+                - generic:
+                  - generic:
+                    - button "Close projects menu" [expanded]:
+                      - generic: Projects
+                    - generic:
+                      - button "Close projects menu":
+                        - img
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - link "Close project menu":
+                              - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/issues
+                              - button "Close project menu":
+                                - paragraph: ClawTeam Board
+                            - generic:
+                              - generic:
+                                - button "Toggle quick actions menu":
+                                  - button:
+                                    - img
+                          - generic:
+                            - generic:
+                              - link "Work items":
+                                - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/issues/
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - img
+                                      - generic: Work items
+                              - link "Pages":
+                                - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/pages/
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - img
+                                      - generic: Pages
+              - generic:
+                - button "Open paid plans' modal": Community
+            - separator "Resize sidebar"
+        - main [ref=e144]:
+          - generic [ref=e148]:
+            - generic [ref=e153]:
+              - img [ref=e155]
+              - generic [ref=e157]: Home
+            - button "Manage widgets" [ref=e159] [cursor=pointer]:
+              - img [ref=e160]
+              - generic [ref=e164]: Manage widgets
+          - generic [ref=e168]:
+            - generic [ref=e169]:
+              - heading "Good evening, Board User" [level=2] [ref=e170]
+              - heading "🌙️ Monday, Apr 13 11:38" [level=5] [ref=e171]:
+                - generic [ref=e172]: 🌙️
+                - generic [ref=e173]: Monday, Apr 13 11:38
+            - generic [ref=e175]:
+              - generic [ref=e177]:
+                - generic [ref=e178]:
+                  - generic [ref=e179]: Quicklinks
+                  - button "Add quick Link" [ref=e180] [cursor=pointer]:
+                    - img [ref=e181]
+                    - generic [ref=e183]: Add quick Link
+                - generic [ref=e187]:
+                  - img [ref=e189]
+                  - paragraph [ref=e202]: Keep important references, resources, or docs handy for your work
+              - generic [ref=e205]:
+                - generic [ref=e206]:
+                  - generic [ref=e207]: Recents
+                  - button "All" [ref=e209] [cursor=pointer]:
+                    - button "All" [ref=e210]:
+                      - generic [ref=e211]: All
+                      - img [ref=e212]
+                - generic [ref=e215]:
+                  - generic [ref=e219]:
+                    - link "CLAW-2 2 22 minutes ago" [ref=e220] [cursor=pointer]:
+                      - /url: /clawteam/browse/CLAW-2/
+                      - generic [ref=e221]:
+                        - generic [ref=e224]:
+                          - img [ref=e226]
+                          - generic [ref=e228]: CLAW-2
+                        - generic [ref=e229]: "2"
+                      - generic [ref=e231]: 22 minutes ago
+                    - generic [ref=e232]:
+                      - img [ref=e234]
+                      - img [ref=e253]
+                  - generic [ref=e257]:
+                    - link "CLAW-1 smoke test 19 minutes ago" [ref=e258] [cursor=pointer]:
+                      - /url: /clawteam/browse/CLAW-1/
+                      - generic [ref=e259]:
+                        - generic [ref=e262]:
+                          - img [ref=e264]
+                          - generic [ref=e266]: CLAW-1
+                        - generic [ref=e267]: smoke test
+                      - generic [ref=e269]: 19 minutes ago
+                    - generic [ref=e270]:
+                      - img [ref=e272]
+                      - img [ref=e291]
+                  - generic [ref=e295]:
+                    - link "CLAW ClawTeam Board 2 minutes ago" [ref=e296] [cursor=pointer]:
+                      - /url: /clawteam/projects/7ddc801b-da2b-45c3-b3ab-c64426eba86f/issues
+                      - generic [ref=e297]:
+                        - generic [ref=e302]: CLAW
+                        - generic [ref=e303]: ClawTeam Board
+                      - generic [ref=e305]: 2 minutes ago
+                    - button "B A" [disabled] [ref=e309]:
+                      - button "B A" [ref=e310] [cursor=pointer]:
+                        - generic [ref=e311]:
+                          - generic [ref=e314]: B
+                          - generic [ref=e317]: A
+              - generic [ref=e319]:
+                - generic [ref=e320]:
+                  - generic [ref=e321]: Your stickies
+                  - generic [ref=e322]:
+                    - generic [ref=e323]:
+                      - button [ref=e324] [cursor=pointer]:
+                        - img [ref=e325]
+                      - generic [ref=e327]:
+                        - img [ref=e328]
+                        - textbox "Search by title"
+                    - button "Add sticky" [ref=e330] [cursor=pointer]:
+                      - img [ref=e331]
+                      - generic [ref=e333]: Add sticky
+                - generic [ref=e341]:
+                  - img [ref=e343]
+                  - paragraph [ref=e354]: Jot down an idea, capture an aha, or record a brainwave. Add a sticky to get started.

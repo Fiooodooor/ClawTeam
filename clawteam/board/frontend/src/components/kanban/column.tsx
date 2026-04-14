@@ -1,5 +1,6 @@
 import { useDroppable } from "@dnd-kit/react"
 import { TaskCard } from "./task-card"
+import { Badge } from "@/components/ui/badge"
 import type { Task, TaskStatus } from "@/types"
 import { STATUS_LABELS, STATUS_COLORS } from "@/types"
 
@@ -14,22 +15,29 @@ export function Column({ status, tasks, onPeek }: ColumnProps) {
   const color = STATUS_COLORS[status]
 
   return (
-    <div className="flex min-h-[400px] flex-col rounded-lg border border-zinc-800 bg-zinc-950/60">
-      <div
-        className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900/30 px-4 py-3"
-        style={{ borderTopColor: color, borderTopWidth: "2px" }}
-      >
+    <div className="flex min-h-[400px] flex-col rounded-lg border border-border bg-card/30 backdrop-blur">
+      <div className="relative flex items-center justify-between px-4 py-3">
         <span
-          className="text-xs font-bold uppercase tracking-wider"
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-px"
+          style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }}
+        />
+        <span
+          className="font-mono text-[10px] font-medium uppercase tracking-[0.2em]"
           style={{ color }}
         >
           {STATUS_LABELS[status]}
         </span>
-        <span className="font-mono text-xs text-zinc-500">{tasks.length}</span>
+        <Badge
+          variant="secondary"
+          className="h-5 min-w-5 justify-center px-1.5 font-mono text-[10px] tabular-nums"
+        >
+          {tasks.length}
+        </Badge>
       </div>
-      <div ref={ref} className="flex flex-1 flex-col gap-2.5 p-3">
+      <div ref={ref} className="flex flex-1 flex-col gap-2.5 border-t border-border/60 p-3">
         {tasks.length === 0 ? (
-          <p className="py-8 text-center font-mono text-[11px] uppercase tracking-widest text-zinc-700">
+          <p className="py-10 text-center font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground/40">
             Empty
           </p>
         ) : (

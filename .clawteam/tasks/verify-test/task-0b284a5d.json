@@ -1,0 +1,18 @@
+{
+  "id": "0b284a5d",
+  "subject": "Write unit tests",
+  "description": "<p></p>",
+  "status": "in_progress",
+  "priority": "medium",
+  "owner": "",
+  "lockedBy": "",
+  "lockedAt": "",
+  "blocks": [],
+  "blockedBy": [],
+  "startedAt": "2026-04-13T13:46:02.354435+00:00",
+  "createdAt": "2026-04-13T13:07:33.302328+00:00",
+  "updatedAt": "2026-04-13T13:46:02.354456+00:00",
+  "metadata": {
+    "plane_issue_id": "887d2e99-6319-4774-9478-b1763e040527"
+  }
+}

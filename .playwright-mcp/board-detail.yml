@@ -1,0 +1,581 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive":
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive":
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+    - generic:
+      - generic:
+        - button "Edit":
+          - img
+          - generic:
+            - heading "Edit" [level=5]
+        - button "Make a copy":
+          - img
+          - generic:
+            - heading "Make a copy" [level=5]
+        - button "Open in new tab":
+          - img
+          - generic:
+            - heading "Open in new tab" [level=5]
+        - button "Copy link":
+          - img
+          - generic:
+            - heading "Copy link" [level=5]
+        - button "Archive Only completed or canceled work items can be archived" [disabled]:
+          - img
+          - generic:
+            - heading "Archive" [level=5]
+            - paragraph: Only completed or canceled work items can be archived
+        - button "Delete":
+          - img
+          - generic:
+            - heading "Delete" [level=5]
+  - generic:
+    - region "Notifications"
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - button "Open workspace switcher" [ref=e8] [cursor=pointer]:
+          - generic [ref=e9]:
+            - generic [ref=e10]: C
+            - heading "ClawTeam" [level=4] [ref=e11]
+          - img [ref=e12]
+        - button [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+          - textbox "Search commands..." [ref=e21]
+        - generic [ref=e23]:
+          - link [ref=e24] [cursor=pointer]:
+            - /url: /clawteam/notifications/
+            - img [ref=e27]
+          - button [ref=e30] [cursor=pointer]:
+            - button [ref=e31]
+          - link "Star us on GitHub" [ref=e36] [cursor=pointer]:
+            - /url: https://github.com/makeplane/plane
+            - img [ref=e37]
+            - generic [ref=e38]: Star us on GitHub
+          - button "B" [ref=e41] [cursor=pointer]:
+            - button "B" [ref=e42]
+      - generic [ref=e50]:
+        - complementary "Main sidebar" [ref=e51]:
+          - complementary [ref=e52]:
+            - generic [ref=e53]
+            - separator "Resize sidebar" [ref=e156]
+        - complementary "Sidebar peek view":
+          - complementary:
+            - generic
+            - separator "Resize sidebar"
+        - main [ref=e157]:
+          - generic [ref=e161]:
+            - generic [ref=e163]
+            - generic [ref=e184]
+          - generic [ref=e218]:
+            - generic [ref=e220]
+            - generic [ref=e237]

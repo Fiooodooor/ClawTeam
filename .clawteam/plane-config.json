@@ -1,0 +1,16 @@
+{
+  "url": "http://localhost:8082",
+  "api_key": "plane_api_5c0d63fbe46f42e8b7c0a1f689b5805b",
+  "workspace_slug": "clawteam",
+  "project_id": "7ddc801b-da2b-45c3-b3ab-c64426eba86f",
+  "sync_enabled": true,
+  "webhook_secret": "",
+  "webhook_port": 9091,
+  "state_mapping": {},
+  "user_to_agent": {
+    "1d6d232e-e5f1-4cd7-93d5-3938a2b4ce70": "board-user",
+    "36493313-93e9-4114-af1a-b4d706412130": "leader",
+    "91d7c796-24a7-48b8-af6f-6e24fdf50540": "worker1",
+    "66f42eee-407b-46e1-8db5-4862dab56ae7": "worker2"
+  }
+}

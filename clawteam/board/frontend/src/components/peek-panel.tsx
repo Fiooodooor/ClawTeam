@@ -7,6 +7,13 @@ import {
 } from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { updateTask } from "@/lib/api"
 import type { Task, Member, TaskStatus } from "@/types"
 
@@ -97,52 +104,61 @@ export function PeekPanel({
               <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
                 Status
               </label>
-              <select
-                value={task.status}
-                onChange={(e) => save("status", e.target.value)}
-                className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
-              >
-                {STATUSES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
+              <Select value={task.status} onValueChange={(v) => { if (v) save("status", v) }}>
+                <SelectTrigger className="w-full border-zinc-800 bg-zinc-900 text-zinc-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-zinc-800 bg-zinc-900">
+                  {STATUSES.map((s) => (
+                    <SelectItem key={s.value} value={s.value} className="text-zinc-200">
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
                 Priority
               </label>
-              <select
+              <Select
                 value={task.priority || "medium"}
-                onChange={(e) => save("priority", e.target.value)}
-                className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+                onValueChange={(v) => { if (v) save("priority", v) }}
               >
-                {PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full border-zinc-800 bg-zinc-900 text-zinc-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-zinc-800 bg-zinc-900">
+                  {PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p} className="text-zinc-200">
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
                 Assignee
               </label>
-              <select
-                value={task.owner || ""}
-                onChange={(e) => save("owner", e.target.value)}
-                className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200"
+              <Select
+                value={task.owner || "__unassigned__"}
+                onValueChange={(v) => { if (v !== null) save("owner", v === "__unassigned__" ? "" : v) }}
               >
-                <option value="">Unassigned</option>
-                {members.map((m) => (
-                  <option key={m.name} value={m.name}>
-                    {m.name} ({m.agentType})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full border-zinc-800 bg-zinc-900 text-zinc-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-zinc-800 bg-zinc-900">
+                  <SelectItem value="__unassigned__" className="text-zinc-200">Unassigned</SelectItem>
+                  {members.map((m) => (
+                    <SelectItem key={m.name} value={m.name} className="text-zinc-200">
+                      {m.name} ({m.agentType})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

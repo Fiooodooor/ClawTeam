@@ -1,0 +1,18 @@
+{
+  "id": "456e012b",
+  "subject": "smoke test",
+  "description": "<div><p></p><p></p></div>",
+  "status": "pending",
+  "priority": "medium",
+  "owner": "",
+  "lockedBy": "",
+  "lockedAt": "",
+  "blocks": [],
+  "blockedBy": [],
+  "startedAt": "",
+  "createdAt": "2026-04-13T13:07:33.309985+00:00",
+  "updatedAt": "2026-04-13T14:05:44.811860+00:00",
+  "metadata": {
+    "plane_issue_id": "d42eee50-724d-43e0-925e-a7e426f768e4"
+  }
+}

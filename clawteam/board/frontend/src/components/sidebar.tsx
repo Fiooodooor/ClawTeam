@@ -27,39 +27,50 @@ export function Sidebar({
   }, [])
 
   return (
-    <aside className="flex w-64 flex-col border-r border-zinc-800 bg-zinc-950 p-6">
-      <div className="mb-10 flex items-center gap-3">
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="text-zinc-300"
-        >
-          <path d="M12 2L2 7l10 5 10-5-10-5z" />
-          <path d="M2 17l10 5 10-5" />
-          <path d="M2 12l10 5 10-5" />
-        </svg>
-        <span className="text-lg font-bold tracking-tight text-zinc-100">
-          ClawTeam
-        </span>
+    <aside className="flex w-64 flex-col border-r border-border bg-background/80 px-6 py-8 backdrop-blur">
+      <div className="mb-12 flex items-center gap-2.5">
+        <div className="flex size-8 items-center justify-center rounded-md bg-foreground text-background">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+            <path d="M2 17l10 5 10-5" />
+            <path d="M2 12l10 5 10-5" />
+          </svg>
+        </div>
+        <div className="flex flex-col leading-none">
+          <span className="text-sm font-semibold tracking-tight text-foreground">
+            ClawTeam
+          </span>
+          <span className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Nexus
+          </span>
+        </div>
       </div>
 
       <div className="mb-auto">
-        <label className="mb-2 block text-xs font-semibold uppercase tracking-widest text-zinc-500">
+        <label className="mb-2 block text-[10px] font-medium uppercase tracking-[0.25em] text-muted-foreground">
           Active Swarm
         </label>
-        <Select value={selectedTeam} onValueChange={(v) => { if (v) onTeamChange(v) }}>
-          <SelectTrigger className="w-full border-zinc-800 bg-zinc-900 text-zinc-200">
+        <Select
+          value={selectedTeam}
+          onValueChange={(v) => {
+            if (v) onTeamChange(v)
+          }}
+        >
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Select team" />
           </SelectTrigger>
-          <SelectContent className="border-zinc-800 bg-zinc-900">
+          <SelectContent>
             {teams.map((t) => (
-              <SelectItem key={t.name} value={t.name} className="text-zinc-200">
+              <SelectItem key={t.name} value={t.name}>
                 {t.name}
               </SelectItem>
             ))}
@@ -67,16 +78,19 @@ export function Sidebar({
         </Select>
       </div>
 
-      <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
-        <div
-          className={`h-2.5 w-2.5 rounded-full ${
-            isConnected
-              ? "bg-emerald-500 shadow-[0_0_8px_theme(--color-status-completed)]"
-              : "bg-red-500"
-          }`}
-        />
-        <span className="text-sm text-zinc-400">
-          {isConnected ? "Live" : "Disconnected"}
+      <div className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2.5">
+        <span className={`relative flex size-2 ${isConnected ? "" : "opacity-60"}`}>
+          {isConnected && (
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+          )}
+          <span
+            className={`relative inline-flex size-2 rounded-full ${
+              isConnected ? "bg-emerald-400" : "bg-destructive"
+            }`}
+          />
+        </span>
+        <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+          {isConnected ? "Live" : "Offline"}
         </span>
       </div>
     </aside>

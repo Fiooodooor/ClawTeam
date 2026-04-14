@@ -15,20 +15,24 @@ export function SummaryBar({ summary }: SummaryBarProps) {
         return (
           <Card
             key={status}
-            className="flex flex-col items-center justify-center border-zinc-800 bg-zinc-950 px-4 py-6"
-            style={{ borderTopColor: color, borderTopWidth: "2px" }}
+            size="sm"
+            className="relative flex flex-col gap-0 overflow-hidden bg-card/60 px-5 py-5 ring-0 backdrop-blur transition-colors hover:bg-card"
           >
             <span
-              className="text-4xl font-bold tabular-nums"
+              aria-hidden
+              className="absolute inset-x-0 top-0 h-px"
               style={{
-                color,
-                textShadow: count > 0 ? `0 0 20px ${color}` : "none",
+                background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
               }}
+            />
+            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              {STATUS_LABELS[status]}
+            </span>
+            <span
+              className="mt-3 text-4xl font-semibold leading-none tabular-nums"
+              style={{ color: count > 0 ? color : "var(--muted-foreground)" }}
             >
               {count}
-            </span>
-            <span className="mt-2 text-xs font-semibold uppercase tracking-widest text-zinc-500">
-              {STATUS_LABELS[status]}
             </span>
           </Card>
         )
