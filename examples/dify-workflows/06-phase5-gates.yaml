@@ -860,7 +860,14 @@ workflow:
 
       - id: e-integration-gate
         source: integration_tester
-        target: tdd_groupchat_gate
+        target: branch_point_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-loop-gate
+        source: debate_loop
+        target: branch_point_gate
         sourceHandle: source
         targetHandle: target
         type: custom
