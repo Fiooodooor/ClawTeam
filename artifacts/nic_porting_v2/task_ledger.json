@@ -1,0 +1,156 @@
+[
+  {
+    "id": "LEDGER-0001",
+    "phase_key": "scope-baseline",
+    "substep": "scope-baseline/linux-analyst",
+    "description": "[sequential] Map Linux driver dependencies, data-path entry points, and kernel API surface",
+    "assigned_to": "linux-analyst",
+    "priority": "high",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687838+00:00",
+    "completed_at": "2026-03-27T07:29:16.689142+00:00"
+  },
+  {
+    "id": "LEDGER-0002",
+    "phase_key": "api-mapping",
+    "substep": "api-mapping/api-mapper",
+    "description": "[concurrent] Map Linux APIs to native FreeBSD/target OS primitives",
+    "assigned_to": "api-mapper",
+    "priority": "high",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687857+00:00",
+    "completed_at": "2026-03-27T07:29:16.689734+00:00"
+  },
+  {
+    "id": "LEDGER-0003",
+    "phase_key": "api-mapping",
+    "substep": "api-mapping/kpi-auditor",
+    "description": "[concurrent] Audit API mappings for completeness and framework contamination",
+    "assigned_to": "kpi-auditor",
+    "priority": "high",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687863+00:00",
+    "completed_at": "2026-03-27T07:29:16.689747+00:00"
+  },
+  {
+    "id": "LEDGER-0004",
+    "phase_key": "seam-design",
+    "substep": "seam-design/seam-architect",
+    "description": "[sequential] Design OAL #ifdef trees, inline wrappers, weak-symbol seams",
+    "assigned_to": "seam-architect",
+    "priority": "high",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687870+00:00",
+    "completed_at": "2026-03-27T07:29:16.690548+00:00"
+  },
+  {
+    "id": "LEDGER-0005",
+    "phase_key": "tdd-harness",
+    "substep": "tdd-harness/tdd-writer",
+    "description": "[sequential] Write failing TDD tests for every porting micro-slice",
+    "assigned_to": "tdd-writer",
+    "priority": "high",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687876+00:00",
+    "completed_at": "2026-03-27T07:29:16.691212+00:00"
+  },
+  {
+    "id": "LEDGER-0006",
+    "phase_key": "incremental-port",
+    "substep": "incremental-port/coder",
+    "description": "[concurrent] Implement native OAL porting code to pass TDD tests",
+    "assigned_to": "coder",
+    "priority": "high",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687882+00:00",
+    "completed_at": "2026-03-27T07:29:16.691914+00:00"
+  },
+  {
+    "id": "LEDGER-0007",
+    "phase_key": "incremental-port",
+    "substep": "incremental-port/native-validator",
+    "description": "[group_chat] Reject any framework/non-native API usage in ported code",
+    "assigned_to": "native-validator",
+    "priority": "high",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687886+00:00",
+    "completed_at": "2026-03-27T07:29:16.691927+00:00"
+  },
+  {
+    "id": "LEDGER-0008",
+    "phase_key": "incremental-port",
+    "substep": "incremental-port/code-reviewer",
+    "description": "[group_chat] Review code quality, minimal-touch compliance, style",
+    "assigned_to": "code-reviewer",
+    "priority": "medium",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687891+00:00",
+    "completed_at": "2026-03-27T07:29:16.691932+00:00"
+  },
+  {
+    "id": "LEDGER-0009",
+    "phase_key": "gates",
+    "substep": "gates/performance-engineer",
+    "description": "[concurrent] Measure overhead, enforce regression budgets per slice",
+    "assigned_to": "performance-engineer",
+    "priority": "medium",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687897+00:00",
+    "completed_at": "2026-03-27T07:29:16.692710+00:00"
+  },
+  {
+    "id": "LEDGER-0010",
+    "phase_key": "gates",
+    "substep": "gates/portability-validator",
+    "description": "[concurrent] Verify cross-OS seam correctness on all target architectures",
+    "assigned_to": "portability-validator",
+    "priority": "medium",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687901+00:00",
+    "completed_at": "2026-03-27T07:29:16.692716+00:00"
+  },
+  {
+    "id": "LEDGER-0011",
+    "phase_key": "gates",
+    "substep": "gates/verification-executor",
+    "description": "[sequential] Run full build/test/perf gate suite end-to-end",
+    "assigned_to": "verification-executor",
+    "priority": "high",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687906+00:00",
+    "completed_at": "2026-03-27T07:29:16.692721+00:00"
+  },
+  {
+    "id": "LEDGER-0012",
+    "phase_key": "merge-sync",
+    "substep": "merge-sync/merge-strategist",
+    "description": "[sequential] Prepare clean merge, resolve conflicts, validate no regressions",
+    "assigned_to": "merge-strategist",
+    "priority": "medium",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687911+00:00",
+    "completed_at": "2026-03-27T07:29:16.693477+00:00"
+  },
+  {
+    "id": "LEDGER-0013",
+    "phase_key": "multi-os-extension",
+    "substep": "multi-os-extension/os-extension-validator",
+    "description": "[concurrent] Prove seams extend to Windows/illumos/NetBSD without core rewrites",
+    "assigned_to": "os-extension-validator",
+    "priority": "medium",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687917+00:00",
+    "completed_at": "2026-03-27T07:29:16.694293+00:00"
+  },
+  {
+    "id": "LEDGER-0014",
+    "phase_key": "multi-os-extension",
+    "substep": "multi-os-extension/risk-auditor",
+    "description": "[magentic] Maintain living risk register, flag critical risks after every step",
+    "assigned_to": "risk-auditor",
+    "priority": "high",
+    "status": "completed",
+    "created_at": "2026-03-27T07:29:16.687921+00:00",
+    "completed_at": "2026-03-27T07:29:16.694307+00:00"
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "RISK-001",
+    "phase": 0,
+    "substep": "dry-run",
+    "severity": "low",
+    "description": "Dry-run mode: no real verification performed",
+    "mitigation": "Run without --dry-run for full verification",
+    "status": "open",
+    "owner": "orchestrator",
+    "detected_at": "2026-03-27T07:29:16.695795+00:00",
+    "resolved_at": null
+  }
+]
