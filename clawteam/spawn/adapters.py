@@ -43,7 +43,9 @@ class NativeCliAdapter:
             if is_claude_command(normalized_command) and not _is_root:
                 final_command.append("--dangerously-skip-permissions")
             elif is_codex_command(normalized_command):
-                final_command.append("--dangerously-bypass-approvals-and-sandbox")
+                # codex-auto already includes auto-approve flags
+                if command_basename(normalized_command) != "codex-auto":
+                    final_command.append("--dangerously-auto-approve-everything")
             elif (
                 is_gemini_command(normalized_command)
                 or is_kimi_command(normalized_command)
@@ -115,7 +117,7 @@ def is_claude_command(command: list[str]) -> bool:
 
 def is_codex_command(command: list[str]) -> bool:
     """Check if the command is a Codex CLI invocation."""
-    return command_basename(command) in ("codex", "codex-cli")
+    return command_basename(command) in ("codex", "codex-cli", "codex-auto")
 
 
 def _is_codex_noninteractive_command(command: list[str]) -> bool:
