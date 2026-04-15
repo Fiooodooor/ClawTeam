@@ -554,6 +554,20 @@ workflow:
                 majority_threshold = max(1, (len(parsed_rounds) // 2) + 1)
                 check("T14-majority-rounds-advance", approve_rounds >= majority_threshold, f"advance={approve_rounds}, replan={replan_rounds}, escalate={escalate_rounds}, threshold={majority_threshold}")
 
+                    # T11: Integration smoke validation passed
+                    check("T11-integration-passed", integration_passed,
+                      integration.get("integration_failures", []))
+
+                    # T12: Integration coverage >= 90
+                    integration_coverage = float(integration.get("coverage_pct", 0))
+                    check("T12-integration-coverage-gte90", integration_coverage >= 90.0,
+                      f"coverage={integration_coverage}")
+
+                    # T13: Smoke suite is non-empty
+                    smoke_suite = integration.get("smoke_suite") or []
+                    check("T13-smoke-suite-exists", len(smoke_suite) > 0,
+                      f"count={len(smoke_suite)}")
+
                 total = passed + failed
                 gate_score = round((passed / total) * 100, 1) if total else 0.0
                 fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
@@ -840,6 +854,13 @@ workflow:
       - id: e-loop-gate
         source: debate_loop
         target: branch_point_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-integration-gate
+        source: integration_tester
+        target: tdd_groupchat_gate
         sourceHandle: source
         targetHandle: target
         type: custom
