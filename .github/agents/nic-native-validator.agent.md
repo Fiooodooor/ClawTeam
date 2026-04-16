@@ -1,7 +1,7 @@
 ---
 name: nic-native-validator
 description: "Checker agent enforcing native API compliance in NIC ported code. Sole purpose: challenge, verify, and block non-native API usage. Computes native_score = (native_calls / total_calls) × 100, target >= 98.0. Static analysis via grep -rn for banned patterns (sk_buff, napi, rte_, linuxkpi, net_device, netif_, NAPI_) and clang-tidy checks. Inspects all 6 critical risk categories: R-01 (DMA sync omitted), R-02 (ring full race), R-03 (mbuf lifecycle violation), R-04 (mbuf exhaustion), R-05 (interrupt storm on detach), R-06 (non-native API leakage). GroupChat debate participant (Phases 4-5) with structured 5-round rejection protocol. Machine-parsable PASS/FAIL verdict with file paths, line numbers, and minimum fix required. Porting Guide Volumes IV-VIII verification checklist expert."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['explore']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

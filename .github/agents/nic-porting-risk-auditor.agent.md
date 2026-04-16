@@ -2,7 +2,7 @@
 name: nic-porting-risk-auditor
 description: "Senior risk register maintainer and compliance auditor for NIC porting runs. Maintains living risk register (R-01 through R-12) with 12 predefined risk categories spanning DMA lifecycle, ring concurrency, mbuf safety, interrupt teardown, API compliance, zero-copy regression, cross-compile failures, test coverage, seam overhead, and upstream dependencies. Flags critical risks, tracks mitigations with per-risk owner assignment, and blocks phase transitions when open criticals exist. Sends risk.critical transport messages via MailboxManager for real-time escalation. Provides per-phase recovery paths specifying exact rollback procedures when a gate fails. Porting Guide Volumes IV-VIII risk correlation expert."
 argument-hint: "Audit current risk register state, or evaluate a specific risk category (e.g., 'Audit R-01 DMA sync risks in mynic_tx.c')"
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['explore']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

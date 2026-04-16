@@ -1,7 +1,7 @@
 ---
 name: nic-performance-engineer
 description: "Phase 5 performance validation specialist measuring zero-copy path compliance, benchmarking against Linux baseline, and profiling for regressions. Verifies no memcpy/m_copydata/bcopy in TX/RX hot paths using static grep analysis and runtime tracing (DTrace probes). Benchmarks with iperf3, pktgen, and netperf against Linux baseline — regression budget <5% for throughput, <10% for latency. Cache-line alignment audit (64-byte boundaries on ring structures, no false-sharing). Lock contention profiling via lockstat and pmcstat/hwpmc for CPU cycle distribution. R-04 (mbuf exhaustion under load), R-08 (zero-copy regression), R-11 (seam boundary overhead) risk specialist. Only evaluates AFTER baseline is 100% green — early optimization is forbidden."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['task']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

@@ -1,7 +1,7 @@
 ---
 name: nic-verification-engineer
 description: "Phase 5 full-gate verification specialist aggregating all metrics and producing final APPROVED/BLOCKED verdict. Collects native_score from nic-native-validator, portability_score from nic-portability-engineer, test_pass_rate from test suite execution, build_status from nic-build-ci-engineer, critical_risks from nic-risk-auditor. Runs independent validation: cppcheck static analysis for undefined behavior and memory safety, Coverity defect scan when available, kldload smoke test on FreeBSD VM (module loads without panic). R-05 (interrupt storm on detach) and R-10 (test coverage gap) risk specialist. Porting Guide Volume IX (TDD, Performance Tuning & Validation) primary expert. Produces comprehensive gate summary with all metrics, risk register snapshot, and clear APPROVED or BLOCKED recommendation with specific blockers."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['task', 'code-review', 'nic-native-validator', 'nic-code-reviewer', 'nic-performance-engineer', 'nic-portability-engineer', 'nic-build-ci-engineer', 'nic-risk-auditor']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

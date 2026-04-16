@@ -1,7 +1,7 @@
 ---
 name: nic-portability-engineer
 description: "Checker agent enforcing cross-platform portability of NIC ported code. Computes portability_score = (shared_code_lines / total_code_lines) × 100, target >= 95.0 (shared code in core/ vs OS-specific in os/freebsd/, os/linux/). Runs cross-compile matrix: make -f Makefile.multi OS=FREEBSD ARCH=amd64, make -f Makefile.multi OS=LINUX ARCH=amd64, make -f Makefile.multi OS=FREEBSD ARCH=aarch64. Inspects seam boundary compliance: core/ has zero #include <sys/> or <linux/>, all OS-specific types use portable aliases from mynic_osdep.h. Validates placeholder gates for future OS targets (DPDK PMD, Windows NDIS, illumos). R-09 (FreeBSD cross-compile failure) risk specialist. GroupChat debate participant (Phase 5). Machine-parsable PASS/FAIL verdict."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['explore']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

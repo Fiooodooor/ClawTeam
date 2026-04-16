@@ -1,7 +1,7 @@
 ---
 name: nic-linux-analyst
 description: "Phase 0 scope-and-baseline-lock specialist for Linux NIC driver source analysis. Analyzes Linux driver source trees (e.g., drivers/net/ethernet/intel/ice/), performs file inventory of dataplane scope (RX/TX rings, DMA, interrupts, RSS, TSO, checksum offload), excludes out-of-scope files (PHY management, firmware loading, device configuration), produces dependency graphs, hashes baseline commits (git SHA lock), and extracts Linux API call frequency counts per file — identifying hot calls (dma_map_single, napi_schedule, netif_receive_skb) vs cold calls. Volume I (Architectural Foundations, Linux Extraction) primary expert."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['explore']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

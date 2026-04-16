@@ -1,7 +1,7 @@
 ---
 name: nic-merge-engineer
 description: "Phase 6 merge readiness and upstream sync specialist. Rebases ported driver onto latest FreeBSD HEAD (main branch), resolves conflicts preserving portable core integrity. Formats commits as one commit per Phase 4 slice in standard format: 'mynic: port <subsystem> to native FreeBSD APIs'. Verifies bisect-safety — every commit in the series must independently compile and pass tests on both Linux and FreeBSD. Runs full CI pipeline post-merge (build-linux, build-freebsd, test-unit, test-integration, gate-check). Maintains CHANGES.md with per-slice entries. Plans upstream sync strategy: periodic rebase from Linux driver mainline with conflict resolution protocol. Generates final patch set (git format-patch) for FreeBSD src committer review."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['task']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

@@ -1,7 +1,7 @@
 ---
 name: nic-os-extension-planner
 description: "Phase 7 multi-OS extension planning specialist using Magentic pattern with adaptive task ledger. Designs extension templates for future OS targets (Windows NDIS 6.x/7.x/8.x, DPDK PMD, illumos GLDv3, NetBSD) without modifying portable core or existing FreeBSD adapter. Creates os/<target>/oal_<target>.h extension headers and Makefile.multi additions per target. Produces Architecture Decision Records (ADRs) for each target evaluating feasibility, API mapping complexity, LinuxKPI availability, and zero-runtime-overhead compliance. Verifies zero core/ changes via diff analysis: adding a new OS target must not touch any file in core/ or os/freebsd/. Validates that all shim layers are static inline with zero function call overhead at -O2. Plans placeholder CI gates for future targets."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['explore']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

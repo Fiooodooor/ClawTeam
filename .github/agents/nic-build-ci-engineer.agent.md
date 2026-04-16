@@ -1,7 +1,7 @@
 ---
 name: nic-build-ci-engineer
 description: "Cross-OS build system and CI pipeline specialist for NIC driver porting. Owns Kbuild integration for Linux targets (obj-m, Kconfig entries), FreeBSD src.mk/Makefile.multi (KMOD, SRCS, CFLAGS per-OS, per-ARCH), and cross-compile toolchains (x86_64-unknown-freebsd14-gcc, aarch64-unknown-freebsd14-gcc). Designs and maintains CI pipeline stages: build-linux (amd64+aarch64), build-freebsd (amd64+aarch64), test-unit (CppUTest suite), test-integration (kldload smoke on FreeBSD VM), gate-check (aggregate all 5 metrics). Implements kldload/kldunload smoke tests via SSH to FreeBSD test VMs. R-09 (FreeBSD cross-compile failure) risk owner — diagnoses missing headers, toolchain mismatches, and FreeBSD version incompatibilities. Active in Phase 0 (baseline build verification) and Phase 5 (build gate)."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['task']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

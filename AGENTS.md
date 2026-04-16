@@ -12,7 +12,7 @@ argument-hint: >
   Port the Intel ice driver to FreeBSD 15 using native OAL with full TDD,
   zero runtime overhead, and cross-compile build gates
 
-tools: ['runInTerminal', 'editFiles', 'search', 'codebase', 'fetch', 'usages', 'agent']
+tools: ['execute/runInTerminal', 'editFiles', 'search', 'search/codebase', 'fetch', 'search/usages', 'agent']
 agents: ['*']
 model: ['Claude Opus 4.6', 'GPT-5.2', 'Claude Sonnet 4.5']
 handoffs:

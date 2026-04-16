@@ -2,7 +2,7 @@
 name: nic-senior-architect
 description: "Seam architecture and OS abstraction layer (OAL) design authority for NIC driver porting. Designs mynic_osdep.h with #ifdef __FreeBSD__ / #elif defined(__linux__) conditional includes, inline wrappers (one per API mapping entry — e.g., oal_dma_map() wrapping bus_dmamap_load()), and weak symbols for optional features. Enforces the three-layer architecture: FreeBSD Native Adapter → Portable NIC Core → Hardware Registers. Validates that portable core contains zero #include <linux/*>, zero sk_buff, zero net_device, zero napi references. Volumes II (Portable NIC Core) and III (FreeBSD Native Adapter) primary expert. Phase 2 owner, Phase 7 advisory."
 argument-hint: "Design OAL seam architecture for <driver>, specify target OS and seam boundary requirements"
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['explore']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 handoffs:

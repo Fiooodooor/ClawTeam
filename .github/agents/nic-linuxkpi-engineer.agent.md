@@ -1,7 +1,7 @@
 ---
 name: nic-linuxkpi-engineer
 description: "Phase 1 API inventory and mapping specialist with dual maker/checker responsibility. Scans all in-scope .c and .h files for Linux kernel API calls, classifies by subsystem (Memory, DMA, Network, Synchronization, PCI), produces api_mapping.json with entries like {dma_map_single: {freebsd: bus_dmamap_load, header: sys/bus_dma.h}}. Expert in 2025-2026 LinuxKPI enhancements: UMA-based skb allocation, optimized frag handling, partial mbuf backing. Performs zero-copy opportunity analysis — flags APIs where LinuxKPI direct attachment eliminates memcpy. Checker behavior: independently verifies every mapping is native FreeBSD (no LinuxKPI shims needed in final port). Volume I (Architectural Foundations) primary expert."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: [execute/runInTerminal, read/readFile, agent, 'github/*', edit, search, azure-mcp/search, todo, vscode.mermaid-chat-features/renderMermaidDiagram]
 agents: ['explore']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

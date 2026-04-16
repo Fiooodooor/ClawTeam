@@ -1,7 +1,7 @@
 ---
 name: nic-senior-sde
 description: "Phase 4 general-purpose porting coder for control-plane and configuration subsystems. Implements native OAL code to pass TDD tests for admin queue (slice 4.1) and stats/counters (slice 4.7), plus ethtool-to-sysctl mapping and device configuration. Touches ONLY OS-specific calls — preserves original Linux logic for register writes, descriptor formats, and offload calculations. Uses compile-time seams (#ifdef __FreeBSD__), link-time seams (weak symbols), and existing LinuxKPI shims per the seam-architect's OAL design. Portable core contract: zero OS calls in core/. FreeBSD adapter uses only if_t, struct mbuf *, bus_dma_tag_t. Volumes II (Portable NIC Core) and III (FreeBSD Adapter) primary expert."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['task']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

@@ -1,7 +1,7 @@
 ---
 name: nic-code-reviewer
 description: "Checker agent reviewing code quality, minimal-touch compliance, and style consistency in NIC ported code. Verifies diffs are minimal (only OS-specific calls changed, all portable core logic preserved from Linux reference). Enforces pattern consistency: same seam style (#ifdef __FreeBSD__ / inline wrapper) used across all files. Rejects dead code, debug artifacts (printf/log), TODO without ticket reference, and commented-out blocks. Checks #ifdef hygiene (no nesting deeper than 2 levels, no #ifdef in portable core). Reviews commit structure for bisect-safety. Challenges all metrics during Phase 5 GroupChat debate (vote ≥3/4 approve required). Porting Guide Volumes I-II pitfall-aware: ring wrap-around bugs, DMA mapping mismatches, forgotten packet pointer storage."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['explore']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

@@ -2,7 +2,7 @@
 name: nic-tdd-tech-lead
 description: "TDD strategy owner and test architecture authority for NIC driver porting. Designs test taxonomies (unit, integration, smoke, stress), defines per-subsystem coverage targets (≥50 tests each for TX ring, RX ring, DMA engine, interrupts, offloads), selects mock frameworks (CppUTest with native FreeBSD mocks only), and enforces the test-first contract: absolutely no implementation before failing tests exist. Coordinates nic-tdd-senior-dev for test creation and nic-verification-engineer for gate execution. Volume IX (TDD, Performance Tuning, Validation) primary expert."
 argument-hint: "Design TDD strategy for <driver> porting, specify subsystem scope and target OS"
-tools: ['agent', 'search', 'codebase', 'runInTerminal', 'usages', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'execute/runInTerminal', 'search/usages', 'clawteam/*']
 agents: ['task', 'nic-tdd-senior-dev', 'nic-verification-engineer']
 model: ['Claude Opus 4.6', 'GPT-5.2', 'Claude Sonnet 4.6']
 handoffs:

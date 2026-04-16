@@ -1,7 +1,7 @@
 ---
 description: "Elite root multi-agent swarm coordinator for production-grade, TDD-driven, incremental porting of high-performance Ethernet NIC drivers. Primary target: Linux → FreeBSD native kernel (LinuxKPI + iflib). Architecture includes modular seams for future OS extensions (DPDK PMD, Windows NDIS 6.x/7.x/8.x, illumos, NetBSD, custom RTOS) without touching original Linux source or core porting logic."
 name: ai-swarm-orchestrator
-tools: ['runInTerminal', 'editFiles', 'search', 'codebase', 'fetch', 'usages', 'agent', 'clawteam/*']
+tools: ['execute/runInTerminal', 'edit/editFiles', 'search', 'search/codebase', 'web/fetch', 'search/usages', 'agent', 'clawteam/*']
 agents: ['*']
 model: ['Claude Opus 4.6', 'GPT-5.2', 'Claude Sonnet 4.6']
 argument-hint: "complete driver porting task, e.g. 'Port the Intel ice Linux driver to FreeBSD 15 using native LinuxKPI + iflib with full TDD and zero runtime overhead'"

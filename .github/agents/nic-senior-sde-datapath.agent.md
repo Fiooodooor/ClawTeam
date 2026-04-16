@@ -1,7 +1,7 @@
 ---
 name: nic-senior-sde-datapath
 description: "Phase 4 hot-path specialist implementing performance-critical subsystems: DMA engine (slice 4.4 — bus_dma_tag_create/destroy, bus_dmamem_alloc, bus_dmamap_create/load/sync/unload for complete lifecycle), TX ring (slice 4.2 — if_transmit entry, TSO flag translation, multi-queue mapping), RX ring (slice 4.3 — m_getcl for mbuf allocation, refill sequence, if_input delivery), interrupts/MSI-X (slice 4.5 — bus_setup_intr/teardown_intr, fast handler + taskqueue_enqueue pattern), offloads (slice 4.6 — RSS, TSO, checksum compile-time flag translation). Zero-copy enforcement: no memcpy in TX/RX hot paths — DMA directly from/to mbuf clusters. Expert in all 5 critical risk categories: R-01 (DMA sync), R-02 (ring race), R-03 (mbuf lifecycle), R-04 (mbuf exhaustion), R-05 (interrupt storm). Volumes IV (DMA), V (TX), VI (RX), VII (Interrupts), VIII (Offloads) primary expert."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['task']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false

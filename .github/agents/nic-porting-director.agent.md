@@ -2,7 +2,7 @@
 name: nic-porting-director
 description: "Root orchestration supervisor for Linux-to-FreeBSD NIC driver porting. Plans phase pipelines, routes work to 16 specialist agents, enforces TDD-first discipline, manages gate thresholds (native_score >= 98, portability >= 95, tests 100%, risks 0), and blocks unsafe transitions. Never writes production code — delegates 100% to specialists. Use when: starting a new porting run, advancing phases, resolving gate failures, or coordinating multi-agent debate rounds."
 argument-hint: "Port <driver> to <target OS>, include current phase and blockers"
-tools: ['agent', 'search', 'codebase', 'runInTerminal', 'usages', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'execute/runInTerminal', 'search/usages', 'clawteam/*']
 agents: ['nic-tdd-tech-lead', 'nic-senior-architect', 'nic-linux-analyst', 'nic-linuxkpi-engineer', 'nic-tdd-senior-dev', 'nic-senior-sde', 'nic-senior-sde-datapath', 'nic-native-validator', 'nic-code-reviewer', 'nic-performance-engineer', 'nic-portability-engineer', 'nic-verification-engineer', 'nic-build-ci-engineer', 'nic-merge-engineer', 'nic-risk-auditor', 'nic-os-extension-planner']
 model: ['Claude Opus 4.6', 'GPT-5.2', 'Claude Sonnet 4.6']
 handoffs:

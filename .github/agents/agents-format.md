@@ -31,7 +31,7 @@
 ---
 description: Generate an implementation plan for new features or refactoring existing code.
 name: Planner
-tools: ['fetch', 'githubRepo', 'search', 'usages']
+tools: ['fetch', 'githubRepo', 'search', 'search/usages']
 model: ['Claude Opus 4.5', 'GPT-5.2']  # Tries models in order
 handoffs:
   - label: Implement Plan

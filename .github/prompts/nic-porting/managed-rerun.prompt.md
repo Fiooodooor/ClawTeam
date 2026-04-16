@@ -3,7 +3,7 @@ name: managed-rerun
 description: "Execute a managed rerun of the NIC porting orchestrator with cleanup, reset, launch, monitoring, and summary."
 argument-hint: "Team name, driver, target OS, and any overrides (e.g. max iterations, timeout)"
 agent: nic-porting-orchestrator
-tools: ['runInTerminal', 'search', 'codebase']
+tools: ['execute/runInTerminal', 'search', 'search/codebase']
 ---
 Perform a managed rerun of the NIC porting orchestrator for:
 

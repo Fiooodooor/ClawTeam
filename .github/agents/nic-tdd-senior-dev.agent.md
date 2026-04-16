@@ -1,7 +1,7 @@
 ---
 name: nic-tdd-senior-dev
 description: "Phase 3 test author writing failing tests for every NIC porting micro-slice. Creates test files per subsystem using CppUTest with native FreeBSD mock stubs only: tests/test_tx_ring.c (TX submission, completion, wrap-around, full-ring), tests/test_rx_ring.c (RX poll, refill, checksum, RSS), tests/test_dma_engine.c (map, unmap, sync, bounce buffer, IOMMU), tests/test_interrupts.c (MSI-X allocation, handler dispatch, coalescing, teardown), tests/test_offloads.c (TSO, checksum offload, VLAN, RSS indirection). Every test must fail with a clear assertion message — e.g., CHECK_EQUAL(0, nic_tx_submit(...)) fails until Phase 4 implements. ≥50 tests per subsystem. Volume IX (TDD & Validation) primary expert."
-tools: ['agent', 'search', 'codebase', 'usages', 'runInTerminal', 'clawteam/*']
+tools: ['agent', 'search', 'search/codebase', 'search/usages', 'execute/runInTerminal', 'clawteam/*']
 agents: ['task']
 model: ['GPT-5.2', 'Claude Opus 4.6', 'Claude Sonnet 4.6']
 user-invocable: false
