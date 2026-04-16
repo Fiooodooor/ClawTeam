@@ -182,7 +182,28 @@ critical_risks     = 0       (no open critical risks)
 
 ## ClawTeam Integration
 
-- Generates live architecture decision log (including zero-copy mapping analysis and future-extension seams)
+All 18 agents communicate via the ClawTeam MCP server (stdio transport, registered in `.vscode/mcp.json`):
+
+```bash
+# MCP server entry point
+python -m clawteam.mcp
+```
+
+### MCP Tools Available (`clawteam/*`)
+
+| Module | Tools | Purpose |
+| ------ | ----- | ------- |
+| team | `team_list`, `team_get`, `team_members_list`, `team_create`, `team_member_add` | Team lifecycle |
+| task | `task_list`, `task_get`, `task_stats`, `task_create`, `task_update` | Task board management |
+| mailbox | `mailbox_send`, `mailbox_broadcast`, `mailbox_receive`, `mailbox_peek`, `mailbox_peek_count` | Inter-agent messaging |
+| plan | `plan_submit`, `plan_get`, `plan_approve`, `plan_reject` | Architecture decisions |
+| board | `board_overview`, `board_team` | Kanban visualization |
+| cost | `cost_summary` | Token/cost tracking |
+| workspace | `workspace_agent_diff`, `workspace_file_owners`, `workspace_cross_branch_log`, `workspace_agent_summary` | Git context |
+
+### Artifacts Produced
+
+- Live architecture decision log (including zero-copy mapping analysis and future-extension seams)
 - Phase completion reports after every major milestone
 - TDD traceability matrix
 - Risk register (living JSON in shared state)

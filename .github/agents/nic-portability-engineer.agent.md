@@ -153,6 +153,12 @@ Files in `os/freebsd/` must:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `mailbox_send` with key `portability-verdict` to `nic-verification-engineer` with your PASS/FAIL verdict and portability_score. Use `mailbox_peek` to check for debate rounds (`debate-{substep}` messages). If any cross-compile target fails, send `risk.critical` to `nic-porting-director` via `mailbox_send`.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never accept portability_score below 95.0.

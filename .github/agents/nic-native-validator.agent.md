@@ -132,6 +132,12 @@ grep -rn '#include <linux/\|#include <sys/bus\|#include <net/if' core/
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `mailbox_send` with key `native-verdict` to `nic-verification-engineer` with your PASS/FAIL verdict and native_score. If native_score < 98.0, also send `risk.critical` to `nic-porting-director` via `mailbox_send`. Use `mailbox_peek` to check for debate rounds (`debate-{substep}` messages).
+
+---
+
 ## Non-Negotiable Rules
 
 - Never accept claims without independent file inspection.

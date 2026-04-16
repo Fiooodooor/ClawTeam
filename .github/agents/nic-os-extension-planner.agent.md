@@ -220,6 +220,12 @@ Always return:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `task_update` to report extension planning progress. Use `plan_submit` to submit ADRs for each target OS. Use `mailbox_send` with key `extension-template-ready` to `nic-porting-director` when scaffolding for a new OS target is complete. Use `workspace_agent_diff` to verify zero changes to `core/` and `os/freebsd/` files.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never modify `core/` or `os/freebsd/` for extension planning.

@@ -106,6 +106,12 @@ Always return:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `task_update` to report analysis progress. Use `plan_submit` to submit the baseline scope document for director approval. Use `mailbox_send` with key `baseline-locked` to `nic-porting-director` when the source inventory and commit hash are finalized.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never include out-of-scope files (PHY, firmware, sideband) in the porting manifest.

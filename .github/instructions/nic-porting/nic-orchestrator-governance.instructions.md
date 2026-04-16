@@ -30,9 +30,17 @@ Apply this guidance when the task involves NIC driver porting orchestration, Cla
 - Porting coder role: performs minimal, native API mapping changes only.
 - Validation roles: challenge assumptions, enforce score thresholds, and block unsafe progression.
 
+## ClawTeam MCP Integration
+- All inter-agent communication uses ClawTeam MCP tools (`clawteam/*` via `.vscode/mcp.json`).
+- Task status transitions must use `task_update` — do not report status only in prose.
+- Phase broadcasts use `mailbox_broadcast`; targeted messages use `mailbox_send`.
+- Critical risk escalations require `mailbox_send` with key `risk.critical` to the director.
+- Plans and architecture decisions must use `plan_submit` for formal approval workflow.
+
 ## Completion Contract
 A phase is complete only if all of the following are true:
 - Build artifacts are produced for required targets.
 - Tests pass at 100% for the phase scope.
 - Critical risks are zero.
 - A short human-readable gate summary is produced.
+- All task items for the phase are marked `completed` via `task_update`.

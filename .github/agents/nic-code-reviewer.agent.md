@@ -120,6 +120,12 @@ Challenge areas:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `mailbox_send` with key `review-verdict` to `nic-verification-engineer` with your PASS/FAIL verdict. Use `mailbox_peek` to check for debate rounds (`debate-{substep}` messages). Use `workspace_agent_diff` to see which files changed per specialist agent.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never accept a diff that modifies hardware logic or ring arithmetic.

@@ -107,6 +107,12 @@ Always return:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `task_update` to report slice progress (`in_progress` → `completed`). Use `mailbox_send` with key `handoff-sde-{target}` to hand off completed slices to checkers. Use `mailbox_receive` to check for review feedback before starting the next slice.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never implement without failing tests from `nic-tdd-senior-dev`.

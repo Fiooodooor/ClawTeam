@@ -141,6 +141,12 @@ Always return:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `task_update` to report test creation progress (`in_progress` → `completed`). Use `mailbox_send` with key `tests-ready-{subsystem}` to `nic-tdd-tech-lead` when a subsystem test suite is complete. Use `task_stats` to track coverage targets (≥50 tests per subsystem).
+
+---
+
 ## Non-Negotiable Rules
 
 - Every test must FAIL before Phase 4 implementation — no vacuous passes.

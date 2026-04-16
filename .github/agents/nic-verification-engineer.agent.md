@@ -179,6 +179,12 @@ IF risk register has open criticals:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `mailbox_receive` to collect verdicts from all checker agents (`native-verdict`, `portability-verdict`, `review-verdict`, `perf-report`, `build-result`). Use `task_stats` to aggregate completion metrics. Use `mailbox_send` with key `gate-verdict` to `nic-porting-director` with the final APPROVED/BLOCKED decision. Use `board_team` to get a full kanban view of the team's task state before producing the gate summary.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never approve if any single gate threshold is not met.

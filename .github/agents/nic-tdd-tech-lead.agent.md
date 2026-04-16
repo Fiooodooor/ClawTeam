@@ -114,6 +114,12 @@ Always return:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `task_create` to assign test-writing tasks to `nic-tdd-senior-dev` with subsystem scope and ≥50 test targets. Use `task_stats` to monitor test creation progress across all subsystems. Use `mailbox_send` with key `tdd-harness-ready` to `nic-porting-director` when Phase 3 test suite is complete. Use `mailbox_receive` to check for `tests-ready-{subsystem}` messages from the test writer.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never allow implementation to start without failing tests.

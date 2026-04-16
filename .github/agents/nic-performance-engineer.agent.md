@@ -139,6 +139,12 @@ objdump -d mynic_tx.o | grep -c 'callq.*oal_'  # should be 0
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `mailbox_send` with key `perf-report` to `nic-verification-engineer` with benchmark results. If regression exceeds budgets (>5% throughput or >10% latency), also send `risk.critical` to `nic-porting-director` via `mailbox_send`. Use `task_update` to report benchmark execution progress.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never evaluate performance until baseline correctness is 100% green.

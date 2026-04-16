@@ -157,6 +157,12 @@ Always return:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `task_update` to report OAL design progress. Use `plan_submit` to submit the seam architecture design for director approval. Use `mailbox_send` with key `seam-design-ready` to `nic-porting-director` when the OAL header and seam boundaries are defined.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never add logic to adapter wrappers — wrappers translate arguments only.

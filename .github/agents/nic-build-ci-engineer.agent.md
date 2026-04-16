@@ -249,6 +249,12 @@ echo "PASS: kldload smoke test succeeded"
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `task_update` to report build status transitions (`in_progress` → `completed` or `blocked`). Use `mailbox_send` to send build results to `nic-verification-engineer` with key `build-result`. Use `task_stats` to check overall task completion before gate reporting.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never approve a build with warnings — `-Werror` is mandatory.

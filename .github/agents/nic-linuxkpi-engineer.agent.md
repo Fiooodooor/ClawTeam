@@ -124,6 +124,12 @@ Always return:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `task_update` to report API mapping progress. Use `plan_submit` to submit the api_mapping.json for review. Use `mailbox_send` with key `mapping-complete` to `nic-porting-director` when all APIs are mapped. Use `mailbox_send` with key `mapping-gap` to flag unmappable APIs requiring risk entries.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never leave an API call unmapped — every Linux call must have a FreeBSD equivalent or a risk flag.

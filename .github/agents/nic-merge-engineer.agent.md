@@ -228,6 +228,12 @@ Always return:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `task_update` to report merge progress (`in_progress` → `completed`). Use `mailbox_send` with key `merge-ready` to `nic-porting-director` when the patch set is complete. Use `mailbox_broadcast` with key `phase-6-ci-results` to share post-merge CI results with all agents. Use `workspace_agent_diff` to review per-agent git contribution stats.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never merge a commit that doesn't independently compile on both targets.

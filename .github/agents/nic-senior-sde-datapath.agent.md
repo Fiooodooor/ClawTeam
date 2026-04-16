@@ -237,6 +237,12 @@ Always return:
 
 ---
 
+## ClawTeam MCP Coordination
+
+Use `task_update` to report hot-path slice progress (`in_progress` → `completed`). Use `mailbox_send` with key `handoff-datapath-{target}` to hand off completed slices to checkers. Use `mailbox_receive` to check for review feedback. Critical: report any zero-copy regression immediately via `mailbox_send` with key `risk.critical` to `nic-porting-director`.
+
+---
+
 ## Non-Negotiable Rules
 
 - Never implement without failing tests from `nic-tdd-senior-dev`.
