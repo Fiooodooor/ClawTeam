@@ -5,7 +5,8 @@ from __future__ import annotations
 import os
 import subprocess
 
-from clawteam.spawn.adapters import NativeCliAdapter, is_claude_command, is_pi_command
+from clawteam.paths import ensure_within_root, validate_identifier
+from clawteam.spawn.adapters import NativeCliAdapter, is_claude_command, is_openclaw_command, is_pi_command
 from clawteam.spawn.base import SpawnBackend
 from clawteam.spawn.cli_env import build_spawn_path, resolve_clawteam_executable
 from clawteam.spawn.command_validation import validate_spawn_command
@@ -13,6 +14,7 @@ from clawteam.spawn.keepalive import build_keepalive_shell_command, build_resume
 from clawteam.spawn.runtime_notification import render_runtime_notification
 from clawteam.team.mailbox import MailboxManager
 from clawteam.team.models import MessageType, get_data_dir
+from clawteam.team.models import get_data_dir
 
 
 class SubprocessBackend(SpawnBackend):
@@ -77,6 +79,12 @@ class SubprocessBackend(SpawnBackend):
         normalized_command = prepared.normalized_command
         validation_command = normalized_command
         final_command = list(prepared.final_command)
+
+        # Optionally clean stale OpenClaw session files to avoid lock contention on re-runs.
+        # Gated by an explicit reset flag to avoid unconditionally wiping session history.
+        reset_openclaw_session = os.environ.get("CLAWTEAM_RESET_OPENCLAW_SESSION") == "1"
+        if reset_openclaw_session and is_openclaw_command(normalized_command) and agent_name:
+            _cleanup_openclaw_session(agent_name)
         if system_prompt and (is_claude_command(normalized_command) or is_pi_command(normalized_command)):
             insert_at = final_command.index("-p") if "-p" in final_command else len(final_command)
             final_command[insert_at:insert_at] = ["--append-system-prompt", system_prompt]
@@ -120,15 +128,22 @@ class SubprocessBackend(SpawnBackend):
                 keepalive=keepalive,
             )
 
-        process = subprocess.Popen(
-            shell_cmd,
-            shell=True,
-            env=spawn_env,
-            # Subprocess agents are fire-and-forget; unread pipes can block long-lived runs.
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            cwd=cwd,
+        log_dir = ensure_within_root(
+            get_data_dir() / "teams",
+            validate_identifier(team_name, "team name"),
+            "agent-logs",
         )
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = ensure_within_root(log_dir, f"{validate_identifier(agent_name, 'agent name')}.log")
+        with log_path.open("ab") as log_handle:
+            process = subprocess.Popen(
+                shell_cmd,
+                shell=True,
+                env=spawn_env,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                cwd=cwd,
+            )
         self._processes[agent_name] = process
 
         # Persist spawn info for liveness checking
@@ -139,6 +154,7 @@ class SubprocessBackend(SpawnBackend):
             backend="subprocess",
             pid=process.pid,
             command=list(final_command),
+            log_path=str(log_path),
         )
 
         return f"Agent '{agent_name}' spawned as subprocess (pid={process.pid})"
@@ -169,3 +185,33 @@ class SubprocessBackend(SpawnBackend):
             summary=str(getattr(envelope, "summary", "") or "").strip() or "Runtime update",
         )
         return True, f"Queued runtime notification in inbox for subprocess agent {agent_name}"
+
+def _cleanup_openclaw_session(agent_name: str) -> None:
+    """Remove a stale OpenClaw lock file for an agent.
+
+    OpenClaw stores session files at ~/.openclaw/agents/main/sessions/<name>.jsonl
+    and acquires locks at <name>.jsonl.lock.  A leftover lock from a previous run
+    causes a FailoverError on the next spawn.  Only the lock file is removed here;
+    the session history (.jsonl) is preserved so that conversation context survives
+    re-runs.
+    """
+    from pathlib import Path
+
+    from clawteam.paths import ensure_within_root, validate_identifier
+
+    try:
+        safe_name = validate_identifier(agent_name, "agent name")
+    except ValueError:
+        return
+
+    sessions_dir = Path.home() / ".openclaw" / "agents" / "main" / "sessions"
+    if not sessions_dir.is_dir():
+        return
+    try:
+        target = ensure_within_root(sessions_dir, f"{safe_name}.jsonl.lock")
+    except ValueError:
+        return
+    try:
+        target.unlink(missing_ok=True)
+    except OSError:
+        pass

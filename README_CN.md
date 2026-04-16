@@ -1,25 +1,10 @@
-<h1 align="center"><img src="assets/icon.png" alt="" width="64" style="vertical-align: middle;">&nbsp; ClawTeam：Agent 群体智能</h1>
+# ClawTeam Chinese README (English Fallback)
 
-<p align="center">
-  <strong>今天的 Agent 各自为战 🤖，明天的 Agent 将协同作战 🦞🤖🤖🤖<br>
-  ClawTeam：让 AI Agent 自主组建团队、分配任务、协同工作的 CLI 工具</strong>
-</p>
+This file is kept for backward compatibility of links and repository structure.
 
-<p align="center">
-  <a href="#-快速开始"><img src="https://img.shields.io/badge/快速开始-3_分钟-blue?style=for-the-badge" alt="Quick Start"></a>
-  <a href="#-使用场景"><img src="https://img.shields.io/badge/使用场景-3_个演示-green?style=for-the-badge" alt="Use Cases"></a>
-  <a href="#-功能特性"><img src="https://img.shields.io/badge/功能-12+-purple?style=for-the-badge" alt="Features"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/开源协议-MIT-yellow?style=for-the-badge" alt="License"></a>
-</p>
+The canonical English documentation is available in:
 
-<p align="center">
-  <img src="https://img.shields.io/badge/python-≥3.10-blue?logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/typer-CLI-green" alt="Typer">
-  <img src="https://img.shields.io/badge/agents-Claude_Code_%7C_Codex_%7C_Any_CLI-blueviolet" alt="Agents">
-  <img src="https://img.shields.io/badge/transport-File_%7C_ZeroMQ_P2P-orange" alt="Transport">
-  <a href="https://github.com/HKUDS/.github/blob/main/profile/README.md"><img src="https://img.shields.io/badge/飞书-交流群-E9DBFC?style=flat&logo=feishu&logoColor=white" alt="Feishu"></a>
-  <a href="https://github.com/HKUDS/.github/blob/main/profile/README.md"><img src="https://img.shields.io/badge/微信-交流群-C5EAB4?style=flat&logo=wechat&logoColor=white" alt="WeChat"></a>
-</p>
+- [README.md](README.md)
 
 **一行命令**：给 Agent 一个目标，它自动组建团队完成任务。支持 [Claude Code](https://claude.ai/claude-code)、[Codex](https://openai.com/codex)、[OpenClaw](https://github.com/openclaw/openclaw)、[nanobot](https://github.com/HKUDS/nanobot)、[Cursor](https://cursor.com) 及任意 CLI Agent。&nbsp;&nbsp;[**English**](README.md)
 

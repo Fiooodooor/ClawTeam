@@ -12,3 +12,7 @@ venv/
 uv.lock
 .claude/*.local.md
 node_modules/
+.vscode/*
+artifacts/**
+logs/*
+artifacts/nic_porting_v2/orchestrator_checkpoint.json
