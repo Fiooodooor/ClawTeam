@@ -1,0 +1,33 @@
+LOCAL  &curr_path &HISTORY_FILE_PATH &history_value
+
+&curr_path=OS.PWD()
+&HISTORY_FILE_PATH="C:\T32\demo\arm\MEVTS_Menues\Generic\history.his"
+
+IF OS.FILE("&HISTORY_FILE_PATH")
+(
+OPEN #1 &HISTORY_FILE_PATH /Read
+READ #1 %LINE &history_value
+CLOSE #1
+)
+
+IF OS.DIR("&history_value")
+	chdir &history_value
+
+&elf_file=""
+dialog.file "*.elf"
+entry %line &elf_file
+
+IF OS.FILE("&elf_file")
+(
+IF OS.FILE("&HISTORY_FILE_PATH")
+(
+RM &HISTORY_FILE_PATH
+)
+OPEN #1 &HISTORY_FILE_PATH /Create
+WRITE #1 OS.FILE.PATH("&elf_file")
+CLOSE #1	
+)
+
+chdir "&curr_path"
+
+ENDDO &elf_file

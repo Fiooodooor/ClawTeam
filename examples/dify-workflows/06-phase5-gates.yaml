@@ -1,0 +1,901 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "NIC Porting — Phase 5: Gates (Looped Debate + Branch Evaluation)"
+  mode: workflow
+  icon: "🚦"
+  icon_type: emoji
+  icon_background: "#FFF7ED"
+  description: >
+    Phase 5 executes true iterative gate review. Specialist agents produce independent
+    evidence, then a fixed-round debate loop synthesizes consensus snapshots across
+    performance, portability, verification, and integration. A branch-point evaluator
+    decides advance, replan, or escalate using TDD thresholds and shared risk state.
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    viewport: {x: 0, y: 0, zoom: 0.72}
+    nodes:
+
+      - id: start
+        type: custom
+        position: {x: 30, y: 380}
+        data:
+          type: start
+          title: "Phase 5 Inputs"
+          variables:
+            - variable: driver_name
+              label: "Driver Name"
+              type: text-input
+              required: true
+              default: "ixgbe"
+            - variable: target_os
+              label: "Target OS"
+              type: select
+              required: true
+              options:
+                - value: FreeBSD
+                  label: "FreeBSD"
+                - value: Windows
+                  label: "Windows"
+                - value: DPDK
+                  label: "DPDK"
+              default: FreeBSD
+            - variable: ported_code_summary
+              label: "Phase 4 Implementations JSON"
+              type: paragraph
+              required: true
+            - variable: tdd_test_results
+              label: "Phase 4 TDD Results JSON"
+              type: paragraph
+              required: true
+            - variable: api_mappings
+              label: "API Mappings JSON"
+              type: paragraph
+              required: true
+            - variable: seam_headers
+              label: "Seam Headers JSON"
+              type: paragraph
+              required: true
+            - variable: risk_register
+              label: "Risk Register JSON (shared across phases)"
+              type: paragraph
+              required: false
+
+      - id: tdd_gate_spec
+        type: custom
+        position: {x: 330, y: 380}
+        data:
+          type: llm
+          title: "TDD Gate Spec — Debate Branch Points"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 3000
+          prompt_template:
+            - role: system
+              text: |
+                Generate machine-checkable gate criteria and branch points for Phase 5.
+                This is a tree-of-thought evaluation stage.
+                Each branch point must choose one of: advance, replan, escalate.
+                Thresholds are strict: native_score >= 98.0, portability_score >= 95.0,
+                integration coverage >= 90.0, zero critical open risks.
+                Return only valid JSON.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Ported code: {{#start.ported_code_summary#}}
+                TDD results so far: {{#start.tdd_test_results#}}
+
+                Output:
+                {
+                  "native_threshold": 98.0,
+                  "portability_threshold": 95.0,
+                  "integration_threshold": 90.0,
+                  "max_debate_rounds": 5,
+                  "branch_points": [
+                    {"name": "performance-violation", "advance": false, "replan": true, "escalate": false},
+                    {"name": "portability-blocker", "advance": false, "replan": true, "escalate": true},
+                    {"name": "integration-gap", "advance": false, "replan": true, "escalate": false}
+                  ],
+                  "criteria_clear": true
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      - id: performance_engineer
+        type: custom
+        position: {x: 670, y: 80}
+        data:
+          type: llm
+          title: "performance-engineer — Native Score Evidence"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 4000
+          prompt_template:
+            - role: system
+              text: |
+                You are the performance-engineer checker.
+                Evaluate zero-overhead compliance.
+                Use tree-of-thought decomposition:
+                1. Identify hot-path wrappers.
+                2. Estimate overhead sources.
+                3. Score native fidelity.
+                4. Decide approved or rejected.
+                Return only valid JSON.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Ported implementations: {{#start.ported_code_summary#}}
+                API mappings: {{#start.api_mappings#}}
+                Gate spec: {{#tdd_gate_spec.text#}}
+
+                Return:
+                {
+                  "native_score": 0.0,
+                  "linuxkpi_overhead": 0.0,
+                  "bottlenecks": [],
+                  "perf_engineer_verdict": "approved|rejected",
+                  "rejection_notes": []
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      - id: portability_validator
+        type: custom
+        position: {x: 670, y: 300}
+        data:
+          type: llm
+          title: "portability-validator — Cross-Target Evidence"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 4000
+          prompt_template:
+            - role: system
+              text: |
+                You are the portability-validator checker.
+                Evaluate branch points:
+                1. Seam compilability.
+                2. Core rewrite pressure.
+                3. Cross-OS leakage.
+                4. Portability score and verdict.
+                Return only valid JSON.
+            - role: user
+              text: |
+                Target OS: {{#start.target_os#}}
+                Seam headers: {{#start.seam_headers#}}
+                Ported code summary: {{#start.ported_code_summary#}}
+                Gate spec: {{#tdd_gate_spec.text#}}
+
+                Return:
+                {
+                  "portability_score": 0.0,
+                  "core_rewrites_found": false,
+                  "cross_os_leakage_found": false,
+                  "portability_validator_verdict": "approved|rejected",
+                  "critical_issues": []
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      - id: verification_executor
+        type: custom
+        position: {x: 670, y: 520}
+        data:
+          type: llm
+          title: "verification-executor — Build/Test Evidence"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 4000
+          prompt_template:
+            - role: system
+              text: |
+                You are the verification-executor checker.
+                Evaluate build, unit test, ABI, and structured TDD evidence.
+                Return only valid JSON.
+            - role: user
+              text: |
+                TDD results: {{#start.tdd_test_results#}}
+                Ported code: {{#start.ported_code_summary#}}
+                Gate spec: {{#tdd_gate_spec.text#}}
+
+                Return:
+                {
+                  "build_passed": true,
+                  "unit_test_passed": true,
+                  "abi_check_passed": true,
+                  "verification_verdict": "approved|rejected",
+                  "blocking_issues": []
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      - id: integration_tester
+        type: custom
+        position: {x: 670, y: 740}
+        data:
+          type: llm
+          title: "integration-tester — Smoke Coverage Evidence"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 4000
+          prompt_template:
+            - role: system
+              text: |
+                You are the integration-tester.
+                Evaluate end-to-end smoke coverage for TX, RX, interrupts, offloads,
+                and control plane visibility. Return only valid JSON.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                Ported code summary: {{#start.ported_code_summary#}}
+                TDD results: {{#start.tdd_test_results#}}
+
+                Return:
+                {
+                  "integration_passed": true,
+                  "coverage_pct": 0.0,
+                  "subsystems_covered": ["tx", "rx", "interrupts", "offloads"],
+                  "integration_failures": []
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      - id: debate_loop
+        type: custom
+        position: {x: 1090, y: 180}
+        data:
+          type: loop
+          title: "Debate Rounds"
+          start_node_id: debate_loop_start
+          loop_count: 5
+          logical_operator: and
+          break_conditions:
+            - variable_selector:
+                - debate_round_score
+                - consensus_ready
+              comparison_operator: is
+              value: "true"
+              id: cond-debate-consensus-ready
+              varType: boolean
+          loop_variables:
+            - label: debate_marker
+              var_type: string
+              value_type: constant
+              value: debate
+              id: loop-var-debate-marker
+          outputs: {}
+          output_selector:
+            - debate_round_score
+            - round_snapshot
+          error_handle_mode: terminated
+          flatten_output: true
+          height: 950
+          width: 1150
+
+      - id: debate_loop_start
+        type: custom-loop-start
+        parentId: debate_loop
+        position: {x: 40, y: 60}
+        draggable: false
+        selectable: false
+        zIndex: 1002
+        data:
+          type: loop-start
+          title: ""
+          isInLoop: true
+
+      - id: debate_round_moderator
+        type: custom
+        parentId: debate_loop
+        position: {x: 250, y: 120}
+        zIndex: 1002
+        data:
+          type: llm
+          title: "Debate Round Moderator"
+          isInLoop: true
+          loop_id: debate_loop
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 5000
+          prompt_template:
+            - role: system
+              text: |
+                You are the debate moderator for one gate round.
+                Use tree-of-thought branch-point evaluation.
+                Evaluate four branches:
+                1. performance branch
+                2. portability branch
+                3. verification branch
+                4. integration branch
+                For each branch, choose advance, replan, or escalate.
+                Then emit one round consensus snapshot as valid JSON.
+            - role: user
+              text: |
+                Gate spec: {{#tdd_gate_spec.text#}}
+                Performance evidence: {{#performance_engineer.text#}}
+                Portability evidence: {{#portability_validator.text#}}
+                Verification evidence: {{#verification_executor.text#}}
+                Integration evidence: {{#integration_tester.text#}}
+
+                Return:
+                {
+                  "branch_evaluations": [
+                    {"branch": "performance", "decision": "advance|replan|escalate", "reason": ""},
+                    {"branch": "portability", "decision": "advance|replan|escalate", "reason": ""},
+                    {"branch": "verification", "decision": "advance|replan|escalate", "reason": ""},
+                    {"branch": "integration", "decision": "advance|replan|escalate", "reason": ""}
+                  ],
+                  "consensus_ready": true,
+                  "round_decision": "advance|replan|escalate",
+                  "round_summary": "short summary"
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      - id: debate_round_score
+        type: custom
+        parentId: debate_loop
+        position: {x: 720, y: 120}
+        zIndex: 1002
+        data:
+          type: code
+          title: "Round Branch Evaluator"
+          isInLoop: true
+          loop_id: debate_loop
+          code_language: python3
+          code: |
+            import json
+
+            def main(round_json: str) -> dict:
+                try:
+                    data = json.loads(round_json)
+                except Exception as exc:
+                    snapshot = {
+                        "round_decision": "replan",
+                        "consensus_ready": False,
+                        "branch_evaluations": [],
+                        "error": str(exc),
+                    }
+                    return {
+                        "round_snapshot": json.dumps(snapshot),
+                        "round_decision": "replan",
+                        "consensus_ready": False,
+                    }
+
+                decisions = [item.get("decision", "replan") for item in data.get("branch_evaluations") or []]
+                snapshot = {
+                    "round_decision": data.get("round_decision", "replan"),
+                    "consensus_ready": data.get("consensus_ready") is True,
+                    "branch_evaluations": data.get("branch_evaluations") or [],
+                    "round_summary": data.get("round_summary", ""),
+                    "decision_histogram": {
+                        "advance": decisions.count("advance"),
+                        "replan": decisions.count("replan"),
+                        "escalate": decisions.count("escalate"),
+                    },
+                }
+                return {
+                    "round_snapshot": json.dumps(snapshot),
+                    "round_decision": snapshot["round_decision"],
+                    "consensus_ready": snapshot["consensus_ready"],
+                }
+          variables:
+            - variable: round_json
+              value_selector: [debate_round_moderator, text]
+          outputs:
+            round_snapshot: {type: string}
+            round_decision: {type: string}
+            consensus_ready: {type: boolean}
+
+      - id: branch_point_gate
+        type: custom
+        position: {x: 2360, y: 380}
+        data:
+          type: code
+          title: "Branch-Point Gate — Final Consensus"
+          code_language: python3
+          code: |
+            import json
+
+            GATE_NATIVE_THRESHOLD = 98.0
+            GATE_PORTABILITY_THRESHOLD = 95.0
+            GATE_INTEGRATION_THRESHOLD = 90.0
+
+            def _parse_http_or_json(value: str):
+                if isinstance(value, str):
+                    return json.loads(value)
+                return value
+
+            def main(perf_json: str, portability_json: str, verification_json: str, integration_json: str, round_snapshots_json: str, risk_register_json: str = "[]") -> dict:
+                results = []
+                passed = 0
+                failed = 0
+
+                def check(tid, ok, detail=""):
+                    nonlocal passed, failed
+                    status = "PASS" if ok else "FAIL"
+                    if ok:
+                        passed += 1
+                    else:
+                        failed += 1
+                    results.append({"test_id": tid, "status": status, "detail": str(detail)[:180]})
+
+                try:
+                    perf = _parse_http_or_json(perf_json)
+                except Exception:
+                    perf = {}
+
+                try:
+                    portability = _parse_http_or_json(portability_json)
+                except Exception:
+                    portability = {}
+
+                try:
+                    verification = _parse_http_or_json(verification_json)
+                except Exception:
+                    verification = {}
+
+                try:
+                    integration = _parse_http_or_json(integration_json)
+                except Exception:
+                    integration = {}
+
+                try:
+                    round_snapshots = _parse_http_or_json(round_snapshots_json)
+                except Exception:
+                    round_snapshots = []
+
+                try:
+                    risk_register = _parse_http_or_json(risk_register_json) if risk_register_json else []
+                    if not isinstance(risk_register, list):
+                        risk_register = []
+                except Exception:
+                    risk_register = []
+
+                native_score = float(perf.get("native_score", 0))
+                portability_score = float(portability.get("portability_score", 0))
+                integration_coverage = float(integration.get("coverage_pct", 0))
+                integration_passed = integration.get("integration_passed") is True
+
+                approve_rounds = 0
+                replan_rounds = 0
+                escalate_rounds = 0
+                parsed_rounds = []
+                for item in round_snapshots if isinstance(round_snapshots, list) else []:
+                    try:
+                        snap = json.loads(item) if isinstance(item, str) else item
+                    except Exception:
+                        continue
+                    parsed_rounds.append(snap)
+                    decision = snap.get("round_decision", "replan")
+                    if decision == "advance":
+                        approve_rounds += 1
+                    elif decision == "escalate":
+                        escalate_rounds += 1
+                    else:
+                        replan_rounds += 1
+
+                check("T01-native-score-gte98", native_score >= GATE_NATIVE_THRESHOLD, f"score={native_score}")
+                check("T02-portability-score-gte95", portability_score >= GATE_PORTABILITY_THRESHOLD, f"score={portability_score}")
+                check("T03-perf-approved", perf.get("perf_engineer_verdict") == "approved", perf.get("rejection_notes", []))
+                check("T04-portability-approved", portability.get("portability_validator_verdict") == "approved", portability.get("critical_issues", []))
+                check("T05-verification-approved", verification.get("verification_verdict") == "approved", verification.get("blocking_issues", []))
+                check("T06-build-passed", verification.get("build_passed") is True)
+                check("T07-unit-test-passed", verification.get("unit_test_passed") is True)
+                check("T08-abi-check-passed", verification.get("abi_check_passed") is True)
+                check("T09-integration-passed", integration_passed, integration.get("integration_failures", []))
+                check("T10-integration-coverage-gte90", integration_coverage >= GATE_INTEGRATION_THRESHOLD, f"coverage={integration_coverage}")
+                check("T11-zero-linuxkpi-overhead", float(perf.get("linuxkpi_overhead", 0)) == 0.0, perf.get("linuxkpi_overhead", 0))
+                check("T12-no-core-rewrites", portability.get("core_rewrites_found") is False)
+                check("T13-loop-produced-rounds", 1 <= len(parsed_rounds) <= 5, f"rounds={len(parsed_rounds)}")
+                majority_threshold = max(1, (len(parsed_rounds) // 2) + 1)
+                check("T14-majority-rounds-advance", approve_rounds >= majority_threshold, f"advance={approve_rounds}, replan={replan_rounds}, escalate={escalate_rounds}, threshold={majority_threshold}")
+
+                    # T11: Integration smoke validation passed
+                    check("T11-integration-passed", integration_passed,
+                      integration.get("integration_failures", []))
+
+                    # T12: Integration coverage >= 90
+                    integration_coverage = float(integration.get("coverage_pct", 0))
+                    check("T12-integration-coverage-gte90", integration_coverage >= 90.0,
+                      f"coverage={integration_coverage}")
+
+                    # T13: Smoke suite is non-empty
+                    smoke_suite = integration.get("smoke_suite") or []
+                    check("T13-smoke-suite-exists", len(smoke_suite) > 0,
+                      f"count={len(smoke_suite)}")
+
+                total = passed + failed
+                gate_score = round((passed / total) * 100, 1) if total else 0.0
+                fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
+
+                branch_decision = "advance"
+                if escalate_rounds > 0:
+                    branch_decision = "escalate"
+                elif failed != 0 or approve_rounds < majority_threshold:
+                    branch_decision = "replan"
+
+                updated_risk_register = list(risk_register)
+                if branch_decision != "advance":
+                    updated_risk_register.append({
+                        "risk_id": f"RISK-{len(updated_risk_register) + 1:03d}",
+                        "phase_raised": "phase-5",
+                        "category": "performance" if native_score < GATE_NATIVE_THRESHOLD else "portability",
+                        "description": f"Phase 5 branch decision {branch_decision}: {'; '.join(fail_ids) or 'consensus gap'}",
+                        "severity": "high" if branch_decision == "escalate" else "medium",
+                        "status": "open",
+                        "mitigation_action": "Re-run branch evaluation and correct failing gate evidence",
+                        "mitigation_phase": "phase-5",
+                        "residual_risk": "medium"
+                    })
+
+                phase_summary = {
+                    "gate_score": gate_score,
+                    "native_score": native_score,
+                    "portability_score": portability_score,
+                    "integration_passed": integration_passed,
+                    "branch_decision": branch_decision,
+                    "replan_recommended": branch_decision != "advance",
+                    "updated_risk_register": updated_risk_register,
+                }
+
+                return {
+                    "all_passed": failed == 0 and branch_decision == "advance",
+                    "passed_count": passed,
+                    "failed_count": failed,
+                    "gate_score": gate_score,
+                    "native_score": native_score,
+                    "portability_score": portability_score,
+                    "integration_passed": integration_passed,
+                    "test_results": json.dumps(results),
+                    "fail_summary": "; ".join(fail_ids),
+                    "branch_decision": branch_decision,
+                    "round_snapshots": json.dumps(parsed_rounds),
+                    "updated_risk_register": json.dumps(updated_risk_register),
+                    "replan_recommended": branch_decision != "advance",
+                    "phase5_gate_results_json": json.dumps(phase_summary),
+                }
+          variables:
+            - variable: perf_json
+              value_selector: [performance_engineer, text]
+            - variable: portability_json
+              value_selector: [portability_validator, text]
+            - variable: verification_json
+              value_selector: [verification_executor, text]
+            - variable: integration_json
+              value_selector: [integration_tester, text]
+            - variable: round_snapshots_json
+              value_selector: [debate_loop, output]
+            - variable: risk_register_json
+              value_selector: [start, risk_register]
+          outputs:
+            all_passed: {type: boolean}
+            passed_count: {type: number}
+            failed_count: {type: number}
+            gate_score: {type: number}
+            native_score: {type: number}
+            portability_score: {type: number}
+            integration_passed: {type: boolean}
+            test_results: {type: string}
+            fail_summary: {type: string}
+            branch_decision: {type: string}
+            round_snapshots: {type: string}
+            updated_risk_register: {type: string}
+            replan_recommended: {type: boolean}
+            phase5_gate_results_json: {type: string}
+
+      - id: gate_branch
+        type: custom
+        position: {x: 2720, y: 380}
+        data:
+          type: if-else
+          title: "Advance Or Replan?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [branch_point_gate, all_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-phase5-pass
+
+      - id: end_success
+        type: custom
+        position: {x: 3040, y: 170}
+        data:
+          type: end
+          title: "Phase 5 PASSED ✅ — Consensus Reached"
+          outputs:
+            - variable: gate_score
+              value_type: number
+              value_selector: [branch_point_gate, gate_score]
+            - variable: native_score
+              value_type: number
+              value_selector: [branch_point_gate, native_score]
+            - variable: portability_score
+              value_type: number
+              value_selector: [branch_point_gate, portability_score]
+            - variable: integration_passed
+              value_type: boolean
+              value_selector: [branch_point_gate, integration_passed]
+            - variable: test_results
+              value_type: string
+              value_selector: [branch_point_gate, test_results]
+            - variable: phase5_gate_results_json
+              value_type: string
+              value_selector: [branch_point_gate, phase5_gate_results_json]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [branch_point_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [branch_point_gate, replan_recommended]
+
+      - id: remediation_llm
+        type: custom
+        position: {x: 3040, y: 620}
+        data:
+          type: llm
+          title: "Phase 5 Remediation — Replan From Branch Failures"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.2
+              max_tokens: 5000
+          prompt_template:
+            - role: system
+              text: |
+                The Phase 5 branch-point gate did not advance.
+                Produce a remediation plan organized by branch:
+                performance, portability, verification, integration.
+                Use the debate snapshots to decide what to fix first.
+                Return only valid JSON.
+            - role: user
+              text: |
+                Branch decision: {{#branch_point_gate.branch_decision#}}
+                Fail summary: {{#branch_point_gate.fail_summary#}}
+                Round snapshots: {{#branch_point_gate.round_snapshots#}}
+                Performance evidence: {{#performance_engineer.text#}}
+                Portability evidence: {{#portability_validator.text#}}
+                Verification evidence: {{#verification_executor.text#}}
+                Integration evidence: {{#integration_tester.text#}}
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      - id: end_fail
+        type: custom
+        position: {x: 3370, y: 620}
+        data:
+          type: end
+          title: "Phase 5 FAILED ❌ — Replan Required"
+          outputs:
+            - variable: remediation_plan
+              value_type: string
+              value_selector: [remediation_llm, text]
+            - variable: fail_summary
+              value_type: string
+              value_selector: [branch_point_gate, fail_summary]
+            - variable: branch_decision
+              value_type: string
+              value_selector: [branch_point_gate, branch_decision]
+            - variable: phase5_gate_results_json
+              value_type: string
+              value_selector: [branch_point_gate, phase5_gate_results_json]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [branch_point_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [branch_point_gate, replan_recommended]
+
+    edges:
+      - id: e-start-spec
+        source: start
+        target: tdd_gate_spec
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-spec-perf
+        source: tdd_gate_spec
+        target: performance_engineer
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-spec-portability
+        source: tdd_gate_spec
+        target: portability_validator
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-spec-verification
+        source: tdd_gate_spec
+        target: verification_executor
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-spec-integration
+        source: tdd_gate_spec
+        target: integration_tester
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-integration-loop
+        source: integration_tester
+        target: debate_loop
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-loop-start-round
+        source: debate_loop_start
+        target: debate_round_moderator
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        data:
+          isInLoop: true
+          loop_id: debate_loop
+          sourceType: loop-start
+          targetType: llm
+
+      - id: e-loop-round-score
+        source: debate_round_moderator
+        target: debate_round_score
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+        data:
+          isInLoop: true
+          loop_id: debate_loop
+          sourceType: llm
+          targetType: code
+
+      - id: e-perf-gate
+        source: performance_engineer
+        target: branch_point_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-portability-gate
+        source: portability_validator
+        target: branch_point_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-verification-gate
+        source: verification_executor
+        target: branch_point_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-integration-gate
+        source: integration_tester
+        target: branch_point_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-loop-gate
+        source: debate_loop
+        target: branch_point_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-integration-gate
+        source: integration_tester
+        target: branch_point_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-loop-gate
+        source: debate_loop
+        target: branch_point_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-gate-branch
+        source: branch_point_gate
+        target: gate_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-success
+        source: gate_branch
+        target: end_success
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-fail
+        source: gate_branch
+        target: remediation_llm
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+
+      - id: e-remediation-end
+        source: remediation_llm
+        target: end_fail
+        sourceHandle: source
+        targetHandle: target
+        type: custom

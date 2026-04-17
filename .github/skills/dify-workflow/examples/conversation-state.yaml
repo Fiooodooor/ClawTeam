@@ -1,0 +1,245 @@
+###############################################################################
+# Conversation State Machine — Dify DSL v0.6.0
+#
+# Pattern: Use conversation variables to keep persistent state across turns.
+# Each turn a question-classifier routes between INFO_COLLECTION and QA phases.
+# An assigner node updates the conversation_var `collected_context` after
+# the info-collection LLM extracts data from the user's message.
+#
+# Key features demonstrated:
+#   - conversation_variables for cross-turn persistence
+#   - variable-assigner to store extracted facts
+#   - question-classifier for intent-based routing
+#   - advanced-chat mode (uses `answer` nodes)
+###############################################################################
+version: "0.6.0"
+kind: app
+app:
+  name: "Conversation State Machine"
+  mode: advanced-chat
+  icon: "🔄"
+  icon_type: emoji
+  icon_background: "#F3E5F5"
+  description: "Multi-turn chatbot that collects context then answers questions"
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables:
+    - id: conv-ctx
+      name: collected_context
+      value_type: string
+      default_value: ""
+      description: "Accumulated context gathered from the user across turns"
+
+  environment_variables: []
+
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: >-
+      Hello! I can answer questions about your project once I know a bit about
+      it. Tell me what you're working on.
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+      - "Let me tell you about my project…"
+      - "I have a question about Python async"
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+
+  graph:
+    edges:
+      - id: start-to-classifier
+        source: start
+        sourceHandle: source
+        target: intent-classifier
+        targetHandle: target
+        type: custom
+
+      - id: classifier-to-collect
+        source: intent-classifier
+        sourceHandle: "class-info"
+        target: info-collector
+        targetHandle: target
+        type: custom
+
+      - id: classifier-to-qa
+        source: intent-classifier
+        sourceHandle: "class-qa"
+        target: qa-llm
+        targetHandle: target
+        type: custom
+
+      - id: collect-to-assigner
+        source: info-collector
+        sourceHandle: source
+        target: ctx-assigner
+        targetHandle: target
+        type: custom
+
+      - id: assigner-to-answer-collect
+        source: ctx-assigner
+        sourceHandle: source
+        target: answer-collect
+        targetHandle: target
+        type: custom
+
+      - id: qa-to-answer-qa
+        source: qa-llm
+        sourceHandle: source
+        target: answer-qa
+        targetHandle: target
+        type: custom
+
+    nodes:
+      # ── Start ────────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: { x: 80, y: 320 }
+        data:
+          type: start
+          title: "Start"
+          variables: []
+
+      # ── Intent Classifier ─────────────────────────────────────────────────
+      - id: intent-classifier
+        type: custom
+        position: { x: 320, y: 320 }
+        data:
+          type: question-classifier
+          title: "Intent Classifier"
+          instruction: >-
+            Determine whether the user message is (a) sharing information about
+            themselves or their project (INFO), or (b) asking a question (QA).
+          query_variable_selector:
+            - sys
+            - query
+          model:
+            provider: openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.0
+          classes:
+            - id: "class-info"
+              name: "Info Collection"
+            - id: "class-qa"
+              name: "Question & Answer"
+
+      # ── Info Collector LLM ────────────────────────────────────────────────
+      - id: info-collector
+        type: custom
+        position: { x: 560, y: 180 }
+        data:
+          type: llm
+          title: "Info Collector"
+          model:
+            provider: openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.3
+              max_tokens: 512
+          prompt_template:
+            - role: system
+              text: >-
+                Extract and summarise key facts from the user's message.
+                Append them (comma-separated key:value style) to the existing
+                context. Return ONLY the updated context string, nothing else.
+
+                EXISTING CONTEXT: {{#conversation.collected_context#}}
+            - role: user
+              text: "{{#sys.query#}}"
+          memory:
+            window:
+              enabled: true
+              size: 5
+          context:
+            enabled: false
+          vision:
+            enabled: false
+
+      # ── Context Assigner ──────────────────────────────────────────────────
+      - id: ctx-assigner
+        type: custom
+        position: { x: 800, y: 180 }
+        data:
+          type: variable-assigner
+          title: "Update Context"
+          # Writes the LLM's output back into the conversation variable
+          assign_list:
+            - write_mode: over-write
+              variable_selector:
+                - conversation
+                - collected_context
+              value:
+                type: selector
+                value_selector:
+                  - info-collector
+                  - text
+
+      # ── QA LLM ────────────────────────────────────────────────────────────
+      - id: qa-llm
+        type: custom
+        position: { x: 560, y: 460 }
+        data:
+          type: llm
+          title: "QA Assistant"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.7
+              max_tokens: 1024
+          prompt_template:
+            - role: system
+              text: >-
+                You are a helpful technical assistant. Use the project context
+                below to give accurate, targeted answers.
+
+                PROJECT CONTEXT:
+                {{#conversation.collected_context#}}
+
+                If the context is empty, ask the user to share more about their
+                project first before answering.
+            - role: user
+              text: "{{#sys.query#}}"
+          memory:
+            window:
+              enabled: true
+              size: 10
+          context:
+            enabled: false
+          vision:
+            enabled: false
+
+      # ── Answer nodes ──────────────────────────────────────────────────────
+      - id: answer-collect
+        type: custom
+        position: { x: 1040, y: 180 }
+        data:
+          type: answer
+          title: "Answer (Info)"
+          answer: >-
+            Got it! I've noted that down. {{#info-collector.text#}}
+            Feel free to share more, or ask me a question.
+
+      - id: answer-qa
+        type: custom
+        position: { x: 800, y: 460 }
+        data:
+          type: answer
+          title: "Answer (QA)"
+          answer: "{{#qa-llm.text#}}"
+
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.9

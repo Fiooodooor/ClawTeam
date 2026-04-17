@@ -241,7 +241,7 @@ def maybe_prompt_refiner() -> Any | None:
     if not os.getenv("OPENAI_API_KEY"):
         return None
 
-    model = os.getenv("PORTING_MODEL", "gpt-4o")
+    model = os.getenv("PORTING_MODEL", "gpt-5")
     llm = ChatOpenAI(model=model, temperature=0)
     prompt = PromptTemplate.from_template(
         """
@@ -389,7 +389,7 @@ def _is_task_terminal(status: str) -> bool:
 
 def _startup_commands_text(state: RuntimeState) -> str:
     """Return the full mandatory startup command sequence."""
-    agent_exe = state["agent_command"][0] if state["agent_command"] else "aider"
+    agent_exe = state["agent_command"][0] if state["agent_command"] else "openclaw"
     return textwrap.dedent(f"""\
         # ── Mandatory startup commands ──────────────────────────────
         # 1. System dependencies
@@ -917,8 +917,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--agent-command",
         nargs="+",
-        default=["aider"],
-        help="Worker CLI command (aider, codex, claude, or openhands)",
+        default=["openclaw"],
+        help="Worker CLI command, for example openclaw or claude",
     )
     parser.add_argument("--poll-interval", type=int, default=20, help="Monitor poll interval in seconds")
     parser.add_argument("--timeout-seconds", type=int, default=3600, help="Max monitor runtime")

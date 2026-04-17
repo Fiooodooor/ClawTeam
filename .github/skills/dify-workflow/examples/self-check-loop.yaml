@@ -1,0 +1,229 @@
+###############################################################################
+# Self-Check Loop — Dify DSL v0.6.0
+#
+# Demonstrates the loop pattern: generate → validate → retry if not good enough.
+#
+# Flow: start → loop[generate → validate → check] → end
+#
+# The loop runs up to 3 times. The code validator scores the LLM output;
+# if score >= 80, the loop breaks and outputs the result.
+###############################################################################
+version: "0.6.0"
+kind: app
+app:
+  name: "Self-Check Loop"
+  mode: workflow
+  icon: "🔁"
+  icon_type: emoji
+  icon_background: "#FCE4EC"
+  description: "LLM generation with self-validation loop (max 3 retries)"
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      # Outer edges
+      - id: start-to-loop
+        source: start
+        sourceHandle: source
+        target: check_loop
+        targetHandle: target
+        type: custom
+
+      - id: loop-to-end
+        source: check_loop
+        sourceHandle: source
+        target: output
+        targetHandle: target
+        type: custom
+
+      # Inner edges (inside loop)
+      - id: loop-start-to-gen
+        source: loop_start
+        sourceHandle: source
+        target: generate
+        targetHandle: target
+        type: custom
+        data:
+          isInLoop: true
+          loop_id: check_loop
+
+      - id: gen-to-validate
+        source: generate
+        sourceHandle: source
+        target: validate
+        targetHandle: target
+        type: custom
+        data:
+          isInLoop: true
+          loop_id: check_loop
+
+    nodes:
+      # --- Outer nodes ---
+      - id: start
+        type: custom
+        position: { x: 80, y: 282 }
+        data:
+          type: start
+          title: "Start"
+          variables:
+            - variable: task
+              label: "Task Description"
+              type: paragraph
+              required: true
+              max_length: 5000
+              options: []
+
+      # --- Loop container ---
+      - id: check_loop
+        type: custom
+        position: { x: 380, y: 200 }
+        data:
+          type: loop
+          title: "Generate & Validate"
+          start_node_id: loop_start
+          loop_count: 3
+          logical_operator: or
+          break_conditions:
+            - variable_selector:
+                - check_loop
+                - score
+              comparison_operator: "≥"
+              value: "80"
+              id: "break-on-score"
+              varType: number
+          loop_variables:
+            - label: score
+              var_type: number
+              value_type: constant
+              value: "0"
+              id: "loop-var-score"
+            - label: best_result
+              var_type: string
+              value_type: constant
+              value: ""
+              id: "loop-var-result"
+          outputs:
+            best_result:
+              type: string
+          height: 250
+          width: 550
+
+      # --- Loop start (child) ---
+      - id: loop_start
+        type: custom-loop-start
+        parentId: check_loop
+        draggable: false
+        selectable: false
+        zIndex: 1002
+        position: { x: 40, y: 60 }
+        data:
+          type: loop-start
+          title: ""
+          isInLoop: true
+
+      # --- Generate ---
+      - id: generate
+        type: custom
+        parentId: check_loop
+        zIndex: 1002
+        position: { x: 200, y: 60 }
+        data:
+          type: llm
+          title: "Generate"
+          isInLoop: true
+          loop_id: check_loop
+          model:
+            provider: openai
+            name: gpt-4
+            mode: chat
+            completion_params:
+              temperature: 0.7
+              max_tokens: 2048
+          prompt_template:
+            - role: system
+              text: >-
+                Complete the task precisely. If previous attempts scored low,
+                improve on the feedback. Current attempt number: {{#check_loop.index#}}.
+            - role: user
+              text: "{{#start.task#}}"
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # --- Validate ---
+      - id: validate
+        type: custom
+        parentId: check_loop
+        zIndex: 1002
+        position: { x: 400, y: 60 }
+        data:
+          type: code
+          title: "Validate"
+          isInLoop: true
+          loop_id: check_loop
+          code_language: python3
+          code: |
+            def main(output: str) -> dict:
+                score = 0
+                # Length check (at least 100 chars)
+                if len(output) >= 100:
+                    score += 30
+                # Structure check (has sections or bullet points)
+                if any(marker in output for marker in ["##", "- ", "1.", "* "]):
+                    score += 25
+                # Completeness check (has conclusion-like ending)
+                lower = output.lower()
+                if any(word in lower for word in ["conclusion", "summary", "in summary", "therefore"]):
+                    score += 25
+                # No placeholder/TODO markers
+                if not any(marker in lower for marker in ["todo", "[placeholder]", "tbd", "xxx"]):
+                    score += 20
+                return {"score": score, "result": output}
+          variables:
+            - variable: output
+              value_selector:
+                - generate
+                - text
+          outputs:
+            score:
+              type: number
+            result:
+              type: string
+
+      # --- Output ---
+      - id: output
+        type: custom
+        position: { x: 980, y: 282 }
+        data:
+          type: end
+          title: "Output"
+          outputs:
+            - variable: result
+              value_type: string
+              value_selector:
+                - check_loop
+                - best_result
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7

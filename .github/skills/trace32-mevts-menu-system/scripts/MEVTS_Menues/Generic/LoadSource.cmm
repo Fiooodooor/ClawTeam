@@ -1,0 +1,42 @@
+&path=OS.PPD()
+chdir &path
+
+IF !SYSTEM.UP()
+	GOSUB print_error
+
+;----------------Definitions--------------------------
+
+Do .\GetFilePath.cmm
+entry &elf_file
+
+IF "&ram_elf_file"==""
+(
+	ENDDO
+)
+
+;--------------Main initialization part----------------------------------------------
+ON.ERROR GOSUB print_error
+
+;Load elves
+Data.LOAD.Elf &elf_file /nocode; Load only the code sources
+; ThreadX Awareness
+
+#TASK.CONFIG C:\T32\demo\arc\kernel\threadx\threadx    ; load ThreadX Awareness (threadx.t32)
+#MENU.ReProgram C:\T32\demo\arc\kernel\threadx\threadx ; load ThreadX Menu (threadx.men)
+#HELP.FILTER.Add rtosthreadx
+
+; Windows layout
+setup.var %HEX
+
+
+;----------------------end of initialization part----------------------------
+
+ENDDO
+print_error:
+	ON.ERROR inherit
+	if SYStem.Up()
+		&msg="Illegal Input. Please recheck.."
+	else
+		&msg="Target is not connected. Please run the attach script."
+	do ~~/demo/arm/MEVTS_Menues/Error_print "&msg"
+	ENDDO

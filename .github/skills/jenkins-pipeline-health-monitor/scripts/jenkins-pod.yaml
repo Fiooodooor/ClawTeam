@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: jenkins-sanity-agent
+  namespace: guy-dev
+  labels:
+    app: jenkins-sanity-agent
+    version: latest
+spec:
+  containers:
+  - name: jenkins-sanity-agent
+    image: ger-is-registry.caas.intel.com/fw-common/snic-images/jenkins_sanity_agent:latest
+    imagePullPolicy: Always
+    ports:
+    - containerPort: 8002
+      name: metrics
+      protocol: TCP
+    env:
+    - name: JENKINS_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: jenkins-credentials
+          key: JENKINS_USERNAME
+    - name: JENKINS_API_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: jenkins-credentials
+          key: JENKINS_API_TOKEN
+    - name: PROMETHEUS_PORT
+      value: "8002"
+    - name: PYTHONUNBUFFERED
+      value: "1"
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    livenessProbe:
+      httpGet:
+        path: /metrics
+        port: 8002
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+    readinessProbe:
+      httpGet:
+        path: /metrics
+        port: 8002
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    volumeMounts:
+    - name: logs
+      mountPath: /app/logs
+  volumes:
+  - name: logs
+    emptyDir: {}
+  restartPolicy: Always

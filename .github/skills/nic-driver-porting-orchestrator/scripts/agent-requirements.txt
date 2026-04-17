@@ -1,0 +1,20 @@
+# NIC Driver Porting Orchestrator — Dependencies
+# This file contains ALL dependencies needed for the multi-agent porting pipeline
+#
+# Installation:
+#   pip install -r agent-requirements.txt
+
+# Core dependencies
+python-dotenv          # Environment variable management
+PyYAML                 # YAML parsing (connection-info files)
+
+# LangChain/LangGraph dependencies (used by pipeline agents)
+langchain              # Core LangChain framework
+langchain-openai       # Azure OpenAI integration
+langchain-core         # LangChain core components (messages, prompts)
+langgraph              # Graph-based agent orchestration
+openai                 # OpenAI API client
+
+# Azure authentication
+azure-identity
+

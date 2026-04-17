@@ -1,0 +1,87 @@
+on error continue
+
+&to_rerun=0
+
+&dir=OS.PPD()
+chdir &dir
+
+ON.ERROR continue
+
+&clock=CLOCK.SECONDS();
+&dump_dir="Dump_NVM"
+OS.HIDDEN MKDIR &(dump_dir);
+&targetFilePath="&(dump_dir)\NVM_dump_&(clock).bin"
+
+&flash_read_buffer_start=0x30000000
+&pattern_len=0x1000
+
+
+&flash_read_buffer_end=&flash_read_buffer_start+&pattern_len
+&flash_read_buffer_end=&flash_read_buffer_end-1
+
+
+;;;;;;;;;;;;;;;;;;;;Add option to specify start, end offsets
+&start_sector=0x0
+&end_sector=0x1
+
+&i=&start_sector
+&flash_read_address=0
+
+if run()
+(
+&to_rerun=1
+BREAK
+)
+&vm_cur=0
+while &i<&end_sector
+( 
+
+data.set D:&flash_read_buffer_start--&flash_read_buffer_end %LONG 0
+
+&flash_read_address=(&i)*(&pattern_len)
+
+;Constant data
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+&whdr0=0x11000  		;Read=0x10000,SPI_dest=0x1000
+&whdr2=0x40				;chunk size = 64 const
+&dword_len=0x10			;Dword rength of response- const 16
+&msgcsr=0x88001003		;CTRL - HDR Dwords=3 const, Expected RD words = 0x10, Read = 0x8000000, CMD enable = 0x80000000
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+Data.Set D:0x402223D0 %Long &whdr0
+Data.Set D:0x402223E0 %Long &flash_read_address
+Data.Set D:0x402223F0 %Long &whdr2
+
+Data.Set D:0x402220C0 %Long &flash_read_buffer_start
+Data.Set D:0x402220D0 %Long &pattern_len
+Data.Set D:0x40222090 %Long &dword_len
+
+Data.Set D:0x40222080 %Long &msgcsr
+
+;poll the CMD valid bit until cleared
+&done=data.long(D:0x40222080)
+&done=((&done)&(0x80000000))
+while &done!=0 
+(
+&done=data.long(D:0x40222080)
+&done=((&done)&(0x80000000))
+)
+
+Data.COPY D:&flash_read_buffer_start--&flash_read_buffer_end VM:&vm_cur 
+&vm_cur= &vm_cur+&pattern_len
+
+&i=&i+1
+)
+&vm_cur= &vm_cur-1
+
+data.save.binary &(targetFilePath) VM:0x0--VM:&vm_cur
+
+DO ..\..\Dump_open.cmm &targetFilePath
+if &to_rerun==1
+(
+Step
+Step
+Go ; run
+)
+
+ENDDO

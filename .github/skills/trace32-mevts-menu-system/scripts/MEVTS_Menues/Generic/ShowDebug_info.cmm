@@ -1,0 +1,95 @@
+AREA.view
+
+ENTRY &section &out_mode
+
+IF !SYSTEM.UP()
+	GOSUB print_error
+
+IF &out_mode=="file"
+(
+	OPEN #1 &section\debug_info.txt /Create
+	CLOSE #1
+)
+
+; break
+&is_to_rerun=0
+if run()
+(
+&is_to_rerun=1
+BREAK
+)
+
+&SessionDate=DATE.DATE()
+&SessionTime=DATE.TIME()
+&ERROR_SUMMARY=0
+GOSUB print_out "%COLOR.BLUE" "*******************************************************************************************"
+GOSUB print_out "%COLOR.BLUE" "*   Debug info rev 1  &SessionTime &SessionDate  (  starting from MEVTS 1.0.0.0  )        *"
+GOSUB print_out "%COLOR.BLUE" "*******************************************************************************************"
+GOSUB print_out "%COLOR.BLUE" "   [ Error summary ]"
+GOSUB print_out "%COLOR.BLUE" "************************************************"
+
+if &ERROR_SUMMARY==1
+(
+   GOSUB print_out "%COLOR.RED" "******************************************"   
+   GOSUB print_out "%COLOR.RED" "  NOTE :  THE SYSTEM IN FAULTY STATE  !!!!"
+   GOSUB print_out "%COLOR.RED" "******************************************"
+)
+else
+(
+	GOSUB print_out "%COLOR.GREEN"    "  There is no error indication in the system !!!"
+	GOSUB print_out "%COLOR.BLUE" "************************************************"
+)
+
+if "&section"=="1"
+(
+    goto END_OF_SCRIPT
+)
+
+
+
+END_OF_SCRIPT:
+PRINT
+if &is_to_rerun==1
+(
+Step
+Step
+Go ; run
+)
+ENDDO
+
+print_out:
+	// This subroutine accepts 1 or 2 arguments.
+	// If two arguments received, the first is the format (e.g. "%COLOR.RED") and the seccond is the message.
+	// If one argument received it is the message.
+	PRIVATE &format &message
+	PARAMETERS &format &message
+	// If only one argument received it will be stored by default in &format, but we want it in &message:
+	if ("&message"=="")
+	(
+		&message="""&format"""
+		&format=""
+	)
+	else
+	(
+		&message="""&message"""
+	)
+	
+	// Print the message to view or to file as needed:
+	if (&out_mode=="show")
+	(
+		PRINT &format &message
+	)
+	else
+	(
+		APPEND &section/debug_info.txt &message
+	)
+	RETURN
+
+print_error:
+	ON.ERROR inherit
+	if SYStem.Up()
+		&msg="Illegal Input. Please recheck.."
+	else
+		&msg="Target is not connected. Please run the attach script."
+	do ~~/demo/arm/MEVTS_Menues/Error_print "&msg"
+	ENDDO

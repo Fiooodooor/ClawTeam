@@ -1,0 +1,37 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: jenkins-alerts
+  namespace: monitoring
+  labels:
+    app: alertmanager
+    alertmanagerConfig: main
+spec:
+  route:
+    groupBy: ['alertname']
+    groupWait: 10s
+    groupInterval: 5m
+    repeatInterval: 12h
+    receiver: 'jenkins-team'
+    routes:
+      - match:
+          severity: critical
+        receiver: 'jenkins-critical'
+      - match:
+          severity: warning
+        receiver: 'jenkins-team'
+
+  receivers:
+    - name: 'jenkins-critical'
+      emailConfigs:
+        - to: 'fw.devops@intel.com'
+          from: 'alerts@ipu-dora.intel.com'
+          smarthost: 'smtp.intel.com:25'
+          requireTLS: false
+          
+    - name: 'jenkins-team'
+      emailConfigs:
+        - to: 'fw.devops@intel.com'
+          from: 'alerts@ipu-dora.intel.com'
+          smarthost: 'smtp.intel.com:25'
+          requireTLS: false

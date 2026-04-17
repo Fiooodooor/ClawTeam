@@ -53,7 +53,7 @@ def maybe_llm_chain() -> Any | None:
     if not api_key:
         return None
 
-    model = os.getenv("PORTING_MODEL", "gpt-4o")
+    model = os.getenv("PORTING_MODEL", "gpt-5")
     llm = ChatOpenAI(model=model, temperature=0)
     tmpl = PromptTemplate.from_template(
         """

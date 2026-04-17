@@ -1,0 +1,105 @@
+projects:
+  - manifest_branch: mev-ts-trunk
+    title: "MEV_TS"
+    repo: https://github.com/intel-innersource/networking.ipu.mountevans.manifests
+    repo_list:
+      exclude:
+        - repo: firmware.ethernet.mountevans.nvm-team-utils
+        - repo: firmware.ethernet.mountevans.snic-nvm-generator
+        - repo: firmware.ethernet.mountevans.signing-emulation
+        - repo: firmware.ethernet.mountevans.signing-tool-simulator
+        - repo: firmware.ethernet.mountevans.signing-mock
+        - repo: firmware.ethernet.mountevans.signing-production
+        - repo: firmware.ethernet.mountevans.snic-nvm-generator-config
+        - repo: firmware.ethernet.mountmorgan.snic-nvm-generator-config
+        - repo: firmware.ethernet.mountevans.ts.ddr
+        - repo: firmware.ethernet.mountevans.mev-eth
+        - repo: firmware.ethernet.mountevans.fw-pe-lce
+        - repo: firmware.ethernet.mountevans.fw-pe-rdma
+        - repo: firmware.ethernet.mountevans.ts.secured-binaries
+        - repo: firmware.ethernet.mountevans.vpd
+
+      include:
+        - repo: ^firmware.ethernet
+          regex: true
+        - repo: networking.ipu.mountevans.environment
+        - repo: networking.ipu.mountevans.docker-images
+        - repo: drivers.ethernet.shared.mev-hw
+        - repo: networking.ipu.mountevans.ipu-sdk
+        - repo: networking.ipu.mountevans.bsp
+        - repo: networking.ipu.mountevans.bsp-internal
+        - repo: frameworks.validation.multitester.eth-mev
+        - repo: frameworks.validation.multitester.eth-core
+        - repo: networking.ipu.mountevans.kernel
+        - repo: drivers.ethernet.shared.mev-hw
+
+    
+  - manifest_branch: mev-trunk
+    title: "ONE_IMAGE"
+    repo: https://github.com/intel-innersource/networking.ipu.mountevans.manifests
+    repo_list:
+      exclude:
+        - repo: firmware.ethernet.mountevans.hwconfig
+        - repo: firmware.ethernet.mountevans.nvm-team-utils
+        - repo: firmware.ethernet.mountevans.snic-nvm-generator
+        - repo: firmware.ethernet.mountevans.machine-readable-regs-defs-sydk
+        - repo: firmware.ethernet.mountevans.signing-mock
+        - repo: firmware.ethernet.mountevans.signing-emulation
+        - repo: firmware.ethernet.mountevans.signing-tool-simulator
+        - repo: firmware.ethernet.mountmorgan.snic-nvm-generator-config
+        - repo: firmware.ethernet.mountevans.snic-nvm-generator-config
+        - repo: firmware.ethernet.mountmorgan.ts.ddr
+        - repo: firmware.ethernet.mountevans.ts.ddr
+        - repo: firmware.ethernet.mountmorgan.ddr
+        - repo: firmware.ethernet.mountmorgan.ddr-code
+        - repo: firmware.ethernet.mountevans.ddr
+        - repo: firmware.ethernet.mountevans.mev-eth
+        - repo: firmware.ethernet.mountevans.fw-pe-lce
+        - repo: firmware.ethernet.mountevans.fw-pe-rdma
+        - repo: firmware.ethernet.cpsdk.mev-hal
+
+      include:
+        - repo: ^firmware.ethernet
+          regex: true
+        - repo: networking.ipu.mountevans.environment
+        - repo: networking.ipu.mountevans.docker-images
+        - repo: networking.validation.swift
+        - repo: networking.ipu.mountevans.bsp
+        - repo: networking.ipu.mountevans.bsp-internal
+        - repo: networking.ipu.mountevans.kernel
+        - repo: drivers.ethernet.shared.mev-hw
+        - repo: drivers.ethernet.shared.mev-cpchnl
+        - repo: frameworks.validation.multitester.eth-mev
+        - repo: frameworks.validation.multitester.eth-core
+        - repo: drivers.ethernet.shared.mev-hw
+
+  - manifest_branch: nssip-trunk
+    title: "NSSHIP"
+    repo: https://github.com/intel-innersource/networking.ipu.mountevans.manifests
+    repo_list:
+      exclude:
+        - repo: firmware.ethernet.cpsdk.mev-nsl
+        - repo: firmware.ethernet.mountevans.mev-infra
+        - repo: firmware.ethernet.cpsdk.mev-nsl
+        - repo: firmware.ethernet.mountevans.nvm-team-utils
+        - repo: firmware.ethernet.mountevans.snic-nvm-generator
+        - repo: firmware.ethernet.cnic.physs
+        - repo: firmware.ethernet.cnic.nvm-generator-config
+        - repo: firmware.ethernet.mountevans.signing-emulation
+        - repo: firmware.ethernet.mountevans.signing-tool-simulator
+        - repo: firmware.ethernet.mountevans.mev-eth
+        - repo: firmware.ethernet.mountmorgan.imc.physs
+        - repo: firmware.ethernet.mountevans.fw-pe-lce
+        - repo: firmware.ethernet.mountevans.fw-pe-rdma
+        - repo: firmware.ethernet.mountmorgan.imc.mmg-pmu
+      include:
+        - repo: ^firmware.ethernet
+          regex: true
+        - repo: networking.ipu.mountevans.environment
+        - repo: drivers.ethernet.linux.mev-cp
+        - repo: drivers.ethernet.shared.mev-hw
+        - repo: networking.validation.swift
+        - repo: networking.validation.svd
+
+
+    

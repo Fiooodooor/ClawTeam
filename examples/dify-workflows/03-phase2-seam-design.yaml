@@ -1,0 +1,558 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "NIC Porting — Phase 2: OAL Seam Layer Design (TDD)"
+  mode: workflow
+  icon: "🧩"
+  icon_type: emoji
+  icon_background: "#EDE9FE"
+  description: >
+    Phase 2: Design the OS Abstraction Layer (OAL) — thin #ifdef trees, inline wrappers,
+    weak-symbol seams. TDD gate: every seam header must compile on all targets,
+    no redundant wrapper layers, zero performance overhead. Sequential pattern,
+    seam-architect role with handoff capability to portability-validator.
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    viewport: {x: 0, y: 0, zoom: 0.85}
+    nodes:
+
+      # ── INPUT ──────────────────────────────────────────────────────────────
+      - id: start
+        type: custom
+        position: {x: 30, y: 282}
+        data:
+          type: start
+          title: "Phase 2 Inputs"
+          variables:
+            - variable: driver_name
+              label: "Driver Name"
+              type: text-input
+              required: true
+              default: "ixgbe"
+            - variable: api_mappings
+              label: "API Mappings JSON (from Phase 1)"
+              type: paragraph
+              required: true
+            - variable: hard_constraints
+              label: "Hard Constraints (from Phase 0)"
+              type: paragraph
+              required: true
+            - variable: target_os
+              label: "Target OS"
+              type: select
+              required: true
+              options:
+                - value: FreeBSD
+                  label: "FreeBSD (iflib)"
+                - value: Windows
+                  label: "Windows (NDIS)"
+                - value: DPDK
+                  label: "DPDK PMD"
+              default: FreeBSD
+            - variable: risk_register
+              label: "Risk Register JSON (shared across phases)"
+              type: paragraph
+              required: false
+
+      # ── TDD SPEC: Seam layer test cases ────────────────────────────────────
+      - id: tdd_seam_spec
+        type: custom
+        position: {x: 330, y: 80}
+        data:
+          type: llm
+          title: "TDD — Seam Layer Test Specifications"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 2048
+          prompt_template:
+            - role: system
+              text: |
+                Generate TDD test specifications for Phase 2 OAL seam layer design.
+                Tests must verify: compilability, zero overhead, clean #ifdef structure,
+                no redundant wrappers, proper weak-symbol placement.
+                Output JSON array of {test_id, description, check_target}.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                API Mappings: {{#start.api_mappings#}}
+                Constraints: {{#start.hard_constraints#}}
+
+                Generate tests for:
+                1. Each seam header has proper include guards
+                2. All #ifdef guards use driver-specific prefixes (no generic LINUX_)
+                3. All inline wrappers are zero-overhead (inlined or macros)
+                4. No wrapper nesting deeper than 2 levels
+                5. Weak symbols properly declared for all optional hooks
+                6. Seam compiles with -Wall -Wextra on target OS
+                7. No LinuxKPI includes in any seam header
+                8. Seam structure is self-contained (no circular deps)
+                9. All mappings from Phase 1 have corresponding seam entries
+                10. Seam adds zero binary size overhead vs direct calls
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── SEAM ARCHITECT ─────────────────────────────────────────────────────
+      - id: seam_architect
+        type: custom
+        position: {x: 330, y: 400}
+        data:
+          type: llm
+          title: "seam-architect — OAL Design"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.1
+              max_tokens: 10000
+          prompt_template:
+            - role: system
+              text: |
+                You are the seam-architect agent for NIC driver porting.
+                Design the complete OS Abstraction Layer (OAL) for {{#start.driver_name#}} → {{#start.target_os#}}.
+
+                DESIGN LAWS:
+                1. Use #ifdef trees — NEVER runtime polymorphism for OS selection
+                2. All wrappers must be static inline or macros — zero call overhead
+                3. Use __attribute__((weak)) for optional platform hooks
+                4. No wrapper nesting > 2 levels deep
+                5. Every seam header must compile standalone with target OS headers
+                6. Keep Linux code paths as-is under LINUX guard — minimal touch
+                7. Seam headers go in nic_oal/ directory
+                8. Naming: nic_oal_<category>.h (e.g., nic_oal_mem.h, nic_oal_lock.h)
+
+                Return ONLY valid JSON.
+            - role: user
+              text: |
+                Driver: {{#start.driver_name#}}
+                Target OS: {{#start.target_os#}}
+                API Mappings to implement: {{#start.api_mappings#}}
+                Hard constraints: {{#start.hard_constraints#}}
+
+                Design the OAL seam layer. Produce JSON:
+                {
+                  "seam_headers": [
+                    {
+                      "filename": "nic_oal_<category>.h",
+                      "category": "mem|lock|dma|irq|network|timer|pci",
+                      "include_guard": "NIC_OAL_<CATEGORY>_H",
+                      "linux_includes": ["include/linux/..."],
+                      "bsd_includes": ["sys/..."],
+                      "wrappers": [
+                        {
+                          "linux_api": "api_name",
+                          "native_api": "bsd_api_name",
+                          "wrapper_type": "static_inline|macro|weak_symbol",
+                          "wrapper_depth": 1,
+                          "signature": "static inline ret_t nic_<api>(args...)",
+                          "body": "return native_call(args);",
+                          "overhead": "zero"
+                        }
+                      ],
+                      "compiles_standalone": true
+                    }
+                  ],
+                  "ifdef_strategy": "string describing overall #ifdef structure",
+                  "weak_symbol_hooks": ["list of weak symbol hook names"],
+                  "design_score": 0,
+                  "portability_ready": true,
+                  "seam_notes": "any important design decisions"
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── PORTABILITY VALIDATOR (handoff target) ─────────────────────────────
+      - id: portability_validator
+        type: custom
+        position: {x: 730, y: 400}
+        data:
+          type: llm
+          title: "portability-validator — Cross-Target Seam Review"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.0
+              max_tokens: 4096
+          prompt_template:
+            - role: system
+              text: |
+                You are the portability-validator agent. Review the OAL seam design for
+                cross-OS portability. Check that seams would extend to at least 2 additional
+                OS targets (Windows NDIS, DPDK PMD, illumos) without core rewrites.
+                Return ONLY valid JSON with your findings.
+            - role: user
+              text: |
+                Seam design: {{#seam_architect.text#}}
+                Current target OS: {{#start.target_os#}}
+                API mappings: {{#start.api_mappings#}}
+
+                Audit and return:
+                {
+                  "portability_findings": [
+                    {"header": "filename", "issue": "description or null", "severity": "critical|high|medium|low|ok"}
+                  ],
+                  "additional_os_valid": ["Windows NDIS", "DPDK PMD"],
+                  "core_rewrite_required": false,
+                  "portability_score": 0.0,
+                  "blocking_issues": [],
+                  "approved": true
+                }
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── TDD GATE ───────────────────────────────────────────────────────────
+      - id: tdd_seam_gate
+        type: custom
+        position: {x: 1130, y: 282}
+        data:
+          type: code
+          title: "TDD Seam Gate — Validate Design Quality"
+          code_language: python3
+          code: |
+            import json
+
+            def main(seam_json: str, portability_json: str, risk_register_json: str = "[]") -> dict:
+                results = []
+                passed = 0
+                failed = 0
+              try:
+                risk_register = json.loads(risk_register_json) if risk_register_json else []
+                if not isinstance(risk_register, list):
+                  risk_register = []
+              except Exception:
+                risk_register = []
+
+                def check(tid, ok, detail=""):
+                    nonlocal passed, failed
+                    status = "PASS" if ok else "FAIL"
+                    if ok:
+                        passed += 1
+                    else:
+                        failed += 1
+                    results.append({"test_id": tid, "status": status, "detail": str(detail)[:120]})
+
+                try:
+                    seam = json.loads(seam_json)
+                except Exception as e:
+                    return _fail(f"seam JSON parse: {e}")
+
+                try:
+                    portability = json.loads(portability_json)
+                except Exception as e:
+                    return _fail(f"portability JSON parse: {e}")
+
+                headers = seam.get("seam_headers", [])
+                check("T01-headers-exist", len(headers) > 0, f"count={len(headers)}")
+
+                # Check every header compiles standalone
+                non_standalone = [h["filename"] for h in headers if not h.get("compiles_standalone")]
+                check("T02-standalone-compile", len(non_standalone) == 0, f"failed={non_standalone}")
+
+                # Check no LinuxKPI in BSD includes
+                for h in headers:
+                    bsd_incs = h.get("bsd_includes", [])
+                    linuxkpi_incs = [i for i in bsd_incs if "linuxkpi" in i.lower()]
+                    check(f"T03-no-linuxkpi-{h.get('filename','?')}", len(linuxkpi_incs) == 0,
+                          f"violations={linuxkpi_incs}")
+
+                # Check wrapper depth <= 2
+                for h in headers:
+                    for w in h.get("wrappers", []):
+                        depth = int(w.get("wrapper_depth", 1))
+                        check(f"T04-depth-{w.get('linux_api','?')}", depth <= 2, f"depth={depth}")
+
+                # Check overhead = zero for all wrappers
+                overhead_violations = []
+                for h in headers:
+                    for w in h.get("wrappers", []):
+                        if w.get("overhead", "zero") != "zero":
+                            overhead_violations.append(w.get("linux_api", "?"))
+                check("T05-zero-overhead-all", len(overhead_violations) == 0,
+                      f"violations={overhead_violations}")
+
+                # Check portability approved
+                check("T06-portability-approved", portability.get("approved") is True,
+                      f"score={portability.get('portability_score', 0)}")
+
+                # Check no core rewrites needed
+                check("T07-no-core-rewrite", portability.get("core_rewrite_required") is False)
+
+                # Check portability score >= 90
+                pscore = float(portability.get("portability_score", 0))
+                check("T08-portability-score-gte90", pscore >= 90.0, f"score={pscore}")
+
+                # Check design score >= 80
+                dscore = int(seam.get("design_score", 0))
+                check("T09-design-score-gte80", dscore >= 80, f"score={dscore}")
+
+                # Check ifdef_strategy present
+                check("T10-ifdef-strategy", bool(seam.get("ifdef_strategy", "").strip()))
+
+                total = passed + failed
+                gate_score = round((passed / total) * 100, 1) if total else 0.0
+                fail_ids = [r["test_id"] for r in results if r["status"] == "FAIL"]
+                updated_risk_register = list(risk_register)
+                blocking = portability.get("blocking_issues", []) or []
+                if failed != 0 or blocking:
+                  updated_risk_register.append({
+                    "risk_id": f"RISK-{len(updated_risk_register) + 1:03d}",
+                    "phase_raised": "phase-2",
+                    "category": "portability",
+                    "description": f"Phase 2 seam gate issues: {'; '.join(fail_ids) or 'blocking portability issues'}",
+                    "severity": "high" if portability.get("core_rewrite_required") else "medium",
+                    "status": "open",
+                    "mitigation_action": "Refine seam headers and eliminate blocking portability issues",
+                    "mitigation_phase": "phase-2",
+                    "residual_risk": "medium"
+                  })
+
+                return {
+                    "all_passed": failed == 0,
+                    "passed_count": passed,
+                    "failed_count": failed,
+                    "gate_score": gate_score,
+                    "test_results": json.dumps(results),
+                    "fail_summary": "; ".join(fail_ids),
+                    "seam_headers": json.dumps(seam.get("seam_headers", [])),
+                    "weak_symbol_hooks": json.dumps(seam.get("weak_symbol_hooks", [])),
+                    "ifdef_strategy": seam.get("ifdef_strategy", ""),
+                    "portability_score": pscore,
+                    "blocking_issues": json.dumps(portability.get("blocking_issues", [])),
+                    "updated_risk_register": json.dumps(updated_risk_register),
+                    "replan_recommended": failed != 0 or bool(blocking),
+                }
+
+            def _fail(reason):
+                return {
+                    "all_passed": False, "passed_count": 0, "failed_count": 1,
+                    "gate_score": 0.0, "test_results": json.dumps([{"test_id": "parse", "status": "FAIL", "detail": reason}]),
+                    "fail_summary": reason, "seam_headers": "[]", "weak_symbol_hooks": "[]",
+                    "ifdef_strategy": "", "portability_score": 0.0, "blocking_issues": "[]",
+                  "updated_risk_register": risk_register_json if risk_register_json else "[]",
+                  "replan_recommended": True
+                }
+          variables:
+            - variable: seam_json
+              value_selector: [seam_architect, text]
+            - variable: portability_json
+              value_selector: [portability_validator, text]
+            - variable: risk_register_json
+              value_selector: [start, risk_register]
+          outputs:
+            all_passed: {type: boolean}
+            passed_count: {type: number}
+            failed_count: {type: number}
+            gate_score: {type: number}
+            test_results: {type: string}
+            fail_summary: {type: string}
+            seam_headers: {type: string}
+            weak_symbol_hooks: {type: string}
+            ifdef_strategy: {type: string}
+            portability_score: {type: number}
+            blocking_issues: {type: string}
+            updated_risk_register: {type: string}
+            replan_recommended: {type: boolean}
+
+      # ── BRANCH ─────────────────────────────────────────────────────────────
+      - id: gate_branch
+        type: custom
+        position: {x: 1430, y: 282}
+        data:
+          type: if-else
+          title: "Seam TDD Gate Pass?"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - variable_selector: [tdd_seam_gate, all_passed]
+                  comparison_operator: is
+                  value: "true"
+                  id: cond-seam-pass
+
+      # ── SUCCESS ────────────────────────────────────────────────────────────
+      - id: end_success
+        type: custom
+        position: {x: 1730, y: 120}
+        data:
+          type: end
+          title: "Phase 2 PASSED ✅"
+          outputs:
+            - variable: gate_score
+              value_type: number
+              value_selector: [tdd_seam_gate, gate_score]
+            - variable: seam_headers
+              value_type: string
+              value_selector: [tdd_seam_gate, seam_headers]
+            - variable: weak_symbol_hooks
+              value_type: string
+              value_selector: [tdd_seam_gate, weak_symbol_hooks]
+            - variable: ifdef_strategy
+              value_type: string
+              value_selector: [tdd_seam_gate, ifdef_strategy]
+            - variable: portability_score
+              value_type: number
+              value_selector: [tdd_seam_gate, portability_score]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_seam_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_seam_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_seam_gate, replan_recommended]
+
+      # ── REMEDIATION ────────────────────────────────────────────────────────
+      - id: remediation_llm
+        type: custom
+        position: {x: 1730, y: 500}
+        data:
+          type: llm
+          title: "Remediation — Fix Seam Design Issues"
+          model:
+            provider: openai
+            name: gpt-4o
+            mode: chat
+            completion_params:
+              temperature: 0.2
+              max_tokens: 8000
+          prompt_template:
+            - role: system
+              text: |
+                Fix the OAL seam design to pass all TDD gate checks.
+                Address portability blocking issues and reduce wrapper depth.
+                Return corrected seam JSON with same schema.
+            - role: user
+              text: |
+                Original seam design: {{#seam_architect.text#}}
+                Portability findings: {{#portability_validator.text#}}
+                Failed tests: {{#tdd_seam_gate.fail_summary#}}
+                Blocking issues: {{#tdd_seam_gate.blocking_issues#}}
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # ── FAIL OUTPUT ────────────────────────────────────────────────────────
+      - id: end_fail
+        type: custom
+        position: {x: 2030, y: 500}
+        data:
+          type: end
+          title: "Phase 2 FAILED ❌ — Remediated Design"
+          outputs:
+            - variable: remediated_seam
+              value_type: string
+              value_selector: [remediation_llm, text]
+            - variable: fail_summary
+              value_type: string
+              value_selector: [tdd_seam_gate, fail_summary]
+            - variable: test_results
+              value_type: string
+              value_selector: [tdd_seam_gate, test_results]
+            - variable: updated_risk_register
+              value_type: string
+              value_selector: [tdd_seam_gate, updated_risk_register]
+            - variable: replan_recommended
+              value_type: boolean
+              value_selector: [tdd_seam_gate, replan_recommended]
+
+    edges:
+      - id: e-start-tddspec
+        source: start
+        target: tdd_seam_spec
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-start-architect
+        source: start
+        target: seam_architect
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-architect-portability
+        source: seam_architect
+        target: portability_validator
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-tddspec-gate
+        source: tdd_seam_spec
+        target: tdd_seam_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-portability-gate
+        source: portability_validator
+        target: tdd_seam_gate
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-gate-branch
+        source: tdd_seam_gate
+        target: gate_branch
+        sourceHandle: source
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-success
+        source: gate_branch
+        target: end_success
+        sourceHandle: "true"
+        targetHandle: target
+        type: custom
+
+      - id: e-branch-fail
+        source: gate_branch
+        target: remediation_llm
+        sourceHandle: "false"
+        targetHandle: target
+        type: custom
+
+      - id: e-remediation-fail
+        source: remediation_llm
+        target: end_fail
+        sourceHandle: source
+        targetHandle: target
+        type: custom
