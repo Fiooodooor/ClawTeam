@@ -47,7 +47,13 @@ def to_payload(value: Any) -> Any:
 
 
 def coerce_enum(enum_cls: type[EnumT], value: str | None) -> EnumT | None:
-    return enum_cls(value) if value else None
+    if not value:
+        return None
+    try:
+        return enum_cls(value)
+    except ValueError:
+        valid = ", ".join(e.value for e in enum_cls)
+        raise ValueError(f"'{value}' is not a valid {enum_cls.__name__}. Valid values: {valid}")
 
 
 def require_team(team_name: str):

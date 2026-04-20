@@ -13,7 +13,11 @@ def task_list(
     priority: str | None = None,
     sort_by_priority: bool = False,
 ) -> list[dict]:
-    """List tasks for a team with optional filters."""
+    """List tasks for a team with optional filters.
+
+    Valid status values: pending, in_progress, completed, blocked.
+    Valid priority values: low, medium, high, urgent.
+    """
     store = task_store(team_name)
     return to_payload(
         store.list_tasks(
@@ -48,7 +52,10 @@ def task_create(
     blocked_by: list[str] | None = None,
     metadata: dict | None = None,
 ) -> dict:
-    """Create a task with optional owner, dependencies, and metadata."""
+    """Create a task with optional owner, dependencies, and metadata.
+
+    Valid priority values: low, medium, high, urgent.
+    """
     return to_payload(
         task_store(team_name).create(
             subject=subject,
@@ -76,7 +83,11 @@ def task_update(
     caller: str = "",
     force: bool = False,
 ) -> dict:
-    """Update a task's fields, status, dependencies, or metadata."""
+    """Update a task's fields, status, dependencies, or metadata.
+
+    Valid status values: pending, in_progress, completed, blocked.
+    Valid priority values: low, medium, high, urgent.
+    """
     try:
         task = task_store(team_name).update(
             task_id=task_id,
