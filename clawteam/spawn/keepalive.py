@@ -64,13 +64,28 @@ def build_keepalive_shell_command(
     return (
         f'__ct_cmd={shlex.quote(cmd_str)}; '
         f'__ct_resume={shlex.quote(resume_str)}; '
+        '__ct_attempt=0; '
         "while true; do "
         'eval "$__ct_cmd"; '
         "__ct_status=$?; "
         f"{exit_hook}; "
-        'if [ "$__ct_status" -eq 0 ] && '
-        f"{should_keepalive}; "
-        'then __ct_cmd="$__ct_resume"; sleep 1; continue; fi; '
+        # Resume on ANY exit unless lifecycle explicitly says stop
+        # (agents commonly exit non-zero on transient errors / permission misses
+        # / 429 rate limits). Cap consecutive non-zero retries at 20 with
+        # exponential backoff to handle Azure rate limits gracefully.
+        'if [ "$__ct_status" -ne 0 ]; then '
+        '  __ct_attempt=$((__ct_attempt+1)); '
+        '  if [ "$__ct_attempt" -ge 20 ]; then '
+        '    echo "[keepalive] 20 consecutive non-zero exits; giving up" >&2; '
+        '    exit $__ct_status; '
+        '  fi; '
+        '  __ct_backoff=$((__ct_attempt * 5)); '
+        '  [ "$__ct_backoff" -gt 60 ] && __ct_backoff=60; '
+        '  echo "[keepalive] non-zero exit $__ct_status, attempt $__ct_attempt, sleeping $__ct_backoff" >&2; '
+        '  sleep "$__ct_backoff"; '
+        'else __ct_attempt=0; fi; '
+        f"if {should_keepalive}; "
+        'then __ct_cmd="$__ct_resume"; sleep 2; continue; fi; '
         "exit $__ct_status; "
         "done"
     )

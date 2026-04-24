@@ -188,7 +188,7 @@ scripts/clawteam-manage.sh status
 | `VENV_DIR` | `$ROOT_DIR/.venv` |
 | `TEAM` | `nic-port-v2-rerun7` |
 | `DRIVER_NAME` | `ixgbe` |
-| `GOAL` | Port Linux ixgbe driver to FreeBSD... |
+| `GOAL` | Port Linux nic driver to FreeBSD... |
 | `DRIVER_REPO` | `$ROOT_DIR/artifacts/ethernet-linux-ixgbe-live` |
 | `LINUX_DRIVER_PATH` | `src` |
 | `FREEBSD_TARGET_PATH` | `freebsd/src` |

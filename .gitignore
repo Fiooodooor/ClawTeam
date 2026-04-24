@@ -16,3 +16,4 @@ node_modules/
 artifacts/**
 logs/*
 artifacts/nic_porting_v2/orchestrator_checkpoint.json
+.gitnexus

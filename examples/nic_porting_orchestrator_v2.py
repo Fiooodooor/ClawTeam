@@ -17,8 +17,8 @@ Implements all five Microsoft AI Agent Orchestration Patterns:
 Usage:
   pipenv run python3 examples/nic_porting_orchestrator_v2.py \
     --team nic-port-v2 \
-    --driver-name ixgbe \
-    --goal "Native OAL data-plane port: Linux ixgbe to FreeBSD" \
+    --driver-name nic \
+    --goal "Native OAL data-plane port: Linux nic to FreeBSD" \
     --driver-repo /path/to/driver-repo \
     --linux-driver-path drivers/net/ethernet/intel/ixgbe \
     --freebsd-target-path sys/dev/ixgbe
