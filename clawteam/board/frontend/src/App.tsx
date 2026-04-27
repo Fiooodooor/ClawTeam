@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from "react"
-import { Sidebar } from "@/components/sidebar"
+import { Topbar } from "@/components/topbar"
 import { SummaryBar } from "@/components/summary-bar"
 import { AgentRegistry } from "@/components/agent-registry"
 import { MessageStream } from "@/components/message-stream"
@@ -52,8 +52,8 @@ export default function App() {
 
   return (
     <TeamContext.Provider value={{ teamName, data, isConnected }}>
-      <div className="flex h-screen bg-background text-foreground">
-        <Sidebar
+      <div className="flex h-screen flex-col bg-background text-foreground">
+        <Topbar
           selectedTeam={teamName}
           onTeamChange={setTeamName}
           isConnected={isConnected}
@@ -112,7 +112,7 @@ export default function App() {
                             }
                           />
                           {noneOnline
-                            ? `No agents — run clawteam launch ${teamName}`
+                            ? `No agents — run clawteam team start ${teamName}`
                             : `${online}/${total} online`}
                         </Badge>
                       )
@@ -163,6 +163,7 @@ export default function App() {
           task={peekTask}
           teamName={teamName}
           members={data?.members ?? []}
+          messages={data?.messages ?? []}
           open={peekTaskId !== null}
           onClose={() => setPeekTaskId(null)}
         />

@@ -1,3 +1,4 @@
+import { useRef } from "react"
 import { useSortable } from "@dnd-kit/react/sortable"
 import { AgentAvatar } from "@/components/agent-registry"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,12 +22,25 @@ export function TaskCard({ task, index, column, onPeek }: TaskCardProps) {
     accept: "task",
   })
 
+  const downPos = useRef<{ x: number; y: number } | null>(null)
   const color = STATUS_COLORS[column]
 
   return (
     <Card
       ref={ref}
-      onClick={() => onPeek(task.id)}
+      onPointerDown={(e) => {
+        downPos.current = { x: e.clientX, y: e.clientY }
+      }}
+      onClick={(e) => {
+        const start = downPos.current
+        downPos.current = null
+        if (start) {
+          const dx = e.clientX - start.x
+          const dy = e.clientY - start.y
+          if (dx * dx + dy * dy > 25) return
+        }
+        onPeek(task.id)
+      }}
       size="sm"
       className="cursor-pointer gap-2 bg-card/60 py-3 ring-1 ring-border/60 transition-all hover:bg-card hover:ring-border hover:shadow-[0_0_14px_-4px_var(--task-glow)]"
       style={{ ["--task-glow" as never]: color }}

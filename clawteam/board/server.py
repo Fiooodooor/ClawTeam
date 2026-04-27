@@ -188,11 +188,14 @@ class BoardHandler(BaseHTTPRequestHandler):
                 try:
                     payload = json.loads(body)
                     from clawteam.team.tasks import TaskStore
+                    from clawteam.team.models import TaskPriority
                     store = TaskStore(team_name)
+                    priority_val = payload.get("priority")
                     task = store.create(
                         subject=payload.get("subject", ""),
                         description=payload.get("description", ""),
-                        owner=payload.get("owner", "")
+                        owner=payload.get("owner", ""),
+                        priority=TaskPriority(priority_val) if priority_val else None,
                     )
                     self._serve_json({"status": "ok", "task_id": task.id})
                 except Exception as e:

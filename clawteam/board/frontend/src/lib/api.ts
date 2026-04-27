@@ -28,7 +28,7 @@ export async function fetchOverview() {
 
 export async function createTask(
   team: string,
-  data: { subject: string; owner?: string; description?: string },
+  data: { subject: string; owner?: string; description?: string; priority?: string },
 ) {
   return post(`/team/${encodeURIComponent(team)}/task`, data)
 }

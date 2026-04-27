@@ -58,11 +58,33 @@ export function AgentRegistry({
             key={m.memberKey}
             onClick={() => onMessageClick(m.inboxName || m.name, m.name)}
             className="flex items-center gap-3 rounded-md border border-zinc-800/50 bg-zinc-900/50 px-4 py-3 text-left transition-colors hover:border-zinc-700 hover:bg-zinc-900"
+            title={m.isRunning ? `${m.name} is running` : `${m.name} is offline`}
           >
-            <AgentAvatar name={m.name} />
+            <span className="relative inline-flex">
+              <AgentAvatar name={m.name} />
+              <span
+                aria-hidden
+                className={`absolute -bottom-0.5 -right-0.5 flex size-2.5 rounded-full ring-2 ring-zinc-950 ${
+                  m.isRunning ? "bg-emerald-400" : "bg-zinc-600"
+                }`}
+              >
+                {m.isRunning && (
+                  <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-70" />
+                )}
+              </span>
+            </span>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium text-zinc-200">
-                {m.name}
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-sm font-medium text-zinc-200">
+                  {m.name}
+                </span>
+                <span
+                  className={`font-mono text-[9px] uppercase tracking-widest ${
+                    m.isRunning ? "text-emerald-400" : "text-zinc-600"
+                  }`}
+                >
+                  {m.isRunning ? "online" : "offline"}
+                </span>
               </div>
               <div className="text-xs text-blue-400">{m.agentType}</div>
             </div>

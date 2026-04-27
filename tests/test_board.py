@@ -33,6 +33,7 @@ def test_collect_overview_does_not_call_collect_team(monkeypatch, tmp_path: Path
             "description": "demo team",
             "leader": "leader",
             "members": 1,
+            "membersOnline": 0,
             "tasks": 0,
             "pendingMessages": 0,
         }
@@ -63,6 +64,7 @@ def test_collect_overview_sums_inbox_counts_for_all_members(monkeypatch, tmp_pat
             "description": "demo team",
             "leader": "leader",
             "members": 2,
+            "membersOnline": 0,
             "tasks": 0,
             "pendingMessages": 1,
         }
@@ -198,6 +200,7 @@ def test_collect_overview_preserves_broken_team_fallback(monkeypatch):
             "description": "good team",
             "leader": "lead",
             "members": 1,
+            "membersOnline": 0,
             "tasks": 3,
             "pendingMessages": 2,
         }
@@ -213,6 +216,7 @@ def test_collect_overview_preserves_broken_team_fallback(monkeypatch):
             "description": "good team",
             "leader": "lead",
             "members": 1,
+            "membersOnline": 0,
             "tasks": 3,
             "pendingMessages": 2,
         },
@@ -221,6 +225,7 @@ def test_collect_overview_preserves_broken_team_fallback(monkeypatch):
             "description": "broken team",
             "leader": "",
             "members": 7,
+            "membersOnline": 0,
             "tasks": 0,
             "pendingMessages": 0,
         },
@@ -327,16 +332,15 @@ def test_proxy_fetches_allowed_github_content(monkeypatch):
     assert seen["url"] == "https://raw.githubusercontent.com/org/repo/main/README.md"
 
 
-def test_board_ui_escapes_attacker_controlled_fields():
-    html = Path("clawteam/board/static/index.html").read_text(encoding="utf-8")
+def test_board_ui_is_react_spa_shell():
+    """The dashboard is now a React SPA; escaping is handled by React at render time.
 
-    assert "escapeHtml(m.name)" in html
-    assert "escapeHtml(m.agentType || 'Agent')" in html
-    assert "escapeHtml(m.fromLabel || m.from || 'SYS')" in html
-    assert "escapeHtml(m.toLabel || m.to || 'ALL')" in html
-    assert "escapeHtml(t.owner || 'Unassigned')" in html
-    assert "t.blockedBy.map(v => escapeHtml(v)).join(', ')" in html
-    assert "option.textContent =" in html
+    This test just guards the served index.html shape: a minimal root mount
+    point plus a hashed bundle reference, with no inline user-data interpolation.
+    """
+    html = Path("clawteam/board/static/index.html").read_text(encoding="utf-8")
+    assert '<div id="root"></div>' in html
+    assert "/assets/index-" in html
 
 
 def test_patch_task_updates_status(monkeypatch, tmp_path: Path):

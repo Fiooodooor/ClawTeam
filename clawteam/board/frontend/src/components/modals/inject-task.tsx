@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -25,6 +25,8 @@ interface InjectTaskDialogProps {
   members: Member[]
 }
 
+const PRIORITIES = ["low", "medium", "high", "urgent"]
+
 export function InjectTaskDialog({
   open,
   onClose,
@@ -32,16 +34,29 @@ export function InjectTaskDialog({
   members,
 }: InjectTaskDialogProps) {
   const [subject, setSubject] = useState("")
+  const [description, setDescription] = useState("")
   const [owner, setOwner] = useState("")
+  const [priority, setPriority] = useState("medium")
   const [submitting, setSubmitting] = useState(false)
+
+  function reset() {
+    setSubject("")
+    setDescription("")
+    setOwner("")
+    setPriority("medium")
+  }
 
   async function handleSubmit() {
     if (!subject.trim()) return
     setSubmitting(true)
     try {
-      await createTask(teamName, { subject, owner: owner || undefined })
-      setSubject("")
-      setOwner("")
+      await createTask(teamName, {
+        subject,
+        description: description || undefined,
+        owner: owner || undefined,
+        priority,
+      })
+      reset()
       onClose()
     } catch (e) {
       console.error("Failed to create task", e)
@@ -52,53 +67,90 @@ export function InjectTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="border-zinc-800 bg-zinc-950 sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-zinc-100">Inject New Task</DialogTitle>
+          <DialogTitle>Inject New Task</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
-            <Label className="text-zinc-400">Description</Label>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Title
+            </label>
             <Input
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              placeholder="Task description..."
-              className="mt-1.5 border-zinc-800 bg-zinc-900 text-zinc-200"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit()
+              }}
+              placeholder="Short summary of the task..."
               autoFocus
             />
           </div>
+
           <div>
-            <Label className="text-zinc-400">Assign to</Label>
-            <Select
-              value={owner || "__unassigned__"}
-              onValueChange={(v) => { if (v !== null) setOwner(v === "__unassigned__" ? "" : v) }}
-            >
-              <SelectTrigger className="mt-1.5 w-full border-zinc-800 bg-zinc-900 text-zinc-200">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="border-zinc-800 bg-zinc-900">
-                <SelectItem value="__unassigned__" className="text-zinc-200">Unassigned</SelectItem>
-                {members.map((m) => (
-                  <SelectItem key={m.name} value={m.name} className="text-zinc-200">
-                    {m.name} ({m.agentType})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Description
+            </label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add context, acceptance criteria, or links..."
+              rows={5}
+            />
           </div>
-          <div className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="border-zinc-700 text-zinc-400"
-            >
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Priority
+              </label>
+              <Select
+                value={priority}
+                onValueChange={(v) => { if (v) setPriority(v) }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Assignee
+              </label>
+              <Select
+                value={owner || "__unassigned__"}
+                onValueChange={(v) => { if (v !== null) setOwner(v === "__unassigned__" ? "" : v) }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__unassigned__">Unassigned</SelectItem>
+                  {members.map((m) => (
+                    <SelectItem key={m.name} value={m.name}>
+                      {m.name} ({m.agentType})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-border pt-4">
+            <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button
               onClick={handleSubmit}
               disabled={submitting || !subject.trim()}
-              className="bg-blue-600 text-white hover:bg-blue-700"
             >
               {submitting ? "Deploying..." : "Deploy Task"}
             </Button>
