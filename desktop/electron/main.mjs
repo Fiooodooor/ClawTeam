@@ -305,6 +305,22 @@ function parseVersion(raw) {
   return match ? match[1] : null;
 }
 
+function projectVersion() {
+  try {
+    const pyproject = fs.readFileSync(path.join(REPO_ROOT, "pyproject.toml"), "utf8");
+    return pyproject.match(/^version\s*=\s*"([^"]+)"/m)?.[1] || "";
+  } catch {
+    return "";
+  }
+}
+
+function normalizeRuntimeVersion(value) {
+  const text = String(value || "").trim();
+  const local = projectVersion();
+  if (local && text && local.endsWith(text)) return local;
+  return text || null;
+}
+
 function versionKey(value) {
   return String(value || "")
     .match(/\d+/g)
@@ -332,7 +348,7 @@ function currentVersion() {
     stdio: ["ignore", "pipe", "pipe"],
     timeout: 8000,
   });
-  return parseVersion(`${result.stdout || ""} ${result.stderr || ""}`);
+  return normalizeRuntimeVersion(parseVersion(`${result.stdout || ""} ${result.stderr || ""}`));
 }
 
 async function latestVersion() {
@@ -343,7 +359,7 @@ async function latestVersion() {
     });
     if (!response.ok) return null;
     const payload = await response.json();
-    return payload?.info?.version || null;
+    return normalizeRuntimeVersion(payload?.info?.version);
   } catch {
     return null;
   }
@@ -353,10 +369,11 @@ async function runtimeStatus() {
   const commandPath = resolveClawTeamCommand();
   const current = currentVersion();
   const latest = await latestVersion();
+  const displayLatest = isNewer(current, latest) ? current : latest;
   return {
     installed: Boolean(commandPath || current),
     current_version: current,
-    latest_version: latest,
+    latest_version: displayLatest,
     upgrade_available: isNewer(latest, current),
     command_path: commandPath,
     install_root: CLAWTEAM_HOME,
@@ -583,6 +600,9 @@ ipcMain.handle("sessions:list-launch-targets", launchTargets);
 ipcMain.handle("sessions:open", async (_event, payload) => {
   const target = String(payload?.target || "");
   const session = payload?.session || {};
+  if (session.alive !== true && (target === "terminal" || target === "iterm" || target === "ghostty")) {
+    throw new Error(`Session '${session.agentName || "agent"}' is offline.`);
+  }
   if (target === "terminal" || target === "iterm") {
     if (session.backend !== "tmux") {
       throw new Error("Terminal attach is available for tmux sessions.");

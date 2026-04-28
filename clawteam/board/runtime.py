@@ -21,11 +21,14 @@ def get_runtime_status(timeout: float = 4.0) -> dict:
 
     current_version = _installed_version()
     latest_version = _latest_pypi_version(timeout=timeout)
+    display_latest_version = (
+        current_version if _is_newer(current_version, latest_version) else latest_version
+    )
     command_path = _resolve_command_path()
     return {
         "installed": bool(current_version or command_path),
         "current_version": current_version,
-        "latest_version": latest_version,
+        "latest_version": display_latest_version,
         "upgrade_available": _is_newer(latest_version, current_version),
         "command_path": command_path,
         "install_root": str(Path.home() / ".clawteam"),
@@ -36,7 +39,7 @@ def get_runtime_status(timeout: float = 4.0) -> dict:
 
 def _installed_version() -> str:
     try:
-        return metadata.version("clawteam")
+        return _normalize_runtime_version(metadata.version("clawteam"))
     except metadata.PackageNotFoundError:
         return __version__
 
@@ -47,9 +50,18 @@ def _latest_pypi_version(timeout: float) -> str | None:
         with urllib.request.urlopen(req, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
         version = payload.get("info", {}).get("version")
-        return str(version) if version else None
+        return _normalize_runtime_version(str(version)) if version else None
     except (OSError, urllib.error.URLError, json.JSONDecodeError, TimeoutError):
         return None
+
+
+def _normalize_runtime_version(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = value.strip()
+    if __version__.endswith(text):
+        return __version__
+    return text
 
 
 def _resolve_command_path() -> str:

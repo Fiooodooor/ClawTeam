@@ -453,7 +453,8 @@ textarea:focus {
 
 .kanban {
   display: grid;
-  min-height: 480px;
+  height: clamp(420px, calc(100vh - 300px), 780px);
+  min-height: 0;
   grid-template-columns: repeat(4, minmax(180px, 1fr));
   gap: 10px;
 }
@@ -462,6 +463,7 @@ textarea:focus {
   display: flex;
   overflow: hidden;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
   border: 0.5px solid var(--rule);
   border-radius: var(--radius);
@@ -473,6 +475,7 @@ textarea:focus {
   align-items: center;
   grid-template-columns: 24px 1fr auto;
   gap: 10px;
+  flex: 0 0 auto;
   min-height: 46px;
   padding: 10px 12px;
   border-bottom: 0.5px solid var(--rule);
@@ -524,10 +527,14 @@ textarea:focus {
 
 .task-stack {
   display: flex;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: 8px;
+  min-height: 0;
   padding: 10px;
+  overscroll-behavior: contain;
 }
 
 .task-card {
@@ -758,6 +765,14 @@ textarea:focus {
   grid-template-columns: minmax(160px, 1fr) auto minmax(240px, auto);
 }
 
+.agent-row.offline {
+  color: var(--muted);
+}
+
+.agent-row.offline strong {
+  color: var(--ink-soft);
+}
+
 .profile-row {
   grid-template-columns: minmax(160px, 1fr) auto auto auto;
 }
@@ -779,42 +794,17 @@ textarea:focus {
   letter-spacing: 0.02em;
 }
 
-.editor-panel {
-  align-self: start;
-  gap: 10px;
-}
-
-.runtime-list {
-  display: grid;
-  gap: 0;
-  margin: 0;
-}
-
-.runtime-list div {
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 12px;
-  padding: 9px 0;
-  border-top: 0.5px solid var(--rule);
-}
-
-.runtime-list div:first-child {
-  border-top: 0;
-}
-
-.runtime-list dt {
-  color: var(--muted);
-  font-family: var(--mono);
+.agent-row .session-meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-soft);
   font-size: 10px;
-  letter-spacing: 0.15em;
   text-transform: uppercase;
 }
 
-.runtime-list dd {
-  overflow-wrap: anywhere;
-  margin: 0;
-  font-size: 13px;
-  color: var(--ink);
+.editor-panel {
+  align-self: start;
+  gap: 10px;
 }
 
 .log-panel pre {
@@ -1109,11 +1099,6 @@ textarea:focus {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-}
-
-.runtime-card .runtime-list {
-  border-top: 0.5px solid var(--rule);
-  padding-top: 14px;
 }
 
 .install-log {
@@ -1439,11 +1424,6 @@ textarea:focus {
   gap: 12px;
 }
 
-.settings-popover-body .runtime-list div {
-  grid-template-columns: 90px 1fr;
-  padding: 7px 0;
-}
-
 .settings-popover-body .client-grid {
   grid-template-columns: 1fr;
   gap: 6px;
@@ -1497,6 +1477,15 @@ textarea:focus {
   .agent-row,
   .profile-row {
     grid-template-columns: 1fr;
+  }
+
+  .kanban {
+    height: auto;
+  }
+
+  .kanban-column {
+    height: min(440px, calc(100vh - 220px));
+    min-height: 320px;
   }
 
   .topbar {

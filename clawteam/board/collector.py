@@ -179,11 +179,15 @@ class BoardCollector:
         registry = {}
         try:
             from clawteam.spawn.registry import get_registry, is_agent_alive
+            from clawteam.spawn.sessions import SessionStore
 
             registry = get_registry(team_name)
+            session_store = SessionStore(team_name)
             for agent_name, info in sorted(registry.items()):
                 backend = info.get("backend", "")
                 target = info.get("tmux_target") or info.get("block_id") or ""
+                saved_session = session_store.load(agent_name)
+                session_state = saved_session.state if saved_session else {}
                 try:
                     alive = is_agent_alive(team_name, agent_name)
                 except Exception:
@@ -199,6 +203,12 @@ class BoardCollector:
                         "command": info.get("command", []),
                         "spawnedAt": info.get("spawned_at", 0),
                         "alive": alive,
+                        "sessionId": saved_session.session_id if saved_session else "",
+                        "sessionSavedAt": saved_session.saved_at if saved_session else "",
+                        "sessionClient": session_state.get("client", ""),
+                        "sessionSource": session_state.get("source", ""),
+                        "sessionConfidence": session_state.get("confidence", ""),
+                        "sessionCwd": session_state.get("cwd", ""),
                     }
                 )
         except Exception:

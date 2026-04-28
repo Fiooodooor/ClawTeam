@@ -22,6 +22,7 @@ from clawteam.spawn.cli_env import build_spawn_path, resolve_clawteam_executable
 from clawteam.spawn.command_validation import validate_spawn_command
 from clawteam.spawn.keepalive import build_keepalive_shell_command, build_resume_command
 from clawteam.spawn.runtime_notification import render_runtime_notification
+from clawteam.spawn.session_capture import prepare_session_capture, persist_spawned_session
 from clawteam.spawn.wsh_rpc import WshRpcClient
 from clawteam.team.models import get_data_dir
 
@@ -258,8 +259,15 @@ class WshBackend(SpawnBackend):
             env_vars.update(env)
         env_vars["PATH"] = build_spawn_path(env_vars.get("PATH", os.environ.get("PATH")))
 
-        prepared = self._adapter.prepare_command(
+        session_capture = prepare_session_capture(
             command,
+            team_name=team_name,
+            agent_name=agent_name,
+            cwd=cwd,
+            prompt=prompt,
+        )
+        prepared = self._adapter.prepare_command(
+            session_capture.command,
             prompt=None,
             cwd=cwd,
             skip_permissions=skip_permissions,
@@ -378,6 +386,12 @@ class WshBackend(SpawnBackend):
             backend="wsh",
             block_id=block_id,
             pid=pane_pid,
+            command=list(final_command),
+        )
+        persist_spawned_session(
+            session_capture,
+            team_name=team_name,
+            agent_name=agent_name,
             command=list(final_command),
         )
 

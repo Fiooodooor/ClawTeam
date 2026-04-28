@@ -359,6 +359,10 @@ export function App() {
 
   async function openSession(session, target) {
     setSessionNotice("");
+    if (session?.alive !== true && ["terminal", "iterm", "ghostty"].includes(target)) {
+      setSessionNotice(`Session '${session?.agentName || "agent"}' is offline.`);
+      return;
+    }
     try {
       const result = await dashboardApi.openSession({
         team: selectedTeam,
@@ -369,6 +373,11 @@ export function App() {
     } catch (err) {
       setSessionNotice(err.message);
     }
+  }
+
+  function openTeam(teamName) {
+    setSelectedTeam(teamName);
+    setView("board");
   }
 
   return (
@@ -407,7 +416,7 @@ export function App() {
                 className={selectedTeam === team.name ? "team-row selected" : "team-row"}
                 key={team.name}
                 type="button"
-                onClick={() => setSelectedTeam(team.name)}
+                onClick={() => openTeam(team.name)}
               >
                 <span className="team-row-main">{team.name}</span>
                 <span className="team-row-meta">{team.tasks} tasks</span>
@@ -539,6 +548,14 @@ function topbarTitle(view, teamData, selectedTeam) {
   return view.charAt(0).toUpperCase() + view.slice(1);
 }
 
+function displayVersion(value) {
+  const text = String(value || "").trim();
+  if (!text || text === "unknown") return "unknown";
+  const twoPart = text.match(/^([1-9]\d*)\.(\d+)$/);
+  if (twoPart) return `0.${twoPart[1]}.${twoPart[2]}`;
+  return text;
+}
+
 function BoardView({ data, metrics, sessionsByName }) {
   return (
     <div className="board-layout">
@@ -629,31 +646,46 @@ function AgentsView({ data, launchTargets, onOpenSession, notice }) {
           {(data.sessions || []).length === 0 ? (
             <p className="muted">No registered sessions.</p>
           ) : (
-            (data.sessions || []).map((session) => (
-              <div className="agent-row" key={session.agentName}>
-                <div>
-                  <strong>{session.agentName}</strong>
-                  <span>
-                    {session.backend} {session.target || session.pid || ""}
+            (data.sessions || []).map((session) => {
+              const sessionAlive = session.alive === true;
+              const canAttach = (target) =>
+                sessionAlive || !["terminal", "iterm", "ghostty"].includes(target.id);
+              const sessionRef = session.sessionId
+                ? `session ${session.sessionId}`
+                : session.target || session.pid || "";
+              const sessionMeta = session.sessionId
+                ? [
+                    session.sessionClient,
+                    session.sessionConfidence,
+                    session.sessionSource,
+                  ].filter(Boolean).join(" · ")
+                : "";
+              return (
+                <div className={sessionAlive ? "agent-row" : "agent-row offline"} key={session.agentName}>
+                  <div>
+                    <strong>{session.agentName}</strong>
+                    <span>{session.backend} {sessionRef}</span>
+                    {sessionMeta ? <span className="session-meta">{sessionMeta}</span> : null}
+                  </div>
+                  <span className={sessionAlive ? "live-pill" : "live-pill off"}>
+                    {sessionAlive ? "running" : "offline"}
                   </span>
+                  <div className="row-actions">
+                    {launchTargets.map((target) => (
+                      <button
+                        disabled={!target.available || !canAttach(target)}
+                        key={target.id}
+                        type="button"
+                        title={!canAttach(target) ? "Session is offline" : target.description}
+                        onClick={() => onOpenSession(session, target.id)}
+                      >
+                        {target.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <span className={session.alive ? "live-pill" : "live-pill off"}>
-                  {session.alive ? "running" : "offline"}
-                </span>
-                <div className="row-actions">
-                  {launchTargets.map((target) => (
-                    <button
-                      disabled={!target.available}
-                      key={target.id}
-                      type="button"
-                      onClick={() => onOpenSession(session, target.id)}
-                    >
-                      {target.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
         {notice ? <div className="notice">{notice}</div> : null}
@@ -892,6 +924,7 @@ function ProfilesView({
 function SettingsView({ runtime, launchTargets, logs, refreshRuntime, runRuntimeAction }) {
   const upgradeAvailable = runtime?.upgrade_available;
   const installed = runtime?.installed;
+  const currentVersion = displayVersion(runtime?.current_version || runtime?.latest_version);
   return (
     <div className="settings-stack">
       <section className="runtime-card">
@@ -899,12 +932,11 @@ function SettingsView({ runtime, launchTargets, logs, refreshRuntime, runRuntime
           <div>
             <div className="eyebrow">ClawTeam runtime</div>
             <h2 className="runtime-version">
-              {installed ? `v${runtime?.current_version || "unknown"}` : "Not installed"}
+              {installed ? `v${currentVersion}` : "Not installed"}
             </h2>
             {installed ? (
               <p className="muted">
-                Latest on PyPI: v{runtime?.latest_version || "unknown"}
-                {upgradeAvailable ? " — update available." : " — up to date."}
+                {upgradeAvailable ? `Update available: v${displayVersion(runtime?.latest_version)}` : "Runtime is current."}
               </p>
             ) : (
               <p className="muted">Install ClawTeam to start serving the board.</p>
@@ -935,27 +967,6 @@ function SettingsView({ runtime, launchTargets, logs, refreshRuntime, runRuntime
             )}
           </div>
         </div>
-
-        <dl className="runtime-list">
-          <div>
-            <dt>Source</dt>
-            <dd>{runtime?.source || "pypi"}</dd>
-          </div>
-          <div>
-            <dt>Command</dt>
-            <dd>{runtime?.command_path || "not found"}</dd>
-          </div>
-          <div>
-            <dt>Install root</dt>
-            <dd>{runtime?.install_root || "~/.clawteam"}</dd>
-          </div>
-          <div>
-            <dt>Platform</dt>
-            <dd>
-              {runtime?.platform || "unknown"} · {isDesktop ? "Desktop app" : "Web mode"}
-            </dd>
-          </div>
-        </dl>
 
         {logs.length ? (
           <details className="install-log">
@@ -1013,7 +1024,7 @@ function SettingsFabTrigger({ runtime, open, onToggle }) {
     ? "warn"
     : "ok";
   const label = runtime?.installed
-    ? `v${runtime?.current_version || "unknown"}`
+    ? `v${displayVersion(runtime?.current_version)}`
     : "not installed";
   return (
     <button

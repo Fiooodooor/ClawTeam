@@ -15,6 +15,7 @@ from clawteam.spawn.keepalive import (
     build_resume_command,
 )
 from clawteam.spawn.runtime_notification import render_runtime_notification
+from clawteam.spawn.session_capture import prepare_session_capture, persist_spawned_session
 from clawteam.team.mailbox import MailboxManager
 from clawteam.team.models import MessageType, get_data_dir
 
@@ -69,8 +70,15 @@ class SubprocessBackend(SpawnBackend):
         if os.path.isabs(clawteam_bin):
             spawn_env.setdefault("CLAWTEAM_BIN", clawteam_bin)
 
-        prepared = self._adapter.prepare_command(
+        session_capture = prepare_session_capture(
             command,
+            team_name=team_name,
+            agent_name=agent_name,
+            cwd=cwd,
+            prompt=prompt,
+        )
+        prepared = self._adapter.prepare_command(
+            session_capture.command,
             prompt=prompt,
             cwd=cwd,
             skip_permissions=skip_permissions,
@@ -146,6 +154,12 @@ class SubprocessBackend(SpawnBackend):
             agent_name=agent_name,
             backend="subprocess",
             pid=process.pid,
+            command=list(final_command),
+        )
+        persist_spawned_session(
+            session_capture,
+            team_name=team_name,
+            agent_name=agent_name,
             command=list(final_command),
         )
 

@@ -26,6 +26,7 @@ from clawteam.spawn.cli_env import build_spawn_path, resolve_clawteam_executable
 from clawteam.spawn.command_validation import validate_spawn_command
 from clawteam.spawn.keepalive import build_keepalive_shell_command, build_resume_command
 from clawteam.spawn.runtime_notification import render_runtime_notification
+from clawteam.spawn.session_capture import prepare_session_capture, persist_spawned_session
 from clawteam.team.models import get_data_dir
 
 _SHELL_ENV_KEY_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
@@ -86,8 +87,15 @@ class TmuxBackend(SpawnBackend):
         if os.path.isabs(clawteam_bin):
             env_vars.setdefault("CLAWTEAM_BIN", clawteam_bin)
 
-        prepared = self._adapter.prepare_command(
+        session_capture = prepare_session_capture(
             command,
+            team_name=team_name,
+            agent_name=agent_name,
+            cwd=cwd,
+            prompt=prompt,
+        )
+        prepared = self._adapter.prepare_command(
+            session_capture.command,
             prompt=prompt,
             cwd=cwd,
             skip_permissions=skip_permissions,
@@ -296,6 +304,12 @@ class TmuxBackend(SpawnBackend):
             backend="tmux",
             tmux_target=target,
             pid=pane_pid,
+            command=list(final_command),
+        )
+        persist_spawned_session(
+            session_capture,
+            team_name=team_name,
+            agent_name=agent_name,
             command=list(final_command),
         )
 
