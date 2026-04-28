@@ -126,11 +126,11 @@ class NativeCliAdapter:
                     final_command.extend(["-p", prompt])
         elif is_hermes_command(normalized_command):
             # hermes uses --yolo for auto-approve and -z for one-shot prompt
-            if skip_permissions:
-                if "--yolo" not in final_command:
-                    final_command.append("--yolo")
-                if "--accept-hooks" not in final_command:
-                    final_command.append("--accept-hooks")
+            # Always add --yolo and --accept-hooks to prevent interactive stalls
+            if "--yolo" not in final_command:
+                final_command.append("--yolo")
+            if "--accept-hooks" not in final_command:
+                final_command.append("--accept-hooks")
             if prompt:
                 final_command.extend(["-z", prompt])
         elif is_gemini_command(normalized_command):
