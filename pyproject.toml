@@ -35,9 +35,6 @@ dev = [
 p2p = [
     "pyzmq>=25.0.0,<27.0.0",
 ]
-plane = [
-    "httpx>=0.27.0,<1.0.0",
-]
 
 [project.scripts]
 clawteam = "clawteam.cli.commands:app"

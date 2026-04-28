@@ -9,7 +9,6 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from clawteam.fileutil import atomic_write_text
-from clawteam.plane.config import PlaneConfig
 
 
 class AgentProfile(BaseModel):
@@ -68,7 +67,6 @@ class ClawTeamConfig(BaseModel):
     spawn_ready_timeout: float = 30.0  # max seconds to poll for TUI readiness before fallback
     hooks: list[HookDef] = Field(default_factory=list)
     plugins: list[str] = Field(default_factory=list)
-    plane: PlaneConfig = Field(default_factory=PlaneConfig)
 
 
 # Alias for code that uses the harness naming
