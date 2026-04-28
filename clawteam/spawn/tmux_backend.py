@@ -38,7 +38,8 @@ class TmuxBackend(SpawnBackend):
     """
 
     def __init__(self):
-        self._agents: dict[str, str] = {}  # agent_name -> tmux target
+        # (team_name, agent_name) -> {"target": "...", "pane_id": "%N"}
+        self._agents: dict[tuple[str, str], dict[str, str]] = {}
         self._adapter = NativeCliAdapter()
 
     def spawn(
@@ -223,7 +224,20 @@ class TmuxBackend(SpawnBackend):
                 stderr=subprocess.PIPE,
             )
 
-        self._agents[agent_name] = target
+        # Capture pane id (e.g. %42) so future runtime injections target by
+        # stable pane id rather than the user-renamable window name.
+        pane_id = ""
+        pane_id_result = subprocess.run(
+            ["tmux", "display-message", "-p", "-t", target, "#{pane_id}"],
+            capture_output=True, text=True,
+        )
+        if pane_id_result.returncode == 0:
+            pane_id = pane_id_result.stdout.strip()
+
+        self._agents[(team_name, agent_name)] = {
+            "target": target,
+            "pane_id": pane_id,
+        }
 
         # Capture pane PID for robust liveness checking (survives tile operations)
         pane_pid = 0
@@ -266,8 +280,14 @@ class TmuxBackend(SpawnBackend):
 
     def list_running(self) -> list[dict[str, str]]:
         return [
-            {"name": name, "target": target, "backend": "tmux"}
-            for name, target in self._agents.items()
+            {
+                "name": agent,
+                "team": team,
+                "target": rec.get("target", ""),
+                "pane_id": rec.get("pane_id", ""),
+                "backend": "tmux",
+            }
+            for (team, agent), rec in self._agents.items()
         ]
 
     def inject_runtime_message(self, team: str, agent_name: str, envelope) -> tuple[bool, str]:
@@ -275,7 +295,11 @@ class TmuxBackend(SpawnBackend):
         if not shutil.which("tmux"):
             return False, "tmux not installed"
 
-        target = f"{self.session_name(team)}:{agent_name}"
+        record = self._agents.get((team, agent_name)) or {}
+        recorded_pane = (record.get("pane_id") or "").strip()
+        fallback_target = f"{self.session_name(team)}:{agent_name}"
+        target = recorded_pane or fallback_target
+
         probe = subprocess.run(
             ["tmux", "list-panes", "-t", target, "-F", "#{pane_id}"],
             capture_output=True,

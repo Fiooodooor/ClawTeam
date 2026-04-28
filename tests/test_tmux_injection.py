@@ -127,3 +127,78 @@ def test_inject_runtime_message_returns_false_on_paste_failure(monkeypatch):
     ok, reason = backend.inject_runtime_message("demo", "leader", envelope)
     assert ok is False
     assert "paste-buffer" in reason
+
+
+def test_inject_uses_recorded_pane_id_when_available(monkeypatch):
+    backend = tmux_backend.TmuxBackend()
+    backend._agents[("demo", "leader")] = {
+        "target": "clawteam-demo:leader",
+        "pane_id": "%42",
+    }
+    envelope = MagicMock(summary="hi", source="w", target="leader",
+                         channel="direct", priority="high",
+                         evidence=[], recommended_next_action="",
+                         payload={}, dedupe_key="d", created_at="t",
+                         requires_injection=True)
+
+    seen_targets = []
+
+    def fake_run(cmd, *args, **kwargs):
+        if "list-panes" in cmd:
+            seen_targets.append(cmd[cmd.index("-t") + 1])
+            return _completed(stdout="%42\n")
+        if "display-message" in cmd:
+            return _completed(stdout="claude\n")
+        if "paste-buffer" in cmd or "send-keys" in cmd:
+            seen_targets.append(cmd[cmd.index("-t") + 1])
+            return _completed()
+        return _completed()
+
+    monkeypatch.setattr("shutil.which", lambda _name: "/usr/bin/tmux")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr("time.sleep", lambda _x: None)
+
+    ok, _ = backend.inject_runtime_message("demo", "leader", envelope)
+    assert ok is True
+    assert all(t == "%42" for t in seen_targets), seen_targets
+
+
+def test_inject_falls_back_to_window_name_when_no_pane_id(monkeypatch):
+    backend = tmux_backend.TmuxBackend()
+    envelope = MagicMock(summary="hi", source="w", target="leader",
+                         channel="direct", priority="high",
+                         evidence=[], recommended_next_action="",
+                         payload={}, dedupe_key="d", created_at="t",
+                         requires_injection=True)
+
+    def fake_run(cmd, *args, **kwargs):
+        if "list-panes" in cmd:
+            return _completed(stdout="%99\n")
+        if "display-message" in cmd:
+            return _completed(stdout="claude\n")
+        return _completed()
+
+    monkeypatch.setattr("shutil.which", lambda _name: "/usr/bin/tmux")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr("time.sleep", lambda _x: None)
+
+    ok, reason = backend.inject_runtime_message("demo", "leader", envelope)
+    assert ok is True, reason
+
+
+def test_list_running_returns_pane_id_and_team(monkeypatch):
+    backend = tmux_backend.TmuxBackend()
+    backend._agents[("demo", "leader")] = {
+        "target": "clawteam-demo:leader",
+        "pane_id": "%42",
+    }
+    backend._agents[("demo", "worker")] = {
+        "target": "clawteam-demo:worker",
+        "pane_id": "%43",
+    }
+
+    rows = backend.list_running()
+    by_name = {r["name"]: r for r in rows}
+    assert by_name["leader"]["pane_id"] == "%42"
+    assert by_name["leader"]["team"] == "demo"
+    assert by_name["worker"]["pane_id"] == "%43"
