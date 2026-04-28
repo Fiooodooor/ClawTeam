@@ -343,6 +343,35 @@ def test_board_ui_is_react_spa_shell():
     assert "/assets/index-" in html
 
 
+def test_post_member_endpoint_adds_agent_without_explicit_id(monkeypatch, tmp_path: Path):
+    import json as _json
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    TeamManager.create_team(
+        name="addtest", leader_name="leader", leader_id="l001", description="test",
+    )
+
+    from unittest.mock import MagicMock
+    handler = MagicMock(spec=BoardHandler)
+    handler.path = "/api/team/addtest/member"
+
+    body = _json.dumps({"name": "newbie", "agentType": "claude"}).encode()
+    handler.headers = {"Content-Length": str(len(body))}
+    handler.rfile = io.BytesIO(body)
+
+    responses = []
+    handler._serve_json = lambda data: responses.append(data)
+    handler.send_error = MagicMock()
+
+    BoardHandler.do_POST(handler)
+
+    handler.send_error.assert_not_called()
+    assert responses == [{"status": "ok", "name": "newbie"}]
+    config = TeamManager.get_team("addtest")
+    member = next(m for m in config.members if m.name == "newbie")
+    assert member.agent_type == "claude"
+    assert member.agent_id  # auto-generated
+
+
 def test_patch_task_updates_status(monkeypatch, tmp_path: Path):
     import json as _json
     monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
