@@ -6,7 +6,13 @@
   "scripts": {
     "dev": "vite --config website/vite.config.mjs",
     "build": "vite build --config website/vite.config.mjs",
-    "preview": "vite preview --config website/vite.config.mjs"
+    "preview": "vite preview --config website/vite.config.mjs",
+    "dashboard:dev": "vite --config dashboard/vite.config.mjs --host 127.0.0.1 --port 5174",
+    "dashboard:build": "vite build --config dashboard/vite.config.mjs",
+    "dashboard:preview": "vite preview --config dashboard/vite.config.mjs --host 127.0.0.1 --port 4174",
+    "desktop:dev": "cross-env CLAWTEAM_BOARD_PORT=8780 concurrently -k \"npm run dashboard:dev\" \"wait-on http://127.0.0.1:5174 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5174 CLAWTEAM_BOARD_PORT=8780 electron desktop/electron/main.mjs\"",
+    "desktop:start": "electron desktop/electron/main.mjs",
+    "build:all": "npm run build && npm run dashboard:build"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -14,6 +20,10 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
+    "electron": "^37.2.6",
+    "wait-on": "^8.0.4",
     "vite": "^5.4.11"
   }
 }

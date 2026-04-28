@@ -173,6 +173,45 @@ class BoardCollector:
         except Exception:
             pass
 
+        # Spawn/session registry data. This is intentionally best-effort:
+        # dashboards should still render if tmux/wsh/process probing fails.
+        sessions = []
+        registry = {}
+        try:
+            from clawteam.spawn.registry import get_registry, is_agent_alive
+
+            registry = get_registry(team_name)
+            for agent_name, info in sorted(registry.items()):
+                backend = info.get("backend", "")
+                target = info.get("tmux_target") or info.get("block_id") or ""
+                try:
+                    alive = is_agent_alive(team_name, agent_name)
+                except Exception:
+                    alive = None
+                sessions.append(
+                    {
+                        "agentName": agent_name,
+                        "backend": backend,
+                        "target": target,
+                        "tmuxTarget": info.get("tmux_target", ""),
+                        "blockId": info.get("block_id", ""),
+                        "pid": info.get("pid", 0),
+                        "command": info.get("command", []),
+                        "spawnedAt": info.get("spawned_at", 0),
+                        "alive": alive,
+                    }
+                )
+        except Exception:
+            registry = {}
+
+        for member in members:
+            session_info = registry.get(member["name"])
+            if session_info:
+                member["session"] = {
+                    "backend": session_info.get("backend", ""),
+                    "target": session_info.get("tmux_target") or session_info.get("block_id") or "",
+                }
+
         return {
             "team": {
                 "name": config.name,
@@ -186,6 +225,7 @@ class BoardCollector:
             "tasks": grouped,
             "taskSummary": summary,
             "messages": all_messages,
+            "sessions": sessions,
             "cost": cost_data,
             "conflicts": conflict_data,
         }

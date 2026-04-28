@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import mimetypes
 import threading
 import time
 import urllib.error
@@ -14,6 +15,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from clawteam.board.collector import BoardCollector
+from clawteam.board.runtime import get_runtime_status
 
 _STATIC_DIR = Path(__file__).parent / "static"
 _ALLOWED_PROXY_HOSTS = {
@@ -129,9 +131,11 @@ class BoardHandler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
 
         if path == "/" or path == "/index.html":
-            self._serve_static("index.html", "text/html")
+            self._serve_static("index.html")
         elif path == "/api/overview":
             self._serve_json(self.collector.collect_overview())
+        elif path == "/api/runtime/status":
+            self._serve_json(get_runtime_status())
         elif path.startswith("/api/team/"):
             team_name = path[len("/api/team/"):].strip("/")
             if not team_name:
@@ -160,8 +164,10 @@ class BoardHandler(BaseHTTPRequestHandler):
                 self.send_error(403, str(e))
             except Exception as e:
                 self.send_error(500, str(e))
+        elif self._static_exists(path.strip("/")):
+            self._serve_static(path.strip("/"))
         else:
-            self.send_error(404)
+            self._serve_static("index.html")
 
     def do_POST(self):
         path = self.path.split("?")[0]
@@ -186,12 +192,30 @@ class BoardHandler(BaseHTTPRequestHandler):
                 return
         self.send_error(404)
 
-    def _serve_static(self, filename: str, content_type: str):
-        filepath = _STATIC_DIR / filename
+    def _static_path(self, filename: str) -> Path | None:
+        try:
+            filepath = (_STATIC_DIR / filename).resolve()
+            filepath.relative_to(_STATIC_DIR.resolve())
+            return filepath
+        except ValueError:
+            return None
+
+    def _static_exists(self, filename: str) -> bool:
+        filepath = self._static_path(filename)
+        return bool(filepath and filepath.is_file())
+
+    def _serve_static(self, filename: str):
+        filepath = self._static_path(filename)
+        if filepath is None:
+            self.send_error(403, "Static path is not allowed")
+            return
         if not filepath.exists():
             self.send_error(404, f"Static file not found: {filename}")
             return
         content = filepath.read_bytes()
+        content_type = mimetypes.guess_type(filepath.name)[0] or "application/octet-stream"
+        if filepath.suffix == ".js":
+            content_type = "text/javascript"
         self.send_response(200)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
         self.send_header("Content-Length", str(len(content)))

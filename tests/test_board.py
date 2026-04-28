@@ -125,6 +125,47 @@ def test_collect_team_preserves_conflicts_field(monkeypatch, tmp_path: Path):
     assert "conflicts" in data
 
 
+def test_collect_team_exposes_spawn_sessions(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    TeamManager.create_team(
+        name="demo",
+        leader_name="leader",
+        leader_id="leader001",
+        description="demo team",
+    )
+    TeamManager.add_member("demo", "worker", "worker001")
+
+    from clawteam.spawn.registry import register_agent
+
+    register_agent(
+        "demo",
+        "worker",
+        backend="tmux",
+        tmux_target="clawteam-demo:worker",
+        pid=123,
+        command=["claude"],
+    )
+    monkeypatch.setattr("clawteam.spawn.registry.is_agent_alive", lambda *_: True)
+
+    data = BoardCollector().collect_team("demo")
+
+    assert data["sessions"] == [
+        {
+            "agentName": "worker",
+            "backend": "tmux",
+            "target": "clawteam-demo:worker",
+            "tmuxTarget": "clawteam-demo:worker",
+            "blockId": "",
+            "pid": 123,
+            "command": ["claude"],
+            "spawnedAt": data["sessions"][0]["spawnedAt"],
+            "alive": True,
+        }
+    ]
+    worker = next(member for member in data["members"] if member["name"] == "worker")
+    assert worker["session"] == {"backend": "tmux", "target": "clawteam-demo:worker"}
+
+
 def test_collect_team_exposes_member_inbox_identity(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
     TeamManager.create_team(
@@ -365,15 +406,28 @@ def test_proxy_fetches_allowed_github_content(monkeypatch):
     assert seen["url"] == "https://raw.githubusercontent.com/org/repo/main/README.md"
 
 
-def test_board_ui_escapes_attacker_controlled_fields():
-    html = Path("clawteam/board/static/index.html").read_text(encoding="utf-8")
+def test_board_static_path_rejects_escape():
+    handler = object.__new__(BoardHandler)
 
-    assert "escapeHtml(m.name)" in html
-    assert "escapeHtml(m.agentType || 'Agent')" in html
-    assert "escapeHtml(m.fromLabel || m.from || 'SYS')" in html
-    assert "escapeHtml(m.toLabel || m.to || 'ALL')" in html
-    assert "escapeHtml(t.owner || 'Unassigned')" in html
-    assert "t.blockedBy.map(v => escapeHtml(v)).join(', ')" in html
-    assert "option.textContent =" in html
-    assert "document.getElementById('ui-meta').innerText =" in html
-    assert "`${t.name || ''}${t.description ? ` - ${t.description}` : ''}`" in html
+    assert handler._static_path("../config.json") is None
+
+
+def test_board_react_source_does_not_use_raw_html():
+    source = Path("dashboard/src/App.jsx").read_text(encoding="utf-8")
+
+    assert "dangerouslySetInnerHTML" not in source
+
+
+def test_runtime_status_reports_upgrade(monkeypatch):
+    from clawteam.board import runtime
+
+    monkeypatch.setattr(runtime, "_installed_version", lambda: "0.3.0")
+    monkeypatch.setattr(runtime, "_latest_pypi_version", lambda timeout: "0.4.0")
+    monkeypatch.setattr(runtime, "_resolve_command_path", lambda: "/tmp/clawteam")
+
+    status = runtime.get_runtime_status()
+
+    assert status["installed"] is True
+    assert status["current_version"] == "0.3.0"
+    assert status["latest_version"] == "0.4.0"
+    assert status["upgrade_available"] is True
