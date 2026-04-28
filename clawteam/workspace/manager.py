@@ -79,6 +79,13 @@ class WorkspaceManager:
             try:
                 git.remove_worktree(self.repo_root, wt_path)
             except git.GitError:
+                # If git worktree remove fails, nuke the directory directly
+                import shutil
+                shutil.rmtree(wt_path, ignore_errors=True)
+            # Prune stale worktree entries so git no longer thinks the path is used
+            try:
+                git._run(["worktree", "prune"], cwd=self.repo_root)
+            except git.GitError:
                 pass
         try:
             git.delete_branch(self.repo_root, branch)

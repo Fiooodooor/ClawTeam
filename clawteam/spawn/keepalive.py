@@ -32,6 +32,10 @@ def build_resume_command(command: list[str]) -> list[str]:
         return [normalized[0], "--continue"]
     if executable == "pi":
         return [normalized[0], "--continue"]
+    if executable == "hermes":
+        # Hermes doesn't have a --continue flag; re-run the full command.
+        # The agent picks up state from its ClawTeam mailbox/task list.
+        return list(normalized)
     return []
 
 
@@ -68,7 +72,6 @@ def build_keepalive_shell_command(
         "while true; do "
         'eval "$__ct_cmd"; '
         "__ct_status=$?; "
-        f"{exit_hook}; "
         # Resume on ANY exit unless lifecycle explicitly says stop
         # (agents commonly exit non-zero on transient errors / permission misses
         # / 429 rate limits). Cap consecutive non-zero retries at 20 with
@@ -77,6 +80,7 @@ def build_keepalive_shell_command(
         '  __ct_attempt=$((__ct_attempt+1)); '
         '  if [ "$__ct_attempt" -ge 20 ]; then '
         '    echo "[keepalive] 20 consecutive non-zero exits; giving up" >&2; '
+        f"    {exit_hook}; "
         '    exit $__ct_status; '
         '  fi; '
         '  __ct_backoff=$((__ct_attempt * 5)); '
@@ -86,6 +90,8 @@ def build_keepalive_shell_command(
         'else __ct_attempt=0; fi; '
         f"if {should_keepalive}; "
         'then __ct_cmd="$__ct_resume"; sleep 2; continue; fi; '
+        # Only fire the exit hook when NOT resuming (agent is truly done)
+        f"{exit_hook}; "
         "exit $__ct_status; "
         "done"
     )
