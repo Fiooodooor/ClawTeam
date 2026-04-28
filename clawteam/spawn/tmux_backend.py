@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import uuid
 from xml.sax.saxutils import escape
 
 from clawteam.spawn.adapters import (
@@ -657,6 +658,22 @@ def _pane_safe_to_inject(target: str) -> bool:
     return cmd in _INJECT_SAFE_COMMANDS
 
 
+def _run_tmux(args: list[str]) -> None:
+    """Run a tmux subcommand and raise RuntimeError on non-zero exit.
+
+    Replaces the unchecked ``subprocess.run`` calls that previously masked
+    paste-buffer / load-buffer failures as success.
+    """
+    result = subprocess.run(
+        ["tmux", *args],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip() or "(no stderr)"
+        raise RuntimeError(f"tmux {args[0]} failed (exit {result.returncode}): {stderr}")
+
+
 def _inject_prompt_via_buffer(
     target: str,
     agent_name: str,
@@ -664,11 +681,11 @@ def _inject_prompt_via_buffer(
 ) -> None:
     """Inject a prompt into a tmux pane via ``load-buffer`` / ``paste-buffer``.
 
-    Using a temp file avoids the shell-escaping pitfalls of ``send-keys`` for
-    multi-line or special-character prompts. Two Enter keystrokes are sent
-    after the paste to confirm and submit.
+    Uses a per-call unique buffer name so concurrent injections can't clobber
+    each other. Every tmux subcommand return code is checked; failures raise
+    RuntimeError instead of silently reporting success.
     """
-    buf_name = f"prompt-{agent_name}"
+    buf_name = f"prompt-{agent_name}-{uuid.uuid4().hex[:8]}"
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".txt", delete=False, prefix="clawteam-prompt-"
     ) as f:
@@ -676,33 +693,16 @@ def _inject_prompt_via_buffer(
         tmp_path = f.name
 
     try:
-        subprocess.run(
-            ["tmux", "load-buffer", "-b", buf_name, tmp_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        subprocess.run(
-            ["tmux", "paste-buffer", "-b", buf_name, "-t", target],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        _run_tmux(["load-buffer", "-b", buf_name, tmp_path])
+        _run_tmux(["paste-buffer", "-b", buf_name, "-t", target])
         time.sleep(0.5)
-        subprocess.run(
-            ["tmux", "send-keys", "-t", target, "Enter"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        _run_tmux(["send-keys", "-t", target, "Enter"])
         time.sleep(0.3)
-        subprocess.run(
-            ["tmux", "send-keys", "-t", target, "Enter"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        subprocess.run(
-            ["tmux", "delete-buffer", "-b", buf_name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        _run_tmux(["send-keys", "-t", target, "Enter"])
+        try:
+            _run_tmux(["delete-buffer", "-b", buf_name])
+        except RuntimeError:
+            pass
     finally:
         os.unlink(tmp_path)
 
