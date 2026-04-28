@@ -124,6 +124,15 @@ class NativeCliAdapter:
                     final_command.append(prompt)
                 else:
                     final_command.extend(["-p", prompt])
+        elif is_hermes_command(normalized_command):
+            # hermes uses --yolo for auto-approve and -z for one-shot prompt
+            if skip_permissions:
+                if "--yolo" not in final_command:
+                    final_command.append("--yolo")
+                if "--accept-hooks" not in final_command:
+                    final_command.append("--accept-hooks")
+            if prompt:
+                final_command.extend(["-z", prompt])
         elif is_gemini_command(normalized_command):
             if prompt:
                 if interactive:
@@ -224,6 +233,11 @@ def is_pi_command(command: list[str]) -> bool:
     return command_basename(command) == "pi"
 
 
+def is_hermes_command(command: list[str]) -> bool:
+    """Check if the command is a Hermes Agent CLI invocation."""
+    return command_basename(command) == "hermes"
+
+
 def is_interactive_cli(command: list[str]) -> bool:
     """Check if the command is a known interactive AI coding CLI."""
     return (
@@ -236,4 +250,5 @@ def is_interactive_cli(command: list[str]) -> bool:
         or is_opencode_command(command)
         or is_openclaw_command(command)
         or is_pi_command(command)
+        or is_hermes_command(command)
     )
