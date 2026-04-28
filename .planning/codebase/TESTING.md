@@ -1,112 +1,74 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-04-15
+**Analysis Date:** 2026-04-28
 
 ## Test Framework
 
 **Runner:**
-- pytest (dev dep `pytest>=9.0.0,<10.0.0` in `pyproject.toml`).
-- Config in `pyproject.toml`:
-  ```toml
-  [tool.pytest.ini_options]
-  testpaths = ["tests"]
-  ```
-- No separate `pytest.ini` or `conftest`-level plugins beyond fixtures.
+- `pytest>=9.0.0,<10.0.0` (declared in `pyproject.toml:32` under `[project.optional-dependencies] dev`).
+- Config: `[tool.pytest.ini_options]` in `pyproject.toml:73-74` — `testpaths = ["tests"]`. No conftest plugins or extra options are registered globally.
 
-**Assertion Library:**
-- Plain `assert` statements (no `unittest.TestCase`, no `hamcrest`).
-- `pytest.raises(...)` for expected exceptions; `pytest.fixture` for
-  setup; `pytest.mark.skipif(...)` for platform-gated tests.
+**Assertion library:**
+- Stock `assert` statements with pytest's introspection. No `unittest.TestCase`-style assertions. (Class-based tests do exist for grouping — `TestTaskItem`, `TestTeamMember` — but they still use bare `assert`.)
 
-**Run Commands:**
+**Mocking:**
+- `unittest.mock` from the standard library: `MagicMock`, `AsyncMock`, `patch`. Imported at module top: `from unittest.mock import MagicMock` (`tests/test_plane_sync.py:4`), `from unittest.mock import AsyncMock, MagicMock, patch` (`tests/test_plane_client.py:4`).
+- pytest's `monkeypatch` fixture is the dominant tool — used in 100+ places to set env vars, swap module attributes, and inject fakes (`monkeypatch.setattr("clawteam.spawn.get_backend", lambda _: backend)`).
+
+**Frontend:** No JavaScript/TypeScript test runner is configured. The board frontend (`clawteam/board/frontend/package.json`) only ships `dev`, `build`, `preview` scripts — there are no `test`/`vitest`/`jest` entries. All UI behavior is exercised indirectly via the Python `tests/test_board.py` suite which talks to `BoardCollector` + `BoardHandler`.
+
+**Run commands:**
+
 ```bash
-pytest                                        # Run all tests
-pytest tests/test_mailbox.py                  # Single file
-pytest tests/test_mailbox.py::TestSendReceive::test_send_and_receive_single
-                                              # Single test
-pytest -k "liveness"                          # Name match
-pytest -x                                     # Stop on first failure
-pytest tests/board/                           # Run a subdirectory
+pip install -e ".[dev]"        # install dev deps including pytest + ruff
+python -m pytest tests/ -v --tb=short    # full suite (matches CI in .github/workflows/ci.yml)
+python -m pytest tests/test_plane_sync.py        # single file
+python -m pytest tests/board/                    # subdirectory
+python -m pytest tests/test_plane_client.py::test_client_init    # single test
+ruff check clawteam/ tests/    # lint (also run in CI)
 ```
 
-**Frontend:**
-- No unit tests. The smoke check is `pnpm build`
-  (`cd clawteam/board/frontend && pnpm install && pnpm build`), which runs
-  `tsc -b && vite build` per `package.json:scripts.build`. TypeScript in
-  strict mode + `noUnusedLocals` + `noUncheckedIndexedAccess` catches most
-  regressions at build time.
+CI matrix: Ubuntu + macOS, Python 3.10 / 3.11 / 3.12 (`.github/workflows/ci.yml`).
 
 ## Test File Organization
 
-**Location and naming:**
-- All Python tests live in `/home/jac/repos/ClawTeam/tests/`.
-- Flat `test_<area>.py` by feature area, one file per Python module or
-  subsystem (44 test files, ~556 `def test_*` functions,
-  495+ currently collected by pytest with the in-progress refactors).
-- One nested package: `tests/board/` (with its own `__init__.py`) for
-  board-specific helpers/tests such as `tests/board/test_liveness.py`.
+**Location:**
+- All tests live under top-level `tests/` (separate from `clawteam/` source). Tests are NOT co-located.
+- Most test files sit flat in `tests/` (44 files). One subpackage exists so far: `tests/board/` (currently only `test_liveness.py`) — use this pattern when adding focused groups for a subsystem.
 
-**Representative layout:**
+**Naming:**
+- One file per source module: `tests/test_plane_client.py` ↔ `clawteam/plane/client.py`, `tests/test_plane_models.py` ↔ `clawteam/plane/models.py`, `tests/board/test_liveness.py` ↔ `clawteam/board/liveness.py`.
+- Cross-cutting end-to-end tests get an `_integration` suffix: `tests/test_plane_integration.py`.
+- Test functions are flat `def test_<behavior>(...)` named after the behavior asserted (`test_push_new_task_creates_plane_work_item`, `test_handle_work_item_updated_changes_status`, `test_team_start_spawns_runtime_watcher_for_leader`, `test_walks_up_from_cwd_to_find_project_dotclawteam`).
+- Optionally grouped under a plain `class TestThing:` (no inheritance, no setUp) to namespace several related tests — used in `tests/test_models.py`, `tests/test_event_bus.py`, `tests/test_harness.py`.
+
+**Structure (current branch):**
+
 ```
 tests/
-  __init__.py
-  conftest.py                    # global autouse fixtures
-  test_models.py                 # Pydantic model behaviour
-  test_manager.py                # TeamManager operations
-  test_mailbox.py                # mailbox send/receive
-  test_tasks.py                  # TaskStore CRUD
-  test_task_store_locking.py     # cross-process lock contention
-  test_spawn_cli.py              # Typer spawn/launch commands
-  test_spawn_backends.py         # tmux/subprocess backend behaviour
-  test_registry.py               # spawn.registry liveness
-  test_cli_commands.py           # top-level CLI commands
-  test_data_dir.py               # get_data_dir() resolution
-  test_board.py                  # board collector/server
-  test_plane_client.py           # plane REST client
-  test_plane_sync.py             # bidirectional sync engine
-  ...
-  board/
-    __init__.py
-    test_liveness.py             # tmux_windows / agents_online
+├── __init__.py
+├── conftest.py                       # autouse isolated_data_dir fixture
+├── board/
+│   ├── __init__.py
+│   └── test_liveness.py              # tmux-window detection (NEW on board-enhancement)
+├── test_plane_client.py              # Plane REST client + payload helpers
+├── test_plane_config.py              # PlaneConfig pydantic model + JSON roundtrip
+├── test_plane_models.py              # PlaneWorkItem / PlaneState / PlaneComment
+├── test_plane_mapping.py             # status <-> group + resolve_state_id
+├── test_plane_sync.py                # PlaneSyncEngine push/pull (mocked client)
+├── test_plane_webhook.py             # _verify_signature + _handle_*_event
+├── test_plane_integration.py         # end-to-end: file store ↔ Plane ↔ HITL
+├── test_data_dir.py                  # walk-up project-local discovery (NEW)
+├── test_spawn_cli.py                 # 25+ CliRunner tests for spawn / launch / team start
+├── test_board.py                     # BoardCollector + HTTP handler + SSE cache
+└── ... (35 more module-level tests)
 ```
 
-## Test Structure
+## Shared Fixtures (`tests/conftest.py`)
 
-**Suite Organization:**
-Most files are flat `def test_*(...)` functions. Larger files group
-related tests in plain classes (no `TestCase` base) — pytest discovers
-methods with a `test_` prefix:
+The single conftest is small but **critical** — every test runs through `isolated_data_dir`:
 
 ```python
-# tests/test_models.py:17-49
-class TestTaskItem:
-    def test_defaults(self):
-        t = TaskItem(subject="do something")
-        assert t.status == TaskStatus.pending
-        assert len(t.id) == 8
-
-    def test_alias_serialization(self):
-        t = TaskItem(subject="x", blocked_by=["a"], locked_by="agent-1")
-        data = json.loads(t.model_dump_json(by_alias=True))
-        assert "blockedBy" in data
-```
-
-**Naming convention** — tests read as sentences:
-`test_send_and_receive_single`, `test_collect_overview_sums_inbox_counts_for_all_members`,
-`test_spawn_cli_rolls_back_auto_created_team_on_spawn_error`.
-
-**Imports:**
-- `from __future__ import annotations` at the top of every test file.
-- Direct imports of production code (no re-export shims): `from
-  clawteam.team.mailbox import MailboxManager`, `from clawteam.cli.commands
-  import app`.
-
-## Global Fixtures — `tests/conftest.py`
-
-Two fixtures drive almost every test:
-
-```python
-# tests/conftest.py:10-19
 @pytest.fixture(autouse=True)
 def isolated_data_dir(tmp_path, monkeypatch):
     """Point CLAWTEAM_DATA_DIR at a temp dir so every test gets a clean slate."""
@@ -117,94 +79,115 @@ def isolated_data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     return data_dir
 
+
 @pytest.fixture
 def team_name():
     return "test-team"
 ```
 
-**Why this matters:**
-- `isolated_data_dir` is `autouse=True`, so every test automatically runs
-  against an empty `tmp_path/.clawteam/`. Real `~/.clawteam/` is never
-  touched.
-- `HOME` / `USERPROFILE` are also repointed so `config_path()` (which
-  resolves `Path.home() / ".clawteam" / "config.json"` unconditionally)
-  hits the scratch dir instead of the user's real config.
-- Tests that need to override the autouse defaults — e.g.
-  `tests/test_data_dir.py:10-28` — declare their own autouse fixture that
-  deletes `CLAWTEAM_DATA_DIR` and removes the pre-created scratch dir so
-  the walk-up discovery logic can be exercised cleanly.
+Implications for new tests:
 
-**Per-test fixtures** are defined at module scope when reused inside one
-file. Examples:
+- Never write to `~/.clawteam` — the autouse fixture redirects both `CLAWTEAM_DATA_DIR` and `HOME` to a per-test temp directory.
+- Test code that calls `monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))` (without `/.clawteam`) is also valid and intentionally **overrides** the autouse fixture by writing into the bare `tmp_path` (used by most plane tests, e.g. `tests/test_plane_sync.py:17`). Both styles coexist.
+- If your test relies on the absence of `.clawteam/` in the walk-up path, you must explicitly delete the autouse-created directory and re-set `HOME` — see the `clean_env` autouse fixture in `tests/test_data_dir.py:11-27` for the canonical workaround.
+
+## Test Structure
+
+### Suite organization (function-style, dominant)
+
+Plain top-level functions; per-test fixtures defined nearby:
+
 ```python
-# tests/test_plane_sync.py:15-44
 @pytest.fixture
-def setup_team(monkeypatch, tmp_path):
+def setup_team(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
-    TeamManager.create_team(name="demo", leader_name="leader", leader_id="leader001")
+    TeamManager.create_team(
+        name="demo", leader_name="leader", leader_id="leader001",
+    )
     return "demo"
+
 
 @pytest.fixture
 def plane_config():
-    return PlaneConfig(url="http://localhost:8082", api_key="test-key", ...)
+    return PlaneConfig(
+        url="http://localhost:8082",
+        api_key="test-key",
+        workspace_slug="test-ws",
+        project_id="proj-1",
+        sync_enabled=True,
+    )
+
 
 @pytest.fixture
 def mock_client():
     client = MagicMock()
-    client.list_states.return_value = [PlaneState(...), ...]
+    client.list_states.return_value = [
+        PlaneState(id="s-pending", name="Pending", group="unstarted"),
+        PlaneState(id="s-progress", name="In Progress", group="started"),
+        PlaneState(id="s-done", name="Done", group="completed"),
+    ]
     return client
-```
 
-## CLI Tests — Typer `CliRunner`
 
-CLI behaviour is covered by `typer.testing.CliRunner`, invoking the real
-`app` with the real global callback. The environment is repointed via the
-runner's `env=` kwarg in addition to `monkeypatch.setenv`, because
-Typer's process-launched command may re-read `os.environ`:
-
-```python
-# tests/test_spawn_cli.py:32-50
-def test_spawn_cli_exits_nonzero_and_rolls_back_failed_member(monkeypatch, tmp_path):
-    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
-    TeamManager.create_team(name="demo", leader_name="leader", leader_id="leader001")
-    monkeypatch.setattr("clawteam.spawn.get_backend", lambda _: ErrorBackend())
-
-    runner = CliRunner()
-    result = runner.invoke(
-        app,
-        ["spawn", "tmux", "nanobot", "--team", "demo", "--agent-name", "alice", "--no-workspace"],
-        env={"CLAWTEAM_DATA_DIR": str(tmp_path)},
+def test_push_new_task_creates_plane_work_item(setup_team, plane_config, mock_client):
+    mock_client.create_work_item.return_value = PlaneWorkItem(
+        id="plane-issue-1", name="Build feature", state="s-pending",
     )
-
-    assert result.exit_code == 1
-    assert "Error: command 'nanobot' not found in PATH" in result.output
-    assert [member.name for member in TeamManager.list_members("demo")] == ["leader"]
+    engine = PlaneSyncEngine(plane_config, client=mock_client)
+    ...
 ```
 
-The standard assertion set is:
-- `result.exit_code == 0` / `== 1` (the CLI always uses 1 for user-facing
-  errors).
-- substring check on `result.output` for the rich-rendered message (the
-  CliRunner strips `[red]` tags but preserves the text).
-- a filesystem / in-memory check on side effects
-  (`TeamManager.list_members("demo")`, `backend.calls`, etc.).
+Source: `tests/test_plane_sync.py:15-62`.
 
-## Backend Stubs — Substitution Over Mocking
+### Suite organization (class-style, used for grouping pure unit tests)
 
-`tests/test_spawn_cli.py` defines tiny hand-written stubs and swaps them
-in with `monkeypatch.setattr("clawteam.spawn.get_backend", lambda _: ...)`:
+Plain (no `unittest.TestCase`) class with bare `assert`:
 
 ```python
-# tests/test_spawn_cli.py:9-29
-class ErrorBackend:
-    def spawn(self, **kwargs):
-        return (
-            "Error: command 'nanobot' not found in PATH. "
-            "Install the agent CLI first or pass an executable path."
-        )
-    def list_running(self):
-        return []
+class TestTaskItem:
+    def test_defaults(self):
+        t = TaskItem(subject="do something")
+        assert t.subject == "do something"
+        assert t.status == TaskStatus.pending
 
+    def test_alias_serialization(self):
+        t = TaskItem(subject="x", blocked_by=["a"], locked_by="agent-1")
+        data = json.loads(t.model_dump_json(by_alias=True))
+        assert "blockedBy" in data
+```
+
+Source: `tests/test_models.py:17-49`. Same shape in `tests/test_event_bus.py`, `tests/test_harness.py`.
+
+### Patterns
+
+- **Setup pattern:** override env via `monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))`, then call domain factories (`TeamManager.create_team`, `TeamManager.add_member`, `FileTaskStore(team).create(...)`) to seed real on-disk state.
+- **Teardown pattern:** none — `tmp_path` cleanup is automatic; `monkeypatch` undoes env changes; no explicit fixtures needed.
+- **Assertion pattern:** plain `assert lhs == rhs`. For multi-step flows, several asserts in sequence; the failing one localizes the bug.
+
+## Mocking
+
+**Framework:** `unittest.mock` (`MagicMock`, `AsyncMock`, `patch`).
+
+**Pattern A — `MagicMock` returning Pydantic models** (Plane sync/webhook tests):
+
+```python
+mock_client = MagicMock()
+mock_client.list_states.return_value = [PlaneState(id="s1", name="Pending", group="unstarted")]
+mock_client.create_work_item.return_value = PlaneWorkItem(id="plane-issue-1", name="Build feature", state="s-pending")
+
+engine = PlaneSyncEngine(plane_config, client=mock_client)
+engine.push_task(team, task)
+
+mock_client.create_work_item.assert_called_once()
+call_args = mock_client.update_work_item.call_args
+assert call_args[0][0] == "proj-1"
+```
+
+Source: `tests/test_plane_sync.py:36-86`. `PlaneSyncEngine.__init__(config, client=None)` accepts an injected client specifically so tests bypass the real `httpx.Client`.
+
+**Pattern B — `monkeypatch.setattr` to swap factories** (spawn CLI tests):
+
+```python
 class RecordingBackend:
     def __init__(self):
         self.calls = []
@@ -213,62 +196,21 @@ class RecordingBackend:
         return f"Agent '{kwargs['agent_name']}' spawned"
     def list_running(self):
         return []
-```
 
-This pattern (a small recording class instead of `MagicMock`) is the
-preferred style when:
-- the backend has a narrow interface that's easy to re-implement;
-- assertions need to inspect recorded kwargs (`call["command"]`,
-  `call["env"]["KIMI_API_KEY"]`).
-
-`unittest.mock.MagicMock` is used when the real API has many methods
-(e.g. `PlaneClient`, see `tests/test_plane_sync.py:36-44`).
-
-## Monkeypatch Patterns
-
-Core moves used throughout:
-
-```python
-# Environment isolation (layered on top of autouse conftest fixture)
-monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
-monkeypatch.setenv("HOME", str(tmp_path))
-monkeypatch.chdir(tmp_path)
-
-# Replace a resolved function by import path (dotted string)
+backend = RecordingBackend()
 monkeypatch.setattr("clawteam.spawn.get_backend", lambda _: backend)
-monkeypatch.setattr("clawteam.spawn.registry.is_agent_alive", lambda team, agent: True)
-monkeypatch.setattr("clawteam.spawn.registry.stop_agent", _stop)
-
-# Freeze time for TTL caches
-monkeypatch.setattr("clawteam.board.server.time.monotonic", lambda: now["value"])
-
-# Intercept subprocess.Popen with an inline fake that records args
-class FakePopen:
-    def __init__(self, args, **kwargs):
-        popen_calls.append(list(args))
-import subprocess as _sp
-monkeypatch.setattr(_sp, "Popen", FakePopen)
 ```
 
-(Examples in `tests/test_spawn_cli.py:170-220`, `tests/test_board.py:93-113`.)
+Source: `tests/test_spawn_cli.py:20-30, 39, 57-58`. The fakes are tiny inline classes; assertions inspect `backend.calls`.
 
-## Mocking Strategy
+**Pattern C — `unittest.mock.patch` context manager** (board liveness tests):
 
-`unittest.mock.patch` / `MagicMock` / `AsyncMock` are used where:
-- the surface is wide (HTTP clients, MCP server);
-- the real dependency is expensive (`subprocess.run("tmux ...")`,
-  network, git);
-- a function must return a specific exception (`side_effect=...`).
-
-Example — `tests/board/test_liveness.py:10-36`:
 ```python
 def _fake_run(stdout: str = "", returncode: int = 0):
     def runner(*args, **kwargs):
-        return subprocess.CompletedProcess(
-            args=args[0] if args else [],
-            returncode=returncode, stdout=stdout, stderr="",
-        )
+        return subprocess.CompletedProcess(args=args[0] if args else [], returncode=returncode, stdout=stdout, stderr="")
     return runner
+
 
 def test_tmux_windows_returns_window_names_when_session_exists():
     with patch("shutil.which", return_value="/usr/bin/tmux"), \
@@ -276,130 +218,186 @@ def test_tmux_windows_returns_window_names_when_session_exists():
         assert liveness.tmux_windows("my-swarm") == {"leader", "coder-1"}
 ```
 
-**What gets mocked:**
-- External CLIs: `subprocess.run`, `shutil.which` (tmux, git).
-- Network: `httpx.Client` via `MagicMock` (plane client tests).
-- `subprocess.Popen` when the test must not actually spawn a child.
-- `time.monotonic` for TTL cache expiry.
-- Backend factories and registry helpers via `monkeypatch.setattr` on the
-  dotted import path.
+Source: `tests/board/test_liveness.py:11-31`. Use `patch` (context manager) when stubbing stdlib calls; use `monkeypatch.setattr` when stubbing project symbols.
 
-**What is *not* mocked:**
-- Pydantic models — tests construct real `TeamConfig`, `TaskItem`, etc.
-- `TeamManager` / `MailboxManager` / `TaskStore` — they run against the
-  real file store under `tmp_path` because the autouse fixture already
-  gives isolation.
-- `Path`, `json`, atomic file helpers — exercised end-to-end.
-
-## Concurrency Tests
-
-Real processes are used for lock tests — `multiprocessing.get_context("fork")`
-is required and the test is skipped on platforms without fork:
+**Pattern D — `MagicMock` as duck-typed lookup** (webhook tests):
 
 ```python
-# tests/test_task_store_locking.py:40-74
-@pytest.mark.skipif("fork" not in mp.get_all_start_methods(), reason="requires fork start method")
-def test_only_one_agent_can_claim_task_concurrently(monkeypatch, tmp_path):
-    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
-    store = TaskStore("demo")
-    task = store.create("demo task")
+mock_states = {"state-1": MagicMock(group="unstarted")}
+result = _handle_work_item_event(payload, config, setup_team, mock_states)
+```
 
+Source: `tests/test_plane_webhook.py:62-67`. When the production code only reads `obj.group`, a one-attribute `MagicMock` is enough.
+
+**Pattern E — Inline fake `Popen` for subprocess assertions:**
+
+```python
+popen_calls = []
+class FakePopen:
+    def __init__(self, args, **kwargs):
+        popen_calls.append(list(args))
+
+import subprocess as _sp
+monkeypatch.setattr(_sp, "Popen", FakePopen)
+...
+watcher_call = next((c for c in popen_calls if "runtime" in c and "watch" in c), None)
+assert watcher_call is not None, f"no runtime watch invocation, got: {popen_calls}"
+```
+
+Source: `tests/test_spawn_cli.py:168-191`.
+
+**What to mock:**
+- HTTP / `httpx` clients — always inject a `MagicMock` configured to return `PlaneWorkItem`/`PlaneState`/etc. instances.
+- Spawn backends — replace via `monkeypatch.setattr("clawteam.spawn.get_backend", lambda _: FakeBackend())`.
+- Subprocess invocations — `monkeypatch.setattr(subprocess, "Popen", FakePopen)` or `patch("subprocess.run", side_effect=_fake_run(...))`.
+- Liveness probes — `patch("clawteam.board.liveness.tmux_windows", return_value={...})` for downstream tests of `agents_online`.
+
+**What NOT to mock:**
+- The file-based stores (`TeamManager`, `FileTaskStore`, `MailboxManager`). The autouse `isolated_data_dir` fixture means hitting real disk is cheap and safe — exercise the real serializer/loader paths instead of mocking them.
+- Pydantic models. Construct them with real values; that is what catches schema drift (e.g. `tests/test_plane_models.py` constructs everything via `model_validate`).
+- `EventBus`. Use a real `EventBus()` and assert by side effect (`tests/test_plane_sync.py:107-130`).
+
+## Fixtures and Factories
+
+- **Fixtures are local to each test module.** There is no shared `tests/factories.py` or model-builder helper. The handful of repeated builders (`setup_team`, `plane_config`, `mock_client`, `states`, `env`, `config`) are defined per file (e.g. `tests/test_plane_sync.py:15-44`, `tests/test_plane_webhook.py:21-28`, `tests/test_plane_integration.py:19-48`).
+- **Test data is built directly with the production constructors:** `TeamManager.create_team(...)`, `TeamManager.add_member(...)`, `FileTaskStore(team).create(subject=..., owner=...)`, `PlaneState(id=..., name=..., group=...)`. No JSON fixtures, no test-only factory classes.
+- **CliRunner pattern** for Typer commands:
+  ```python
+  from typer.testing import CliRunner
+  from clawteam.cli.commands import app
+
+  runner = CliRunner()
+  result = runner.invoke(
+      app,
+      ["spawn", "tmux", "claude", "--team", "demo", "--agent-name", "alice", "--no-workspace"],
+      env={"CLAWTEAM_DATA_DIR": str(tmp_path)},
+  )
+  assert result.exit_code == 1
+  assert "already running" in result.output
+  ```
+  Source: `tests/test_spawn_cli.py:42-50`. Always pass `env={...}` explicitly (do not rely on the test process env). Assert on `result.exit_code` AND `result.output`.
+
+## Coverage
+
+**Requirements:** None enforced. CI runs `python -m pytest tests/ -v --tb=short` with no `--cov` flag. There is no `coverage.py` config in `pyproject.toml` and no `.coveragerc`.
+
+**View coverage manually:**
+
+```bash
+pip install coverage
+coverage run -m pytest tests/
+coverage report -m
+```
+
+## Test Types
+
+### Unit tests
+
+Most files are unit tests in the strict sense — single module under test, no I/O beyond `tmp_path`:
+
+- **Pure logic:** `tests/test_plane_models.py` (Pydantic serialization), `tests/test_plane_mapping.py` (status<->group lookup), `tests/test_plane_config.py` (config defaults + JSON roundtrip), `tests/test_timefmt.py`.
+- **HTTP client unit:** `tests/test_plane_client.py` constructs a real `PlaneClient`, asserts on `_headers()` / `_url()` / payload helpers without ever calling out (no `respx`, no live HTTP).
+- **Webhook handlers:** `tests/test_plane_webhook.py` calls the underscore-prefixed `_handle_work_item_event` and `_handle_comment_event` directly with a hand-built payload dict instead of spinning up the `ThreadingHTTPServer`.
+- **Liveness:** `tests/board/test_liveness.py` patches `shutil.which` + `subprocess.run` and asserts on the parsed set.
+
+### Integration tests
+
+Distinguished by file name `_integration` and exercise multiple subsystems through their public API:
+
+- `tests/test_plane_integration.py` — end-to-end: agent creates task in `FileTaskStore`, `PlaneSyncEngine.push_task` writes through a mocked client, then `_handle_work_item_event` / `_handle_comment_event` simulates the inbound webhook and asserts the file store ends up in the right state. Three scenarios: full round-trip, HITL approval comment, human-creates-task.
+- `tests/test_plane_sync.py:test_event_hook_pushes_on_task_update` — wires a real `EventBus`, registers the real `register_sync_hooks`, emits `AfterTaskUpdate`, and asserts the mock Plane client was called.
+- `tests/test_spawn_cli.py` — invokes the full Typer app via `CliRunner` with mocked spawn backends, exercising config loading, profile resolution, team auto-creation/rollback, runtime-watcher launch, repo/worktree handling. The largest test file in the repo (624 lines, 25+ tests).
+- `tests/test_board.py` — drives `BoardCollector` and `BoardHandler` against real on-disk teams; covers SSE snapshot caching and proxy normalization.
+
+### E2E tests
+
+None for the frontend. There is a manual visual checklist (root-level PNG screenshots: `board-full-page.png`, `board-team-selected.png`, `board-peek-panel.png`) and a `.playwright-mcp/` directory of ad-hoc captures, but no scripted Playwright/Cypress runs.
+
+## Common Patterns
+
+### Async testing
+
+The codebase imports `AsyncMock` (`tests/test_plane_client.py:4`) but the **Plane client is synchronous** (`httpx.Client`, not `httpx.AsyncClient`), so no `@pytest.mark.asyncio` markers exist anywhere and `pytest-asyncio` is not a dependency. Do not introduce async test patterns without first making the corresponding production code async.
+
+### Concurrency / IPC testing
+
+For things like task locking, real `multiprocessing` is used with a `fork`-only skip marker — the only `@pytest.mark.*` in the suite:
+
+```python
+@pytest.mark.skipif("fork" not in mp.get_all_start_methods(), reason="requires fork start method")
+def test_only_one_agent_can_claim_task_concurrently(monkeypatch, tmp_path: Path):
+    ...
     ctx = mp.get_context("fork")
-    result_queue = ctx.Queue()
-    proc_a = ctx.Process(target=_claim_task, args=(str(tmp_path), task.id, "agent-a", 0.3, result_queue))
-    proc_b = ctx.Process(target=_claim_task, args=(str(tmp_path), task.id, "agent-b", 0.0, result_queue))
-    proc_a.start(); time.sleep(0.05); proc_b.start()
-    results = sorted(result_queue.get(timeout=10) for _ in range(2))
+    proc_a = ctx.Process(target=_claim_task, args=(...))
+    proc_a.start()
     ...
     assert [r[1] for r in results].count("ok") == 1
     assert [r[1] for r in results].count("err") == 1
 ```
 
-## Fixtures, Factories, and Test Data
+Source: `tests/test_task_store_locking.py:40-69`. The worker function is module-level (must be picklable for fork) and re-imports `clawteam` modules under the per-process `CLAWTEAM_DATA_DIR` env.
 
-There is **no** `tests/fixtures/` directory and no shared factory module.
-Instead:
+### Error testing
 
-- Small constructor calls go inline: `TeamManager.create_team(name="demo",
-  leader_name="leader", leader_id="leader001")`.
-- A local helper function is defined at the top of the file when it
-  repeats 3+ times, e.g. `_create_team(name)` in
-  `tests/test_registry.py:16-17`, `_make_mailbox(team_name)` in
-  `tests/test_mailbox.py:17-21`, `_inbox_path(...)` / `_peer_path(...)` in
-  `tests/test_mailbox.py:24-37`.
-- Module-scope `@pytest.fixture` for anything a single file needs
-  repeatedly (`client`, `plane_config`, `mock_client`, `setup_team`).
-- Team / task names are deterministic strings (`"demo"`, `"test-team"`,
-  `"my-swarm"`) — no Faker, no uuid randomisation in tests.
+Pattern is to invoke the action and assert on side effects rather than `pytest.raises`:
 
-## Common Patterns
-
-**Error Testing:**
 ```python
-# CLI layer — inspect exit_code + output
-result = runner.invoke(app, ["team", "start", "ghost"], env={...})
+result = runner.invoke(app, [...], env={...})
 assert result.exit_code == 1
-assert "ghost" in result.output
-
-# Library layer — pytest.raises with optional match
-with pytest.raises(ValueError, match="Invalid team name"):
-    TeamManager.create_team(name="bad/name", ...)
+assert "Error: command 'nanobot' not found in PATH" in result.output
+assert [m.name for m in TeamManager.list_members("demo")] == ["leader"]   # rollback verified
 ```
 
-**Async / Threaded Testing:**
-- Most code is synchronous. For the SSE server and event bus, tests
-  construct the primitive (`TeamSnapshotCache`) directly and drive it
-  through its public API — see `tests/test_board.py:74-113`.
-- `AsyncMock` is used in plane tests (`tests/test_plane_client.py:4`)
-  for the httpx async surface.
+Source: `tests/test_spawn_cli.py:32-50`. Note the rollback assertion in line 50 — error tests should also verify cleanup happened.
 
-**Filesystem assertions:**
-- Round-trip: write via production API, re-read via production API, assert
-  equality (`tests/test_models.py:44-49` for Pydantic JSON round-trips).
-- Path assertions use the real `Path` API under `tmp_path`, not string
-  compares.
+### Webhook / HMAC verification
 
-## Test Types
+Build the signature with the real `hmac` + `hashlib` and feed the same body to the verifier:
 
-**Unit tests** — dominant. Single class/function in isolation, real file
-store under `tmp_path` is considered "in-process" state and not mocked.
-Examples: `tests/test_models.py`, `tests/test_fileutil.py`,
-`tests/test_paths.py` (not present; validation covered in manager tests),
-`tests/test_identity.py`.
+```python
+def test_verify_signature_valid():
+    secret = "webhook-secret-123"
+    body = b'{"event": "issue.updated"}'
+    sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    assert _verify_signature(body, sig, secret) is True
+```
 
-**Integration tests** — exercise Typer CLI plus file store plus backend
-stubs. Examples: `tests/test_spawn_cli.py`, `tests/test_cli_commands.py`,
-`tests/test_board.py` (HTTP collector + mailbox + team manager).
+Source: `tests/test_plane_webhook.py:30-38`. No mocking of the crypto — exercise the real path.
 
-**E2E / smoke** — none automated. The frontend smoke is `pnpm build`.
-Webhook and plane integration tests use `MagicMock` for the HTTP layer
-rather than spinning up a real Plane instance.
+### Pydantic model parsing
 
-## Coverage
+Use `Model.model_validate(dict)` with realistic API-shaped payloads, then assert on attributes. Verify forward-compat with extra-fields:
 
-- No coverage tool configured in `pyproject.toml` (no `pytest-cov`, no
-  `.coveragerc`). Coverage is tracked informally.
-- No enforced percentage, no CI gate on coverage.
+```python
+def test_work_item_extra_fields_ignored():
+    data = {"id": "abc-123", "name": "task", "state": "s1", "priority": "none", "unknown_future_field": True}
+    item = PlaneWorkItem.model_validate(data)
+    assert item.id == "abc-123"
+```
 
-## Recent Known-Good Reference Points
+Source: `tests/test_plane_models.py:62-70`.
 
-As of 2026-04-15 these tests are the canonical examples to mirror when
-adding new tests:
+### Walk-up / data-dir tests
 
-- `tests/test_board.py` — HTTP collector/server, TTL cache, SSE behaviour.
-- `tests/test_data_dir.py` — bespoke per-file autouse fixture override.
-- `tests/test_spawn_cli.py` — `CliRunner`, backend stub classes,
-  `monkeypatch.setattr` of dotted paths.
-- `tests/board/test_liveness.py` — subprocess mocking via
-  `unittest.mock.patch` with a fake `CompletedProcess` factory.
-- `tests/test_models.py` — Pydantic alias round-trips and enum behaviour.
-- `tests/test_task_store_locking.py` — cross-process locking via
-  `multiprocessing.fork`.
+When testing `get_data_dir()` (or anything that walks up the cwd looking for `.clawteam/`), you MUST first remove the autouse fixture's stray directory:
 
-Total test count: 556 `def test_*` functions across 44 files; latest
-passing run reported 552 green.
+```python
+@pytest.fixture(autouse=True)
+def clean_env(monkeypatch, tmp_path):
+    monkeypatch.delenv("CLAWTEAM_DATA_DIR", raising=False)
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+
+    stray = tmp_path / ".clawteam"
+    if stray.is_dir():
+        import shutil
+        shutil.rmtree(stray)
+```
+
+Source: `tests/test_data_dir.py:11-27`. This is the only safe way to test `_find_project_data_dir` because the global autouse fixture would otherwise be picked up as the "project root".
 
 ---
 
-*Testing analysis: 2026-04-15*
-*Update when test patterns change*
+*Testing analysis: 2026-04-28*

@@ -1,122 +1,134 @@
 # Technology Stack
 
-**Analysis Date:** 2026-04-15
+**Analysis Date:** 2026-04-28
 
 ## Languages
 
 **Primary:**
-- Python 3.10+ (supports 3.10, 3.11, 3.12) — the entire backend, CLI, MCP server, spawn system, event bus, and HTTP dashboard. Declared in `pyproject.toml:6,15-18`.
-- TypeScript ~5.8 — the board dashboard UI (React). Configured via `clawteam/board/frontend/tsconfig.json`, `tsconfig.app.json`, `tsconfig.node.json`.
+- Python 3.10+ (target 3.10/3.11/3.12) — entire backend, CLI, MCP server, transports, harness, board HTTP server, Plane integration
+- TypeScript 5.8 — board frontend dashboard (`clawteam/board/frontend/src/`)
 
 **Secondary:**
-- Bash — `scripts/plane-docker-setup.sh`, `scripts/openclaw_worker.sh`.
-- TOML — preset/team templates in `clawteam/templates/*.toml` (e.g. `harness-default.toml`, `software-dev.toml`).
+- Bash — operator scripts (`scripts/openclaw_worker.sh`, `scripts/plane-docker-setup.sh`)
+- TOML — pyproject + team templates (`clawteam/templates/*.toml`)
+- HTML/CSS — built dashboard shell (`clawteam/board/static/index.html`) and marketing site (`website/`)
 
 ## Runtime
 
 **Environment:**
-- CPython 3.10+ for the backend process (`requires-python = ">=3.10"` in `pyproject.toml:6`).
-- Node.js (via Vite dev server) for frontend development; the built bundle is static and served by the Python stdlib HTTP server at runtime.
-- `tmux` — required on host for the default spawn backend. Detected with `shutil.which("tmux")` in `clawteam/spawn/tmux_backend.py:56`.
+- CPython 3.10 / 3.11 / 3.12 (declared in `pyproject.toml`, verified in `.github/workflows/ci.yml` matrix)
+- Node 18+ (Vite 6 + TypeScript 5.8 toolchain in `clawteam/board/frontend/package.json`; root `website/` Vite 5 build also requires Node)
 
-**Package Managers:**
-- Python: `uv` is used locally (`uv.lock` present, ~186 KB). `pip install -e ".[dev]"` is the CI path per `.github/workflows/ci.yml:31`. Build backend is Hatchling (`pyproject.toml:51-56`).
-- Frontend: `npm` for `clawteam/board/frontend/` (`package-lock.json`). A separate top-level `package.json` exists for the `website/` (not the app).
+**Package Manager:**
+- Python: `uv` (lockfile `uv.lock` checked in, also installable via `pip install -e .`)
+- Frontend (board): `npm` — `clawteam/board/frontend/package-lock.json`
+- Marketing site: `npm` — `package-lock.json` at repo root
 
 ## Frameworks
 
-**Backend core:**
-- **Typer** `>=0.12,<1.0` — CLI framework. The root `app = typer.Typer(...)` lives at `clawteam/cli/commands.py:22-26`; every subcommand (`team`, `spawn`, `task`, `inbox`, `board`, `plane`, etc.) is registered on it. Entry point: `clawteam = "clawteam.cli.commands:app"` (`pyproject.toml:43`).
-- **Pydantic v2** `>=2.0,<3.0` — all data models. Used for team/task models (`clawteam/team/models.py`), config (`clawteam/config.py`), Plane models (`clawteam/plane/models.py`), events, and MCP tool I/O.
-- **Python stdlib `http.server`** (`ThreadingHTTPServer` + `BaseHTTPRequestHandler`) — board dashboard HTTP/SSE server. No Flask, FastAPI, or Starlette. See `clawteam/board/server.py:12,120,367`. Webhook receiver (`clawteam/plane/webhook.py:9`) uses the same stdlib primitives.
-- **MCP** `>=1.0` — the official Model Context Protocol Python SDK. `FastMCP("clawteam")` registers tools in `clawteam/mcp/server.py:8-13,28-29`. Entry point: `clawteam-mcp = "clawteam.mcp.server:main"` (`pyproject.toml:44`).
+**Core (Python backend):**
+- `typer >=0.12,<1.0` — CLI surface (`clawteam/cli/commands.py`, ~4800 lines, ~30 sub-Typer apps)
+- `pydantic >=2.0,<3.0` — every data model (`clawteam/team/models.py`, `clawteam/plane/models.py`, `clawteam/plane/config.py`)
+- `rich >=13.0,<15.0` — terminal output (Console / Table imports throughout `commands.py`)
+- `questionary >=2.0.1,<3.0` — interactive wizards (`profile_wizard` in `commands.py:795+`)
+- `mcp >=1.0` — Model Context Protocol; ClawTeam exposes a `FastMCP` server (`clawteam/mcp/server.py`, tools in `clawteam/mcp/tools/`)
+- `tomli >=2.0` — TOML parsing on Python <3.11 (templates)
 
-**Backend UI/display:**
-- **Rich** `>=13,<15` — terminal rendering (tables, colors) in `clawteam/cli/commands.py` and `clawteam/board/renderer.py`.
-- **Questionary** `>=2.0.1,<3.0` — interactive CLI prompts (`clawteam/cli/commands.py`).
+**HTTP server:**
+- `http.server.ThreadingHTTPServer` (stdlib only) — board dashboard at `clawteam/board/server.py:367`; Plane HITL webhook receiver at `clawteam/plane/webhook.py:215`. Intentionally framework-free to keep core install dependency-light.
+
+**Frontend (board dashboard — `clawteam/board/frontend/`):**
+- React 19.1 + ReactDOM 19.1 — root mount in `src/main.tsx:6`
+- Vite 6.3 — dev server + bundler (`vite.config.ts`); proxies `/api` → `http://localhost:8080`; build output goes to `../static/` consumed by the Python server
+- TypeScript 5.8 — strict, compiled via `tsc -b` before `vite build`
+- Tailwind CSS 4.1 (via `@tailwindcss/vite`) — theme tokens defined as OKLCH CSS variables in `src/index.css`
+- shadcn/ui — `style: "base-nova"`, alias `@/components/ui` (`components.json`); generated primitives live under `src/components/ui/` (badge, button, card, dialog, input, label, scroll-area, select, sheet, textarea)
+- `@base-ui/react ^1.4` — headless primitive library backing the shadcn components (e.g. `Dialog as DialogPrimitive` from `@base-ui/react/dialog` in `src/components/ui/dialog.tsx:4`)
+- `@dnd-kit/react ^0.4` + `@dnd-kit/react/sortable` — kanban drag-and-drop (`src/components/kanban/board.tsx:1`)
+- `lucide-react ^1.8` — icon set (declared `iconLibrary: "lucide"` in `components.json`)
+- `class-variance-authority ^0.7`, `clsx ^2.1`, `tailwind-merge ^3.5` — `cn()` utility in `src/lib/utils.ts`
+- `tw-animate-css ^1.4` — Tailwind animation utilities used by dialog/sheet primitives
+
+**Frontend (marketing — `website/`):**
+- React 18.3, ReactDOM 18.3, Vite 5.4, `@vitejs/plugin-react` 4.3 (root `package.json`). Separate from the board app and pinned to React 18.
+
+**Real-time transport (browser ↔ board):**
+- Server-Sent Events (`text/event-stream`) — produced by `BoardHandler._serve_sse` (`clawteam/board/server.py:324`), consumed by `useTeamStream` via `EventSource` (`src/hooks/use-team-stream.ts:21`). 2-second poll with TTL-cached snapshots (`TeamSnapshotCache`, `server.py:96`).
+
+**Optional Python extras (`pyproject.toml [project.optional-dependencies]`):**
+- `dev` → `pytest>=9.0,<10.0`, `ruff>=0.1` (lint + test)
+- `p2p` → `pyzmq>=25,<27` — ZeroMQ PUSH/PULL transport (`clawteam/transport/p2p.py`); imported lazily inside `P2PTransport`
+- `plane` → `httpx>=0.27,<1.0` — sync HTTP client used only by `clawteam/plane/client.py:7`
 
 **Testing:**
-- **pytest** `>=9.0,<10.0` (dev extra). Config in `pyproject.toml:73-74` (`testpaths = ["tests"]`). Shared fixture `isolated_data_dir` in `tests/conftest.py:10-19` redirects `CLAWTEAM_DATA_DIR` and `HOME` to `tmp_path` so tests never touch the real `~/.clawteam/`.
-- 30+ test modules under `tests/` covering CLI, MCP tools, Plane, event bus, mailbox, workspace, etc.
+- `pytest >=9.0,<10.0` — `[tool.pytest.ini_options] testpaths = ["tests"]`. CI runs `python -m pytest tests/ -v --tb=short` across 3 Python versions × {ubuntu, macos}.
 
-**Linting:**
-- **Ruff** `>=0.1` (dev extra). Config in `pyproject.toml:65-71`: line length 100, targets `py310`, rules `E,F,I,N,W` (E501 ignored). CI runs `ruff check clawteam/ tests/` (`.github/workflows/ci.yml:10-18`).
-
-**Frontend core (`clawteam/board/frontend/package.json`):**
-- **React 19.1** + **React DOM 19.1** — UI runtime.
-- **Vite 6.3** with `@vitejs/plugin-react` — dev server and build tool. Config: `clawteam/board/frontend/vite.config.ts`. Builds into `../static` (consumed by the Python HTTP server). Dev-mode proxy: `/api → http://localhost:8080`.
-- **Tailwind CSS 4.1** via `@tailwindcss/vite` plugin — no separate `tailwind.config.*` file; Tailwind v4 is configured through `src/index.css` using `@import "tailwindcss"` and CSS variables (OKLCH-based theme tokens at `clawteam/board/frontend/src/index.css:1-30`).
-- **shadcn** (style: `base-nova`, base color `neutral`, icon library `lucide`) — configured in `clawteam/board/frontend/components.json`. Generated primitives live in `src/components/ui/`: `badge`, `button`, `card`, `dialog`, `input`, `label`, `scroll-area`, `select`, `sheet`, `textarea`.
-- **@base-ui/react** `^1.4.0` — unstyled headless primitives that shadcn composes over.
-- **@dnd-kit/react** `^0.4.0` — drag-and-drop for kanban. `DragDropProvider` + `isSortable` at `clawteam/board/frontend/src/components/kanban/board.tsx:1-40`; used in `column.tsx` and `task-card.tsx`.
-- **lucide-react**, **clsx**, **tailwind-merge**, **class-variance-authority**, **tw-animate-css** — styling/utility trio standard to shadcn.
+**Build / dev tooling:**
+- `ruff >=0.1` — lint + import-sort. Config in `pyproject.toml`: `line-length = 100`, `target-version = "py310"`, lint rules `E, F, I, N, W` (E501 ignored).
+- `hatchling` — Python build backend (`[build-system]` in `pyproject.toml`); wheels package the `clawteam` directory.
 
 ## Key Dependencies
 
-**Python critical (`pyproject.toml:21-40`):**
-- `typer>=0.12,<1.0` — CLI surface.
-- `pydantic>=2.0,<3.0` — all typed models.
-- `mcp>=1.0` — MCP server runtime for `clawteam-mcp`.
-- `rich>=13,<15` — terminal output (tables, panels).
-- `questionary>=2.0.1,<3.0` — interactive wizards.
-- `tomli>=2.0; python_version < '3.11'` — TOML reading shim for Python 3.10.
+**Critical (always installed):**
+- `typer` — defines the entire `clawteam` command tree, including the `clawteam plane` sub-app added on this branch (`commands.py:4684`)
+- `pydantic` — boundary of every cross-process payload (tasks, messages, Plane work items, configs)
+- `rich` — sole terminal-rendering library (no fallback)
+- `mcp` — required to ship the `clawteam-mcp` console script (`pyproject.toml [project.scripts]`)
 
-**Python optional extras:**
-- `[dev]`: `pytest>=9.0,<10.0`, `ruff>=0.1`.
-- `[p2p]`: `pyzmq>=25,<27` — enables the ZeroMQ transport (`clawteam/transport/p2p.py`); off by default (file transport is the built-in).
-- `[plane]`: `httpx>=0.27,<1.0` — needed only when Plane integration is active (`clawteam/plane/client.py:7`).
+**Critical (extras-gated):**
+- `httpx` — required for `clawteam plane *` commands; absent in the default install. The Plane modules `import httpx` at module top so calling Plane CLI without the extra raises `ImportError` at first use.
+- `pyzmq` — required only when `CLAWTEAM_TRANSPORT=p2p`; falls back to file transport otherwise.
 
-**Frontend critical (`clawteam/board/frontend/package.json`):**
-- `react@^19.1.0`, `react-dom@^19.1.0`.
-- `vite@^6.3.0` + `@vitejs/plugin-react@^4.4.0`.
-- `tailwindcss@^4.1.0` + `@tailwindcss/vite@^4.1.0`.
-- `@base-ui/react@^1.4.0` (shadcn base layer).
-- `@dnd-kit/react@^0.4.0` (kanban DnD).
-- `typescript@~5.8.0`.
+**Infrastructure:**
+- Native `tmux` binary — required by the default spawn backend (`clawteam/spawn/tmux_backend.py`) and by agent-liveness detection (`clawteam/board/liveness.py:17` shells out to `tmux list-windows`). The board explicitly distinguishes SSE liveness from agent liveness using this signal.
+- Native `wsh` binary — optional Wave Terminal backend (`clawteam/spawn/wsh_backend.py`)
+- Native `gource` binary — optional, used by `clawteam/board/gource.py` for activity visualization
+- Docker + Docker Compose — required to host the bundled Plane stack via `scripts/plane-docker-setup.sh` (downloads Plane's official `setup.sh` and runs `docker compose up -d`)
 
 ## Configuration
 
-**Runtime config file:**
-- `~/.clawteam/config.json` — persistent user config. Loaded and validated via `ClawTeamConfig` Pydantic model (`clawteam/config.py:51-75,83-97`). Path is fixed and independent of `data_dir` (`clawteam/config.py:78-80`).
-- Contains: `data_dir`, `user`, `default_team`, `default_profile`, `transport`, `task_store`, `workspace`, `default_backend`, `skip_permissions`, `timezone`, `gource_*`, `spawn_*`, agent `profiles`, agent `presets`, `hooks`, `plugins`, and a nested `plane: PlaneConfig`.
+**Environment variables (read directly from source):**
+- `CLAWTEAM_DATA_DIR` — overrides the data directory; set by `--data-dir` CLI flag (`commands.py:64-66`). Resolution order in `clawteam/team/models.py:15-46`: env var → user-config `data_dir` → nearest `.clawteam/` walking up from cwd (project-local, git-style) → `~/.clawteam/` global fallback.
+- `CLAWTEAM_TRANSPORT` — selects `file` (default) vs `p2p` ZeroMQ transport; set by global `--transport` flag (`commands.py:67-69`).
 
-**Data directory (`.clawteam/`):**
-- Resolution order in `clawteam/team/models.py:15-36`: (1) `$CLAWTEAM_DATA_DIR`, (2) `data_dir` in user config, (3) nearest `.clawteam/` walking up from cwd (git-style project-local discovery), (4) `~/.clawteam/` fallback.
-- Structure: `teams/`, `tasks/`, `workspaces/`, `costs/`, and (when enabled) `plane-config.json`. Observed live in `/home/jac/repos/ClawTeam/.clawteam/`.
+**Project-local data directory (this branch's addition):**
+- `.clawteam/` — discovered by walking up from cwd. Contains `teams/`, `tasks/`, `costs/`, `workspaces/`, and the new `plane-config.json` (`clawteam/plane/config.py:27`).
 
-**Plane integration config:**
-- `<data_dir>/plane-config.json` — loaded via `PlaneConfig` model (`clawteam/plane/config.py:13-48`). Separate file so secrets stay out of the global config.
+**Per-team / per-tool config files:**
+- `.clawteam/plane-config.json` — Plane integration settings (URL, API key, workspace slug, project ID, sync flag, webhook secret/port, state mapping). Schema: `PlaneConfig` in `clawteam/plane/config.py:13`.
+- `.clawteam/teams/<team>/config.json` — team + member definitions
+- `.clawteam/teams/<team>/inboxes/` — per-agent mailboxes
+- `.clawteam/teams/<team>/peers/<agent>.json` — P2P peer discovery (`clawteam/transport/p2p.py:22`)
+- User config (CLI/profile/preset) — managed via `clawteam config` / `clawteam profile` / `clawteam preset` sub-apps
 
-**Environment variables** (full map in `clawteam/config.py:100-136`):
-- `CLAWTEAM_DATA_DIR`, `CLAWTEAM_USER`, `CLAWTEAM_TEAM_NAME`, `CLAWTEAM_DEFAULT_PROFILE`, `CLAWTEAM_TRANSPORT`, `CLAWTEAM_TASK_STORE`, `CLAWTEAM_WORKSPACE`, `CLAWTEAM_DEFAULT_BACKEND`, `CLAWTEAM_SKIP_PERMISSIONS`, `CLAWTEAM_TIMEZONE`, `CLAWTEAM_GOURCE_*`, `CLAWTEAM_SPAWN_*`.
-- Agent-scoped (injected by spawn backends into every spawned window, `clawteam/spawn/tmux_backend.py:67-77`): `CLAWTEAM_AGENT_ID`, `CLAWTEAM_AGENT_NAME`, `CLAWTEAM_AGENT_TYPE`, `CLAWTEAM_TEAM_NAME`, `CLAWTEAM_AGENT_LEADER`, `CLAWTEAM_WORKSPACE_DIR`, `CLAWTEAM_CONTEXT_ENABLED`, `CLAWTEAM_BIN`.
+**Build configuration:**
+- `pyproject.toml` — packaging, deps, ruff, pytest
+- `clawteam/board/frontend/vite.config.ts` — React + Tailwind plugins, `@/` alias to `src/`, build outDir set to `../static`, dev proxy `/api → localhost:8080`
+- `clawteam/board/frontend/components.json` — shadcn config (style `base-nova`, baseColor `neutral`, CSS variables enabled, lucide icons)
+- `clawteam/board/frontend/tsconfig.json`, `tsconfig.app.json`, `tsconfig.node.json` — split TS configs for app vs Node (Vite) code
 
-**Build config:**
-- `pyproject.toml` — project metadata, deps, ruff, pytest, hatchling build.
-- `clawteam/board/frontend/vite.config.ts` — Vite + React + Tailwind plugins, `@/` alias, output to `../static`, dev proxy.
-- `clawteam/board/frontend/components.json` — shadcn registry config.
-- `clawteam/board/frontend/tsconfig*.json` — TS project references.
-
-**File-based stores** (all JSON on disk, atomic writes via `fileutil.atomic_write_text`, `fcntl`/`msvcrt` cross-platform locking):
-- Tasks: `<data_dir>/tasks/<team>/task-<id>.json` (`clawteam/store/file.py:24-38`).
-- Teams: `<data_dir>/teams/<team>/` with `config.json`, `spawn_registry.json`, `inboxes/<agent>/`.
-- Mailbox: `<data_dir>/teams/<team>/inboxes/<agent>/msg-<ts>-<uuid>.json` (`clawteam/team/mailbox.py:1-40`).
-- Costs: `<data_dir>/costs/`.
-- Events: in-process pub/sub only (see `INTEGRATIONS.md` → Event bus).
+**Secrets handling:**
+- `.env` is in `.gitignore` (no `.env*` files committed in repo root).
+- Plane API keys are persisted to `.clawteam/plane-config.json` via `save_plane_config` (atomic write); the project gitignore excludes only `.env`, not this file — operators must keep `.clawteam/` out of shared workspaces or use a non-project data dir.
+- Webhook signatures verified via HMAC-SHA256 (`clawteam/plane/webhook.py:19-21`).
 
 ## Platform Requirements
 
 **Development:**
-- Linux or macOS (CI matrix: `ubuntu-latest`, `macos-latest` × Python 3.10/3.11/3.12 per `.github/workflows/ci.yml:22-25`).
-- Windows is partially supported in transports (`msvcrt` locking at `clawteam/store/file.py:14-17`, `clawteam/transport/file.py:7-16`) but `tmux` is POSIX-only, so the default spawn backend won't work on native Windows.
-- Required tooling: `tmux` (agent spawning), Python 3.10+, optionally Node 20+ for frontend dev, optionally `gource` binary for visualization (`clawteam/board/gource.py`), optionally Docker (only for Plane self-hosted — see `INTEGRATIONS.md`).
+- Linux or macOS (CI matrix: `ubuntu-latest`, `macos-latest`)
+- Python 3.10–3.12
+- Node 18+ for board frontend builds
+- `tmux` on PATH for the default spawn / liveness pipeline
+- `git` (workspace context tracking in `clawteam/workspace/git.py`)
+- One or more agent CLIs on PATH (the spawner detects `claude`, `claude-code`, `codex`, `codex-cli`, `gemini`, `kimi`, `qwen`, `qwen-code`, `opencode`, `nanobot`, `openclaw`, `pi` — see `clawteam/spawn/adapters.py:106-172`)
+- Optional: Docker for self-hosted Plane (`scripts/plane-docker-setup.sh`)
+- Optional: `wsh` for Wave Terminal backend
+- Optional: `gource` for activity visualization
 
-**Production:**
-- Distributed as a Python package (`hatchling` wheels and sdists, `pyproject.toml:55-63`) installed with `pip install clawteam` or `uv pip install`.
-- Two console entry points: `clawteam` (the CLI) and `clawteam-mcp` (the MCP server over stdio).
-- Runs entirely on the user's workstation; there is no hosted service. The board HTTP server binds to `127.0.0.1:8080` by default (`clawteam/board/server.py:354-359`).
+**Production / runtime targets:**
+- Same as development. ClawTeam ships as a developer-side coordination CLI; there is no managed-service deployment target. The board server binds `127.0.0.1:8080` by default (`clawteam/board/server.py:354`); the Plane webhook receiver binds `0.0.0.0:9091` by default (`clawteam/plane/webhook.py:209,215`).
+- Distribution: PyPI-compatible wheel built by hatchling (`clawteam-0.3.0`); console scripts `clawteam` and `clawteam-mcp`.
 
 ---
 
-*Stack analysis: 2026-04-15*
-*Update after major dependency changes*
+*Stack analysis: 2026-04-28*
