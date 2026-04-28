@@ -2,195 +2,507 @@
 
 **Analysis Date:** 2026-04-28
 
-This codebase has two distinct convention zones:
+ClawTeam is a hybrid Python + TypeScript repository. The Python package
+(`clawteam/`) is the CLI / coordination engine; the TypeScript package
+(`clawteam/board/frontend/`) is the React SPA shipped as `clawteam board serve`'s
+static bundle. Conventions differ meaningfully between the two halves and are
+documented separately below.
 
-1. **Python backend** (`clawteam/`) — Typer CLI + Pydantic v2 models, lint with ruff, line length 100, py3.10+.
-2. **TypeScript frontend** (`clawteam/board/frontend/`) — React 19 + Vite 6 + Tailwind v4 + shadcn/ui (`base-nova` style) on top of `@base-ui/react` primitives, strict TypeScript.
+The project skill at `skills/clawteam/SKILL.md` is the authoritative reference
+for end-user CLI behavior; this document covers source-level conventions only.
 
-## Naming Patterns
+---
 
-### Python files & modules
+## Python — `clawteam/`
 
-- Lowercase, snake_case, single-word where possible: `clawteam/plane/client.py`, `clawteam/board/liveness.py`, `clawteam/spawn/tmux_backend.py`.
-- Sub-packages are flat (`plane/`, `board/`, `spawn/`, `team/`, `events/`, `store/`) and each has an `__init__.py` that re-exports the public surface (see `clawteam/plane/__init__.py`, `clawteam/spawn/__init__.py`).
-- Test files mirror source: `tests/test_plane_client.py` exercises `clawteam/plane/client.py`. New focused test areas are nested (`tests/board/test_liveness.py`).
-- Backend files are suffixed `_backend.py`: `subprocess_backend.py`, `tmux_backend.py`, `wsh_backend.py`.
+### Toolchain
 
-### Python identifiers
+- **Python:** `>=3.10` (`pyproject.toml` line 6). Type syntax assumes 3.10
+  (`X | None`, PEP 604).
+- **Formatter / linter:** `ruff` only — no `black`, no `isort`. Configured in
+  `pyproject.toml`:
+  - `line-length = 100`
+  - `target-version = "py310"`
+  - lint rules: `["E", "F", "I", "N", "W"]` with `E501` (line length) ignored
+- **Pydantic:** v2 (`pydantic>=2.0.0,<3.0.0`). All models use `model_config`,
+  `model_dump_json`, `model_validate`. Never use deprecated `dict()` / `parse_obj()`.
 
-- Functions/variables: `snake_case` (`load_plane_config`, `resolve_state_id`, `_task_to_plane_payload`).
-- Classes: `PascalCase` (`PlaneClient`, `PlaneSyncEngine`, `TeamManager`, `BoardCollector`).
-- Constants: `UPPER_SNAKE_CASE` module-level dicts/lookups (`_STATUS_TO_GROUP`, `DEFAULT_STATE_NAMES`, `_CLAWTEAM_TO_PLANE_PRIORITY`, `_ALLOWED_PROXY_HOSTS`).
-- Private helpers: leading underscore (`_handle_work_item_event`, `_verify_signature`, `_now_iso`, `_find_project_data_dir`).
-- Pydantic enum values: lowercase strings backed by `str, Enum` so they JSON-serialize naturally (see `TaskStatus`, `TaskPriority`, `MessageType` in `clawteam/team/models.py`).
-- Lint rule set in `pyproject.toml` (lines 65-71): `ruff` selects `E, F, I, N, W` and ignores `E501` (line length is checked separately at 100).
+### File header
 
-### TypeScript files & identifiers
+Every Python module starts with a one-line module docstring describing scope.
+Examples:
 
-- Components and modules use **kebab-case filenames** with PascalCase exports: `peek-panel.tsx` exports `PeekPanel`, `agent-registry.tsx` exports `AgentRegistry`, `kanban/task-card.tsx` exports `TaskCard`.
-- Hooks live under `src/hooks/` and use `use-` prefix: `hooks/use-team-stream.ts` exports `useTeamStream`.
-- shadcn UI primitives live under `src/components/ui/` (lowercase filenames, PascalCase exports): `button.tsx`, `dialog.tsx`, `select.tsx`, `sheet.tsx`, `card.tsx`, `badge.tsx`, `input.tsx`, `label.tsx`, `scroll-area.tsx`, `textarea.tsx`.
-- Modals live under `src/components/modals/`: `add-agent.tsx`, `inject-task.tsx`, `send-message.tsx`, `set-context.tsx`.
-- Domain components live flat under `src/components/`: `topbar.tsx`, `summary-bar.tsx`, `peek-panel.tsx`, `message-stream.tsx`, `agent-registry.tsx`, plus the `kanban/` subdirectory.
-- Types: PascalCase interfaces in `src/types.ts` (`TeamData`, `Member`, `Task`, `Message`, `TaskSummary`, `TasksByStatus`); literal-union string types (`TaskStatus = "pending" | "in_progress" | ...`).
-- Constants: UPPER_SNAKE_CASE arrays/maps (`TASK_STATUSES`, `STATUS_LABELS`, `STATUS_COLORS`, `AGENT_TYPES`, `PRIORITIES`).
+- `clawteam/fileutil.py` line 1: `"""Atomic file writes and advisory file locking."""`
+- `clawteam/team/manager.py` line 1: `"""Team manager for creating and managing teams."""`
+- `clawteam/board/liveness.py` line 1: `"""Detects which team members have a live tmux session/window."""`
 
-## Code Style
-
-### Python
-
-- **Formatter / linter:** `ruff` only — no Black, no isort. Configured in `pyproject.toml` `[tool.ruff]` (line-length 100, target `py310`).
-- **`from __future__ import annotations`** at the top of nearly every Python file (87/99 source files). Always include it in new modules; it is what allows `dict | None`, `list[str]`, `PlaneClient | None` style hints on Python 3.10.
-- Type hints use **PEP 604 unions** (`str | None`) and **PEP 585 builtin generics** (`list[str]`, `dict[str, Any]`) — never `Optional[...]`/`List[...]` from `typing` (one exception: `cli/commands.py` still imports `Optional` for Typer compatibility).
-- 4-space indent, double-quoted string literals dominate, f-strings for interpolation.
-- Module docstring on the first line of every file (single triple-quoted string), e.g. `"""Pydantic models for Plane REST API objects."""` at top of `clawteam/plane/models.py`.
-
-### TypeScript / React
-
-- **Strict TypeScript** with `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`, `noUncheckedIndexedAccess` all enabled (see `clawteam/board/frontend/tsconfig.app.json`).
-- React 19 functional components with named `export function ComponentName(...)`.
-- Props are explicit `interface ComponentNameProps { ... }` declared above the component (see `interface TopbarProps` in `topbar.tsx:12`, `interface BoardProps` in `kanban/board.tsx:8`).
-- No semicolons in TS source files.
-- JSX uses double quotes, `className` is the only styling primitive — Tailwind utility classes only, with `cn()` from `@/lib/utils` (twMerge + clsx) for composition.
-- Variant-driven components use `class-variance-authority` (`cva`) — see `buttonVariants` in `components/ui/button.tsx`.
-- Component files do NOT use `default export` for components (only the root `App.tsx` does); everything else is named-export.
-
-## Import Organization
-
-### Python
-
-Three-block layout, blank line between blocks:
-
-1. `from __future__ import annotations`
-2. **stdlib** (`json`, `os`, `hashlib`, `hmac`, `pathlib`, `unittest.mock`, ...)
-3. **third-party** (`httpx`, `pytest`, `typer`, `pydantic`, `rich`, `questionary`)
-4. **first-party** (`from clawteam.* import ...`)
-
-Example pattern (`tests/test_plane_webhook.py:1-18`):
+After the docstring, immediately enable PEP 563 deferred evaluation:
 
 ```python
+"""Module summary line."""
+
 from __future__ import annotations
-
-import hashlib
-import hmac
-import json
-from pathlib import Path
-from unittest.mock import MagicMock
-
-import pytest
-
-from clawteam.plane.config import PlaneConfig
-from clawteam.plane.webhook import (
-    _verify_signature,
-    _handle_work_item_event,
-    _handle_comment_event,
-)
-from clawteam.team.manager import TeamManager
-from clawteam.team.models import TaskStatus
 ```
 
-**Lazy / local imports** are used heavily and intentionally to avoid circular imports and keep CLI startup fast. Examples:
+`from __future__ import annotations` is present in essentially every non-trivial
+module (see `clawteam/team/tasks.py`, `clawteam/store/file.py`,
+`clawteam/spawn/tmux_backend.py`, `tests/test_tmux_injection.py`,
+`tests/test_data_dir.py`).
 
-- `clawteam/plane/__init__.py:17-18` imports `events.types` and `store.file` inside `register_sync_hooks` instead of at module top.
-- `clawteam/plane/sync.py:57-58` imports `FileTaskStore` inside `push_task` to break the `plane <-> store` cycle.
-- `clawteam/cli/commands.py` imports nearly every dependency inside the command function body (e.g. `from clawteam.config import ...` inside `config_set`).
-- `clawteam/spawn/__init__.py` lazily imports each backend module inside `get_backend()` so a missing optional dep (e.g. `pyzmq`) does not break unrelated commands.
+### Naming
 
-Do this when introducing a new sub-feature: pull heavy/optional dependencies in at call site, not at import time.
+| Element | Style | Example | File |
+|---------|-------|---------|------|
+| Modules / packages | `snake_case` | `team_manager` is a class, but the module is `manager.py` | `clawteam/team/manager.py` |
+| Classes | `PascalCase` | `TeamManager`, `FileTaskStore`, `TmuxBackend`, `MailboxManager` | `clawteam/team/manager.py:50` |
+| Functions / methods | `snake_case` | `atomic_write_text`, `get_data_dir`, `_pane_safe_to_inject` | `clawteam/fileutil.py:28` |
+| Module-private helpers | leading `_` | `_now_iso`, `_find_project_data_dir`, `_render_runtime_notification` | `clawteam/team/models.py:39`, `clawteam/spawn/tmux_backend.py:733` |
+| Constants | `SCREAMING_SNAKE` | `_INJECT_SAFE_COMMANDS`, `_SHELL_ENV_KEY_RE`, `_ALLOWED_PROXY_HOSTS` | `clawteam/spawn/tmux_backend.py:30`, `clawteam/board/server.py:19` |
+| Pydantic enum members | lowercase | `TaskStatus.pending`, `MessageType.broadcast` | `clawteam/team/models.py:53` |
 
-### TypeScript
+Two naming subtleties to honor:
 
-Order, blank line between groups:
+1. **Aliased Pydantic fields use `camelCase` on the wire.** Python attributes
+   are `snake_case` but the JSON form (and therefore the disk format and the
+   browser API contract) is camelCase. See `Pydantic models` below.
+2. **`from` is a Python keyword**, so `TeamMessage.from_agent` is aliased to
+   `"from"` for both validation and serialization
+   (`clawteam/team/models.py:124`).
 
-1. React core (`useState`, `useEffect`, `useRef`, `useMemo`, `createContext`, `useContext`).
-2. Third-party libs (`@base-ui/react/...`, `@dnd-kit/react`, `class-variance-authority`, `lucide-react`, `clsx`, `tailwind-merge`).
-3. `@/components/...` (UI first, then domain).
-4. `@/lib/...`, `@/hooks/...`.
-5. `import type { ... } from "@/types"` last.
+### Pydantic v2 models
 
-**Path aliases:** `@/*` -> `clawteam/board/frontend/src/*`. Configured in three places that must stay in sync: `vite.config.ts:9`, `tsconfig.json:5`, `tsconfig.app.json:21`, plus `components.json:15-21` for shadcn.
+All shared records are Pydantic v2 models. Two patterns are mandatory:
 
-## Pydantic Conventions
+```python
+class TeamMember(BaseModel):
+    """A member of a team."""
 
-- **Pydantic v2** (`pydantic>=2.0.0,<3.0.0`). Always use `model_validate`, `model_dump_json`, `model_copy(deep=True)`, `model_fields` — never v1 `parse_obj`, `dict()`, etc.
-- Models inherit from `BaseModel`. Configuration is the inline `model_config = {...}` dict, not a nested `Config` class:
-  - `model_config = {"extra": "ignore"}` for all `clawteam.plane.models.*` so future Plane API fields do not crash deserialization.
-  - `model_config = {"populate_by_name": True}` on team models so both `agent_id`/`agentId` are accepted.
-- Defaults: `Field(default_factory=list)` / `Field(default_factory=dict)` for mutable defaults; `Field(default_factory=lambda: uuid.uuid4().hex[:12], alias="agentId")` for generated IDs.
-- Aliases bridge Python `snake_case` <-> JSON `camelCase`. Always serialize with `model_dump_json(by_alias=True)` for any payload crossing the wire (see `clawteam/team/manager.py:_save_config`, `clawteam/cli/commands.py:_dump`).
-- All persisted JSON files go through `clawteam.fileutil.atomic_write_text` (mkstemp + `os.replace`) — never `path.write_text` for state. See `clawteam/config.py:save_config`, `clawteam/plane/config.py:save_plane_config`.
-- Provide non-strict `__init__` defaults (e.g. `id: str = ""`, `priority: str = "none"` in `PlaneWorkItem`) so partial API responses still construct successfully.
+    model_config = {"populate_by_name": True}
 
-## Typer CLI Conventions
+    name: str = Field(alias="name")
+    user: str = Field(default="", alias="user")
+    agent_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12], alias="agentId")
+    agent_type: str = Field(default="general-purpose", alias="agentType")
+    joined_at: str = Field(default_factory=_now_iso, alias="joinedAt")
+```
 
-- Single root app in `clawteam/cli/commands.py`: `app = typer.Typer(name="clawteam", help=..., no_args_is_help=True)`.
-- Sub-apps wired with `app.add_typer(config_app, name="config")`, `app.add_typer(profile_app, name="profile")`, `app.add_typer(preset_app, name="preset")`, etc. Add new domains the same way.
-- Global options live on `@app.callback()` (`--version`, `--json`, `--data-dir`, `--transport`); they mutate module-level globals (`_json_output`, `_data_dir`) and forward into env vars (`os.environ["CLAWTEAM_DATA_DIR"] = ...`).
-- Every command supports both human and JSON output through `_output(data, _human)`. Always provide both a JSON-serializable dict and a `_human(d)` callable that pretty-prints with `rich.Table` / `console.print`.
-- Errors: `console.print(f"[red]...[/red]")` then `raise typer.Exit(1)` — never `sys.exit`. Successful side effects: `console.print(f"[green]OK[/green] ...")`.
-- Argument/option help strings are mandatory (`typer.Argument(..., help="...")`, `typer.Option(None, "--name", help="...")`).
-- Validation uses `_parse_key_value_items(items, label="env")` for repeatable `KEY=VALUE` options (`--env`, `--env-map`).
-- Lazy imports inside the command body keep `clawteam --help` snappy (see "Import Organization" above).
+(`clawteam/team/models.py:90`)
 
-## React / shadcn Conventions
+- `model_config = {"populate_by_name": True}` — accept both the snake_case
+  attribute name and the camelCase alias when validating.
+- All on-wire keys go through `Field(alias="…")`. Disk JSON, HTTP responses,
+  and CLI `--json` output use the aliases.
+- Default IDs come from `uuid.uuid4().hex[:N]` (12 chars for agent IDs, 8 for
+  task IDs — `clawteam/team/models.py:154`).
+- Default timestamps come from `_now_iso()` returning
+  `datetime.now(timezone.utc).isoformat()`. Never use `datetime.utcnow()`
+  (naive). See `clawteam/team/models.py:49`.
 
-- **shadcn config** (`clawteam/board/frontend/components.json`): style `base-nova`, RSC off, TSX on, base color `neutral`, icon library `lucide`, CSS variables on. Import primitives via the `@/components/ui/*` aliases.
-- **Underlying primitives are `@base-ui/react`**, NOT `@radix-ui`. The shadcn registry has been re-skinned on Base UI. When you regenerate a component, target `base-nova`, not `default`.
-- Tailwind v4 with `@import "tailwindcss"` — config is CSS-first inside `src/index.css` using `@theme inline { ... }`. Color tokens are `oklch()` CSS variables exposed as `--color-*`. Status colors live as semantic tokens: `--color-status-pending`, `--color-status-progress`, `--color-status-approval`, `--color-status-completed`, `--color-status-verified`, `--color-status-blocked`. Reference them via `var(--color-status-*)` (see `STATUS_COLORS` in `src/types.ts:67-74`).
-- All class composition goes through `cn()` from `@/lib/utils` (clsx + tailwind-merge).
-- Variant components use `cva()` and accept `VariantProps<typeof variants>` plus the underlying primitive's props (see `Button` props are `ButtonPrimitive.Props & VariantProps<typeof buttonVariants>` in `components/ui/button.tsx:48`).
-- Data-slot attribute pattern: every UI primitive sets `data-slot="button"` (or similar) on the rendered element so styling and tests can hook in.
-- API access goes through `@/lib/api.ts` only — never inline `fetch()` in components. The client uses a `BASE = "/api"` constant proxied to `http://localhost:8080` in dev (`vite.config.ts:18-21`).
-- SSE consumption is centralized in `@/hooks/use-team-stream.ts`; new realtime data should extend `TeamData` in `@/types.ts` and flow through the same hook.
-- Dialog/Sheet: opening state lives in the parent (`useState` in `App.tsx`), child receives `open: boolean` + `onClose: () => void` props (see `InjectTaskDialog`, `PeekPanel`, `AddAgentDialog` usages in `App.tsx:170-193`).
+When `from_agent: str = Field(alias="from", serialization_alias="from")`
+is needed (Python keyword collision), supply *both* `alias` and
+`serialization_alias` (`clawteam/team/models.py:124`).
 
-## Error Handling
+**Serialization rules** (used everywhere in `clawteam/cli/commands.py:_dump`):
 
-### Python
+```python
+def _dump(model) -> dict:
+    """Dump a pydantic model to dict with by_alias and exclude_none."""
+    return json.loads(model.model_dump_json(by_alias=True, exclude_none=True))
+```
 
-- **CLI surface:** print red message, exit non-zero. Pattern from `cli/commands.py`:
-  ```python
-  console.print(f"[red]Invalid key '{key}'. Valid: {', '.join(sorted(valid_keys))}[/red]")
-  raise typer.Exit(1)
+Every model dump uses `by_alias=True, exclude_none=True`. JSON output is
+indented with `indent=2, ensure_ascii=False` for human + machine readers
+(`clawteam/cli/commands.py:80`).
+
+### Persistence — `atomic_write_text` and `file_locked`
+
+All disk writes go through `clawteam/fileutil.py`. Never call
+`Path.write_text` / `open("w")` directly for shared state.
+
+```python
+from clawteam.fileutil import atomic_write_text, file_locked
+
+atomic_write_text(path, content)               # tmp + os.replace, never partial reads
+
+with file_locked(path):                        # advisory lock on <path>.lock
+    # read-modify-write a JSON file safely across processes
+    ...
+```
+
+(`clawteam/fileutil.py:28`, `:55`)
+
+Cross-process safety is taken seriously. `clawteam/store/file.py` ships its own
+`_write_lock()` context manager built on the same `fcntl.LOCK_EX` /
+`msvcrt.LK_LOCK` primitives (`clawteam/store/file.py:54`). Any code path that
+mutates a shared JSON file under `~/.clawteam/` (or its project-local
+equivalent) must hold this lock for the entire read-modify-write window.
+
+### Path handling
+
+- Always use `pathlib.Path`, never `os.path.join` for new code.
+- The data root is resolved via `get_data_dir()` in `clawteam/team/models.py:15`.
+  Resolution order is documented in the function docstring and tested in
+  `tests/test_data_dir.py`:
+  1. `CLAWTEAM_DATA_DIR` env var
+  2. `data_dir` from `~/.config/clawteam/config.json`
+  3. nearest `.clawteam/` walking up from `cwd` (project-local, git-style)
+  4. `~/.clawteam/` (global fallback)
+- Identifiers that build into filesystem paths must go through
+  `validate_identifier(...)` and `ensure_within_root(...)` from
+  `clawteam/paths.py` to prevent directory traversal. See
+  `clawteam/store/file.py:24`, `clawteam/team/manager.py:20`.
+
+### Typer CLI patterns
+
+The CLI is built on Typer and Rich, exposed through `clawteam.cli.commands:app`
+(see `pyproject.toml` `[project.scripts]`). Patterns from
+`clawteam/cli/commands.py`:
+
+- One root `typer.Typer(no_args_is_help=True)` per `app` and one per command
+  group; sub-typers are mounted with `app.add_typer(group_app, name="…")`
+  (`clawteam/cli/commands.py:175`, `:259`, `:262`).
+- Global options live in `@app.callback()` and write into module-level
+  `_json_output` / `_data_dir` flags that downstream commands read
+  (`clawteam/cli/commands.py:44`).
+- Every command supports `--json` via the global `_output(data, human_fn=…)`
+  helper. JSON output is the structured form; the human form is a Rich
+  `Table` rendering of the same dict
+  (`clawteam/cli/commands.py:77`, `:181`).
+- Validation errors print red text and `raise typer.Exit(1)`. Successes print
+  green `OK`. See `clawteam/cli/commands.py:215`, `:228`.
+- Heavy / optional deps are imported lazily inside the command function
+  (`questionary` in `_load_questionary` at `clawteam/cli/commands.py:135`,
+  `BoardCollector` import inside `board_*` commands). Top-level imports stay
+  cheap so `clawteam --version` is fast.
+
+### Imports
+
+Order (enforced by `ruff` rule `I`):
+
+1. `from __future__ import annotations`
+2. stdlib
+3. third-party (`typer`, `pydantic`, `rich`, `questionary`)
+4. first-party (`from clawteam.…`)
+
+One blank line between groups. Local / lazy imports inside function bodies
+are explicitly allowed and frequently used to keep cold-start fast (e.g.
+`from clawteam.config import load_config` inside `get_data_dir()`).
+
+### Error handling
+
+- Caller-facing CLI errors: print to `console` with a `[red]…[/red]` Rich tag
+  and `raise typer.Exit(1)`. Never `sys.exit` directly from a Typer command.
+- Library-layer errors: raise a typed exception (`TaskLockError`,
+  `RuntimeError("tmux load-buffer failed …")`). See
+  `clawteam/spawn/tmux_backend.py:_run_tmux` (`:685`) — every `subprocess.run`
+  whose failure must be observed is wrapped in `_run_tmux` which raises on
+  non-zero exit.
+- Best-effort side effects (event bus emits, telemetry) are wrapped in
+  bare `try/except Exception: pass` (`clawteam/store/file.py:107`).
+- Subprocess probes that are allowed to fail silently (e.g. tmux liveness
+  detection) explicitly catch `(subprocess.TimeoutExpired, OSError)` and
+  return an empty / falsy value (`clawteam/board/liveness.py:28`).
+
+### Subprocess discipline
+
+Two rules learned from the tmux runtime-injection bug fixes (commit on this
+branch, covered by `tests/test_tmux_injection.py`):
+
+1. **Check `shutil.which` before invoking external CLIs.** If the binary is
+   missing, return a structured failure — never let `FileNotFoundError`
+   escape from a library call. See
+   `clawteam/board/liveness.py:17`,
+   `clawteam/spawn/tmux_backend.py:295`.
+2. **Inspect every return code.** Use `_run_tmux(args)` (raises) for
+   side-effecting tmux commands, and `subprocess.run(..., capture_output=True,
+   text=True)` + manual `returncode` checks for read-only probes. Never use
+   `check=True` blindly inside library code — it makes the error message
+   less actionable than a hand-rolled `RuntimeError("tmux load-buffer failed
+   (exit 1): <stderr>")`.
+
+When generating a unique resource name (paste buffer, temp file, request id),
+use `uuid.uuid4().hex[:N]` — see `clawteam/spawn/tmux_backend.py:712`.
+
+### Logging / output
+
+There is no `logging` framework in user-facing code. CLI output goes through
+the module-level `console = Console()` from Rich
+(`clawteam/cli/commands.py:27`). Library code returns structured values; the
+caller decides whether to print.
+
+### Comments and docstrings
+
+- Every public function and class has a triple-quoted docstring on the line
+  immediately after the signature.
+- Multi-line docstrings start with a one-line summary, blank line, then
+  detail. See `clawteam/fileutil.py:28-40` and `clawteam/team/models.py:15-24`
+  for canonical examples.
+- Inline comments explain *why*, not *what*. The tmux backend has several
+  exemplary inline comments about WSL `PROGRAMFILES(X86)` (`:108`),
+  `TERM=dumb` from non-interactive shells (`:67`), and Claude nesting
+  detection (`:115`).
+
+### Function design
+
+- Prefer keyword arguments for anything beyond two positional parameters.
+  Static methods on managers (`TeamManager.create_team(name, leader_name, …)`)
+  use keyword-only arguments at call sites in tests
+  (`tests/test_board.py:17`).
+- Default mutable arguments are forbidden; use `Field(default_factory=list)`
+  on Pydantic models and `param: list[str] | None = None` plus an
+  `or []` body on plain functions
+  (`clawteam/store/file.py:83-95`).
+
+---
+
+## TypeScript — `clawteam/board/frontend/`
+
+The dashboard is React 19 + Vite 6 + Tailwind v4 + shadcn/ui (`base-nova`
+style on top of Base UI primitives `@base-ui/react`). The build output is
+written to `clawteam/board/static/` and served by the stdlib HTTP server in
+`clawteam/board/server.py`.
+
+### Toolchain
+
+- React 19, react-dom 19 (`package.json` lines 16-17)
+- TypeScript ~5.8 (`package.json` line 28)
+- Vite 6 with `@vitejs/plugin-react` and `@tailwindcss/vite` plugin
+  (`vite.config.ts:2-7`)
+- Tailwind v4 in CSS-first mode — no `tailwind.config.js`, only
+  `@import "tailwindcss"` and `@theme inline {…}` blocks in
+  `src/index.css`. The shadcn `components.json` declares
+  `"tailwind.config": ""` to make this explicit.
+- shadcn style: `"style": "base-nova"` (`components.json:3`),
+  `"baseColor": "neutral"`, `"iconLibrary": "lucide"`.
+- Drag-and-drop: `@dnd-kit/react` (Kanban board)
+- Class composition helpers: `clsx` + `tailwind-merge` exposed as `cn()` in
+  `src/lib/utils.ts`.
+
+### File and directory naming
+
+| Element | Style | Example |
+|---------|-------|---------|
+| Component / hook / lib filenames | `kebab-case.tsx` / `.ts` | `agent-registry.tsx`, `peek-panel.tsx`, `task-card.tsx`, `use-team-stream.ts` |
+| Directories | `kebab-case` | `components/kanban/`, `components/modals/`, `components/ui/` |
+| Component exports | `PascalCase` named exports | `export function Topbar(...)`, `export function Board(...)` |
+| Hooks | `useFoo` named export from `kebab-case` file | `useTeamStream` in `hooks/use-team-stream.ts` |
+| Types | `PascalCase` interface in `src/types.ts` | `TeamData`, `Member`, `Task`, `TaskStatus` |
+| Type-only constants | `SCREAMING_SNAKE` | `TASK_STATUSES`, `STATUS_LABELS`, `STATUS_COLORS` (`types.ts:49-73`) |
+
+The `App.tsx` and `main.tsx` entry points are the only PascalCase filenames —
+this is the standard Vite-React template and should be kept as-is.
+
+### Style: no semicolons
+
+The whole frontend omits trailing semicolons at the end of statements. Verified
+across `App.tsx`, `main.tsx`, `lib/api.ts`, all `components/*.tsx`, and all
+`components/ui/*.tsx` files (zero matches for `;\s*$`). The single exception
+is the `"use client"` directive at the top of files copied verbatim from
+shadcn (currently only `components/ui/dialog.tsx:1`).
+
+This is not enforced by a linter (no eslint / prettier config is checked in
+under the frontend directory), so contributors must mirror the existing
+style by hand. New files: omit semicolons.
+
+Other style points observed throughout:
+
+- Double-quoted strings (`import { foo } from "bar"`).
+- 2-space indentation.
+- Trailing commas in multiline object / arg lists.
+- Arrow components only for inline callbacks; top-level components use
+  `export function Name() {}`.
+
+### Imports and path aliases
+
+- The `@/*` alias maps to `./src/*`. Configured in both
+  `tsconfig.json:4-6` and `vite.config.ts:9-11`. Always import via the alias:
+  `import { Button } from "@/components/ui/button"` — never relative `../..`
+  paths across the `src/` tree.
+- `components.json` aliases mirror this: `components → @/components`,
+  `ui → @/components/ui`, `utils → @/lib/utils`, `hooks → @/hooks`,
+  `lib → @/lib`. Honor these when running `shadcn add`.
+
+Import groups (consistent across files, though not linter-enforced):
+
+1. React / react-dom
+2. Third-party libs (`@base-ui/react/...`, `@dnd-kit/react`,
+   `class-variance-authority`, `lucide-react`)
+3. `@/components/...`
+4. `@/hooks/...`
+5. `@/lib/...`
+6. `@/types` (type-only)
+
+Use `import type { ... }` for type-only imports
+(`App.tsx:15`, `peek-panel.tsx:19`).
+
+### shadcn / Base UI primitive pattern
+
+UI primitives in `src/components/ui/` are generated by the shadcn CLI on the
+`base-nova` style and wrap `@base-ui/react/<primitive>`. The canonical pattern
+(from `components/ui/button.tsx`):
+
+```tsx
+import { Button as ButtonPrimitive } from "@base-ui/react/button"
+import { cva, type VariantProps } from "class-variance-authority"
+
+import { cn } from "@/lib/utils"
+
+const buttonVariants = cva(
+  "group/button inline-flex shrink-0 items-center justify-center …",
+  {
+    variants: { variant: { default: "...", outline: "...", … }, size: {...} },
+    defaultVariants: { variant: "default", size: "default" },
+  },
+)
+
+function Button({
+  className,
+  variant = "default",
+  size = "default",
+  ...props
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  return (
+    <ButtonPrimitive
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
+  )
+}
+
+export { Button, buttonVariants }
+```
+
+Rules:
+
+- Always re-export both the component and its `cva` variants object so that
+  callers can compose styles (`buttonVariants({ variant: "outline" })`).
+- Always set `data-slot="<primitive>"` on the wrapper. Sibling primitives use
+  this for adjacency selectors.
+- Always pipe className through `cn(...)` so consumer overrides win the
+  tailwind-merge conflict resolution.
+- Type the props as `<Primitive>.Props & VariantProps<typeof variants>` —
+  do not redeclare prop interfaces by hand.
+
+### Tailwind v4 + theme tokens
+
+All theme colors are CSS variables in `src/index.css` and exposed as Tailwind
+utilities through the `@theme inline { … }` block:
+
+```css
+:root {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --status-pending: #f59e0b;
+  --status-progress: #3b82f6;
+  /* … */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  /* … */
+}
+```
+
+Conventions:
+
+- **Always reference theme tokens, never raw color values.** Use
+  `bg-background`, `text-foreground`, `bg-card/60`, `text-muted-foreground`,
+  `border-border` — not `bg-zinc-950` or `text-white`.
+  (Counter-example: `agent-registry.tsx` still uses raw `zinc-*` classes; new
+  components should not copy that.)
+- Status colors are sourced via `STATUS_COLORS[status]` from `src/types.ts:67`,
+  which resolves to `var(--color-status-pending)` etc. Components that paint
+  status (kanban column header, task card glow) inject the value via inline
+  `style={{ background: `linear-gradient(…, ${color}, …)` }}` because the
+  color name is dynamic at runtime
+  (`components/kanban/column.tsx:23`, `components/kanban/task-card.tsx:46`).
+- Use `oklch(...)` for new theme colors; the existing palette is uniformly
+  oklch except for the status accents.
+- Custom utility classes live in `src/index.css` (e.g. `.atmosphere`,
+  `.dot-grid` at `index.css:75-89`). Keep them small and themable.
+
+### React component patterns
+
+- **Functional components only.** No class components anywhere.
+- **Named exports for components, default export only for `App`.**
+  `App.tsx` uses `export default function App()`; everything else exports by
+  name.
+- Component props are declared as a top-level `interface FooProps` directly
+  above the component:
+
+  ```tsx
+  interface BoardProps {
+    teamName: string
+    tasks: TasksByStatus
+    onPeek: (taskId: string) => void
+  }
+
+  export function Board({ teamName, tasks, onPeek }: BoardProps) { … }
   ```
-- **Library surface:** raise specific exceptions (`ValueError`, `TaskLockError`, `httpx.HTTPStatusError`). Don't catch unless you have something meaningful to do.
-- **Background hooks / sync:** broad `except Exception as exc: log.warning(...)` so a failing webhook or Plane API never tears down the whole agent (see `clawteam/plane/__init__.py:28-29`, `clawteam/plane/sync.py:75-76`, `clawteam/plane/webhook.py:133-134`).
-- **Persistence:** `load_*` functions return defaults on `json.JSONDecodeError` / generic `Exception` so a corrupt file does not brick the CLI (`clawteam/config.py:88-92`, `clawteam/plane/config.py:35-39`, `clawteam/team/manager.py:35-36`).
-- HTTP: `resp.raise_for_status()` immediately after every request (see `PlaneClient._get/_post/_patch` in `clawteam/plane/client.py:62, 67, 72`).
 
-### TypeScript
+  (`components/kanban/board.tsx:8`).
+- Local state is `useState`, side effects are `useEffect`, derived values use
+  `useMemo` when the dependency cost is real
+  (`peek-panel.tsx:63`).
+- Refs use `useRef` typed explicitly: `useRef<{ x: number; y: number } | null>(null)`
+  (`task-card.tsx:25`).
+- Cross-tree state is shared via a single React context exposed by `App.tsx`:
+  `TeamContext` + `useTeam()` hook (`App.tsx:23-31`). Don't reach for Redux /
+  Zustand — the SSE-driven team snapshot is small and re-rendering top-down is
+  fine.
 
-- `fetch` wrappers throw on non-2xx: `if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)` (`src/lib/api.ts:9, 19`).
-- Components catch with `.catch(console.error)` for fire-and-forget mutations (`updateTask(...).catch(console.error)` in `kanban/board.tsx:35`, `peek-panel.tsx:78`).
-- For interactive flows, set a local `submitting` flag and try/catch/finally (see `add-agent.tsx:43-56`).
-- SSE: silent `.onerror = () => setIsConnected(false)` with parse failures going to `console.error` (`hooks/use-team-stream.ts:35, 39`).
+### Data fetching
 
-## Logging
+All HTTP calls live in `src/lib/api.ts` and target the `/api` prefix proxied
+to the Python server (`vite.config.ts:17-21` proxies `/api` to
+`http://localhost:8080` in dev). Pattern:
 
-- **Module-level logger:** `log = logging.getLogger(__name__)` at top of every module that logs (consistent variable name `log`, not `logger`, except in `clawteam/workspace/manager.py` which still uses `logger`). Used in `clawteam/plane/__init__.py:12`, `clawteam/plane/sync.py:20`, `clawteam/plane/webhook.py:16`.
-- Log calls use `%`-style placeholders, never f-strings: `log.info("Created Plane work item %s for task %s", item.id, task.id)`. This defers formatting until the handler decides to emit.
-- User-facing CLI messages go through `rich.Console.print(...)` with `[color]...[/color]` markup, NOT through `logging`.
-- Frontend uses `console.error` for unexpected conditions only.
+```ts
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
+  return res.json()
+}
+```
 
-## Function Design
+(`lib/api.ts:3`)
 
-- **Module-level helpers** for pure transforms (no class wrapper). Examples: `_task_to_plane_payload(task, state_id)` in `clawteam/plane/client.py:30`, `clawteam_status_to_plane_group(status)` and `resolve_state_id(states, status)` in `clawteam/plane/mapping.py`. Prefer this over methods when there is no state to carry.
-- Classes are reserved for things that genuinely own state or a connection: `PlaneClient` (httpx session), `PlaneSyncEngine` (config + cached states), `TeamManager` (uses `@staticmethod` for everything because all state lives on disk).
-- Keep functions short — most CLI commands and webhook handlers are 20-50 lines. When a webhook handler needs sub-steps (`_send_approval_request`, `_send_hitl_message`), extract them as private module-level helpers next to the caller (see `clawteam/plane/webhook.py:118-162`).
-- Constructor signatures pass plain values, not big config blobs, when feasible: `PlaneClient(base_url, api_key, workspace_slug)` rather than `PlaneClient(config)`. The orchestrating layer (`PlaneSyncEngine`) takes the full `PlaneConfig` and unpacks.
+- Generic helpers (`post<T>`, `patch<T>`) for the verb, then per-endpoint
+  named exports (`createTask`, `updateTask`, `addMember`, `sendMessage`).
+- Always `encodeURIComponent` path segments.
+- Errors throw; UI callers `.catch(console.error)` at the call site (e.g.
+  `Board.onDragEnd`).
 
-## Module Design
+### Realtime: SSE via custom hook
 
-- Each subpackage `__init__.py` exposes a small surface via `__all__` (e.g. `clawteam/plane/__init__.py: __all__ = ["register_sync_hooks"]`, `clawteam/spawn/__init__.py: __all__ = ["SpawnBackend", "get_backend", "register_backend"]`).
-- No barrel files in the frontend — every component is imported by its full path (`@/components/kanban/board`, `@/components/modals/add-agent`).
-- Cross-cutting Plane <-> store integration is wired through the **event bus** (`clawteam/events/bus.py`) using `register_sync_hooks(bus, engine, team_name)` rather than direct calls — keeps the store layer ignorant of Plane.
+The team snapshot is streamed over SSE. The hook lives at
+`src/hooks/use-team-stream.ts`:
 
-## Documentation
+- Returns `{ data, isConnected }`; both are derived state on `useState`.
+- Uses a `useRef` to dedupe identical consecutive payloads.
+- Distinguishes SSE liveness (`isConnected`) from agent liveness — the latter
+  is computed from `data.team.membersOnline` in `App.tsx:95`.
+- Always close the `EventSource` in the effect cleanup.
 
-- Module docstring on every Python file (one-liner is fine).
-- Docstrings on public functions/classes; private helpers usually skip docstrings unless behavior is non-obvious.
-- Use numbered lists in docstrings for resolution / fallback order (see `get_data_dir()` in `clawteam/team/models.py:15-24`, `resolve_state_id()` in `clawteam/plane/mapping.py:50-56`).
-- Inline `# pragma: no cover` on import-error guards that are intentionally untested (e.g. `cli/commands.py:139`).
+### Tokens vs raw values cheat-sheet
+
+| Use this | Not this |
+|----------|----------|
+| `bg-background`, `text-foreground` | `bg-zinc-950`, `text-white` |
+| `border-border`, `bg-card`, `bg-muted/50` | `border-zinc-800`, `bg-zinc-900` |
+| `text-muted-foreground` | `text-zinc-500` |
+| `text-destructive` | `text-red-500` |
+| `bg-primary text-primary-foreground` | `bg-blue-600 text-white` |
+| Inline `style={{ color: STATUS_COLORS[s] }}` for status accents | hard-coded per-status hex |
 
 ---
 

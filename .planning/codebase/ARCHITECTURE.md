@@ -6,449 +6,313 @@
 ## System Overview
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Human Operators                                 │
-├──────────────────────────┬───────────────────────────┬──────────────────────┤
-│  Typer CLI               │  React Board UI           │  Plane (HITL)        │
-│  `clawteam ...`          │  http://127.0.0.1:8080    │  external SaaS/OSS   │
-│  `clawteam/cli/          │  served by                │  reached via httpx   │
-│   commands.py`           │  `clawteam/board/         │  `clawteam/plane/`   │
-│                          │   server.py`              │                      │
-└──────────┬───────────────┴────────────┬──────────────┴──────────┬───────────┘
-           │ Typer commands             │ JSON / SSE              │ REST + webhooks
-           ▼                            ▼                         ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       Coordination Layer (`clawteam/team/`)                  │
-│  TeamManager · MailboxManager · TaskStore · PlanManager · LifecycleManager  │
-│  RuntimeRouter · DefaultRoutingPolicy · MailboxWaiter · InboxWatcher        │
-└────┬───────────────┬──────────────┬──────────────┬─────────────────┬────────┘
-     │               │              │              │                 │
-     ▼               ▼              ▼              ▼                 ▼
-┌──────────┐  ┌──────────────┐ ┌──────────┐ ┌────────────┐ ┌──────────────┐
-│ Spawn    │  │ Transport    │ │ Store    │ │ Workspace  │ │ Events       │
-│ backends │  │ (file / p2p) │ │ (file)   │ │ (worktrees)│ │ (pub/sub bus)│
-│ tmux/    │  │ `clawteam/   │ │ `clawteam│ │ `clawteam/ │ │ `clawteam/   │
-│ subproc/ │  │  transport/` │ │  /store/`│ │  workspace/│ │  events/`    │
-│ wsh      │  │              │ │          │ │            │ │              │
-└────┬─────┘  └──────┬───────┘ └────┬─────┘ └─────┬──────┘ └─────┬────────┘
-     │               │              │             │              │
-     ▼               ▼              ▼             ▼              ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│      Project-local data dir (default `./.clawteam/`)                         │
-│      teams/{team}/  inboxes/  events/  spawn_registry.json                   │
-│      tasks/{team}/task-*.json  costs/{team}/  workspaces/{team}/             │
-│      plans/{team}/  harness/{team}/  plane-config.json                       │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                Entry Surfaces                                │
+├─────────────────────────┬───────────────────────────┬────────────────────────┤
+│   Typer CLI             │   FastMCP server          │   Browser dashboard    │
+│  `clawteam.cli`         │  `clawteam.mcp`           │  React + Vite SPA      │
+│   (`clawteam` script)   │  (`clawteam-mcp` script)  │  served by board HTTP  │
+└────────────┬────────────┴─────────────┬─────────────┴───────────┬────────────┘
+             │                          │                         │
+             │                          ▼                         ▼
+             │         ┌────────────────────────────┐   ┌──────────────────────────┐
+             │         │  MCP tool surface          │   │  HTTP + SSE board server │
+             │         │  `clawteam/mcp/tools/`     │   │  `clawteam/board/`       │
+             │         └─────────────┬──────────────┘   └────────────┬─────────────┘
+             │                       │                               │
+             ▼                       ▼                               ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        Coordination Core (in-process)                        │
+│                                                                              │
+│   Team / Mailbox     Tasks         Lifecycle / Plan       Routing            │
+│  `clawteam.team.*`   `store.*`     `team.lifecycle`       `team.router`      │
+│                                    `team.plan`            `team.routing_policy`│
+│                                                                              │
+│   Workspace (git worktrees)        Harness orchestrator                      │
+│  `clawteam.workspace.*`            `clawteam.harness.*`                      │
+│                                                                              │
+│   Identity            Plugin manager        Event bus + hooks                │
+│  `clawteam.identity`  `clawteam.plugins.*`  `clawteam.events.*`              │
+└─────────┬───────────────────┬───────────────────┬────────────────────────────┘
+          │                   │                   │
+          ▼                   ▼                   ▼
+┌────────────────────┐  ┌────────────────────┐  ┌────────────────────────────┐
+│ Spawn backends     │  │ Transport backends │  │ Persistence (filesystem)   │
+│ `clawteam.spawn.*` │  │ `clawteam.transport.*` │ data dir resolved by       │
+│  tmux / subprocess │  │  file (default)    │  │ `team.models.get_data_dir` │
+│  / wsh             │  │  / p2p (ZMQ)       │  │  ~/.clawteam or            │
+│                    │  │                    │  │  walk-up `.clawteam/`      │
+└─────────┬──────────┘  └─────────┬──────────┘  └────────────┬───────────────┘
+          │                       │                          │
+          ▼                       ▼                          ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ External processes                                                           │
+│   tmux session `clawteam-{team}` with one window per agent (CLI in pane)     │
+│   Native subprocesses (claude / codex / gemini / kimi / qwen / opencode /    │
+│     openclaw / pi / nanobot)                                                 │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
-
-Three concurrent surfaces — CLI, React board, and Plane — all read and mutate
-the same on-disk state via the coordination layer. Live agents run inside tmux
-windows spawned by `clawteam team start`; the coordination layer reaches them
-either by writing inbox JSON files (which they poll) or by injecting prompts
-directly into their tmux pane through `RuntimeRouter` → `TmuxBackend`.
 
 ## Component Responsibilities
 
 | Component | Responsibility | File |
 |-----------|----------------|------|
-| Typer app | Single binary entry point with sub-apps for team/task/inbox/board/plane/harness/workspace/etc. | `clawteam/cli/commands.py` |
-| Module entry | `python -m clawteam` shim that re-exports the Typer app | `clawteam/__main__.py` |
-| MCP server | FastMCP server exposing team/task/mailbox/plan/board/cost/workspace tools to LLM clients | `clawteam/mcp/server.py` |
-| Config loader | Pydantic `ClawTeamConfig` + nested `PlaneConfig`, persisted at `~/.clawteam/config.json` | `clawteam/config.py` |
-| Data dir resolver | Walks cwd ancestors for `.clawteam/`, then env, then config, then `~/.clawteam` | `clawteam/team/models.py` (`get_data_dir`) |
-| Path safety | `validate_identifier` + `ensure_within_root` used everywhere a user string maps to a path | `clawteam/paths.py` |
-| Atomic IO | mkstemp+`os.replace` + advisory `flock`/`msvcrt` locking for shared JSON files | `clawteam/fileutil.py` |
-| TeamManager | Team CRUD, member CRUD, leader/inbox name resolution, project cleanup | `clawteam/team/manager.py` |
-| MailboxManager | Send/broadcast/receive/peek, transport-backed inbox + persistent event log | `clawteam/team/mailbox.py` |
-| FileTaskStore | Per-team file-backed task store with cross-process flock | `clawteam/store/file.py` |
-| RuntimeRouter | Normalises inbox messages to `RuntimeEnvelope` and dispatches via tmux injection | `clawteam/team/router.py` |
-| DefaultRoutingPolicy | Decides whether to inject, suppress, or defer (rate-limit / dedupe / quiet hours) | `clawteam/team/routing_policy.py` |
-| InboxWatcher | Foreground polling loop that drains the leader's inbox and feeds RuntimeRouter | `clawteam/team/watcher.py` |
-| MailboxWaiter | Blocking RPC-style wait for a specific reply key | `clawteam/team/waiter.py` |
-| LifecycleManager | shutdown_request/approve/reject + idle notifications | `clawteam/team/lifecycle.py` |
-| PlanManager | Persists plan markdown, sends approval/rejection messages | `clawteam/team/plan.py` |
-| CostStore | Per-team `costs/<team>/` JSON ledger with `summary()` aggregation | `clawteam/team/costs.py` |
-| Snapshot manager | Save/restore/list team snapshots | `clawteam/team/snapshot.py` |
-| Transport (file) | Filesystem inboxes under `teams/{team}/inboxes/{agent}/msg-*.json` | `clawteam/transport/file.py` |
-| Transport (p2p) | Optional pyzmq-based delivery, falls back to file when missing | `clawteam/transport/p2p.py` |
-| TmuxBackend | Spawn agents in `clawteam-{team}` tmux session + buffer-based prompt injection | `clawteam/spawn/tmux_backend.py` |
-| SubprocessBackend | Headless spawn for tests / non-tmux environments | `clawteam/spawn/subprocess_backend.py` |
-| WshBackend | Wave-terminal `wsh` block backend | `clawteam/spawn/wsh_backend.py` |
-| Spawn registry | Persists pid/tmux_target/block_id per agent for liveness checking | `clawteam/spawn/registry.py` |
-| Tmux liveness | Lists tmux windows in `clawteam-{team}` session to compute online members | `clawteam/board/liveness.py` |
-| WorkspaceManager | Git worktree per agent under `workspaces/{team}/{agent}` with checkpoint/merge/cleanup | `clawteam/workspace/manager.py` |
-| Conflict detector | Cross-worktree file-overlap analysis for the board | `clawteam/workspace/conflicts.py` |
-| EventBus | Synchronous pub/sub with thread-pool `emit_async`, hook registry | `clawteam/events/bus.py` |
-| Global bus | Singleton `get_event_bus()`, lazily loads shell hooks from config | `clawteam/events/global_bus.py` |
-| HookManager | Maps `HookDef` (shell/python) to `EventBus` subscriptions | `clawteam/events/hooks.py` |
-| HarnessOrchestrator | DISCUSS/PLAN/EXECUTE/VERIFY/SHIP phase machine with gates | `clawteam/harness/orchestrator.py` |
-| HarnessConductor | Foreground loop that drives phases + reads exit journal + spawns agents | `clawteam/harness/conductor.py` |
-| ContractExecutor | Materialises sprint contracts into tasks for executors | `clawteam/harness/contract_executor.py` |
-| PluginManager | Discovers plugins from entry_points / config / `data_dir/plugins/` | `clawteam/plugins/manager.py` |
-| BoardCollector | Aggregates teams, members, tasks, costs, conflicts, messages into JSON | `clawteam/board/collector.py` |
-| Board HTTP server | Stdlib `ThreadingHTTPServer` exposing `/api/...` JSON + SSE + GitHub README proxy | `clawteam/board/server.py` |
-| TUI renderer | Rich-based kanban renderer for `clawteam board show/live` | `clawteam/board/renderer.py` |
-| Gource bridge | Combines event log + git worktree history into a Gource custom log | `clawteam/board/gource.py` |
-| React app | Vite + React 19 + Tailwind v4 + shadcn/ui SPA built into `clawteam/board/static/` | `clawteam/board/frontend/src/App.tsx` |
-| SSE hook | `useTeamStream` opens an `EventSource` against `/api/events/{team}` | `clawteam/board/frontend/src/hooks/use-team-stream.ts` |
-| API client | `fetch`-based wrapper around the board HTTP API | `clawteam/board/frontend/src/lib/api.ts` |
-| PlaneClient | Synchronous httpx client over `api/v1/workspaces/{slug}/...` | `clawteam/plane/client.py` |
-| PlaneSyncEngine | Bidirectional task<->work-item sync, indexed by `metadata.plane_issue_id` | `clawteam/plane/sync.py` |
-| Plane webhook | Stdlib HTTP server with HMAC-SHA256 signature verification, raises HITL messages | `clawteam/plane/webhook.py` |
-| Plane state mapping | ClawTeam `TaskStatus` ↔ Plane state group / preferred state name | `clawteam/plane/mapping.py` |
-| Plane sync hooks | Subscribes to `AfterTaskUpdate` to push outbound changes to Plane | `clawteam/plane/__init__.py` |
+| Typer CLI app | All user-facing commands grouped into sub-apps (config, profile, preset, team, inbox, runtime, task, cost, session, plan, lifecycle, identity, board, workspace, context, template, hook, plugin, harness) plus top-level `spawn`, `launch`, `run`. | `clawteam/cli/commands.py` |
+| FastMCP server | Wraps a flat list of Python tool callables (`TOOL_FUNCTIONS`) as MCP tools and runs over stdio. | `clawteam/mcp/server.py` |
+| MCP tool surface | Thin façade over team / task / mailbox / plan / board / cost / workspace operations; converts Python errors to `MCPToolError`. | `clawteam/mcp/tools/`, `clawteam/mcp/helpers.py` |
+| Board HTTP/SSE server | stdlib `ThreadingHTTPServer` exposing `/api/overview`, `/api/team/{name}`, `/api/events/{name}` (SSE), `POST/PATCH` task & member & message endpoints, `/api/proxy` (allow-listed), and Vite-built static assets. | `clawteam/board/server.py` |
+| Board collector | Aggregates `TeamConfig` + tasks + inbox counts + event log + costs + workspace overlaps into a single JSON snapshot for the dashboard. | `clawteam/board/collector.py` |
+| Tmux liveness | Detects which member windows currently exist in the tmux session. | `clawteam/board/liveness.py` |
+| React dashboard | SPA shell (`App.tsx`) plus topbar (team selector + SSE indicator), summary bar, kanban board, message stream, agent registry, peek panel, and modal dialogs (inject task / set context / add agent / send message). | `clawteam/board/frontend/src/` |
+| Identity | Builds `AgentIdentity` from `CLAWTEAM_*` / `CLAUDE_CODE_*` env vars and round-trips them to spawned children. | `clawteam/identity.py` |
+| Config | Loads `~/.clawteam/config.json` (always at the home location, ignoring `data_dir`) into the `ClawTeamConfig` Pydantic model. | `clawteam/config.py` |
+| Paths | Identifier validation (`[A-Za-z0-9._-]+`) and `ensure_within_root` to prevent path escapes outside the data dir. | `clawteam/paths.py` |
+| Team manager | Create / discover / inspect / cleanup teams; persists `config.json` per team and computes inbox names (`user_name` or `name`). | `clawteam/team/manager.py` |
+| Mailbox | Sends, broadcasts, peeks, and receives `TeamMessage` JSON via the active `Transport`; mirrors every send into a per-team append-only `events/` log. | `clawteam/team/mailbox.py` |
+| Task store (file backend) | Per-task JSON files under `tasks/{team}/`, guarded by an OS advisory lock on `.tasks.lock`; exposes `BaseTaskStore` interface. | `clawteam/store/file.py`, `clawteam/store/base.py` |
+| Plan / Lifecycle / Costs | Plan submit/approve/reject flow; shutdown protocol; cost ledger. | `clawteam/team/plan.py`, `clawteam/team/lifecycle.py`, `clawteam/team/costs.py` |
+| Routing policy + router | Normalizes inbox messages into `RuntimeEnvelope`s, asks the policy whether to inject, then dispatches via the tmux backend's `inject_runtime_message`. | `clawteam/team/routing_policy.py`, `clawteam/team/router.py` |
+| Inbox watcher | Foreground polling loop that consumes the leader inbox and (optionally) hands messages to a `RuntimeRouter` for tmux injection. | `clawteam/team/watcher.py` |
+| Spawn backends | Three concrete `SpawnBackend`s (tmux / subprocess / wsh) selected by `get_backend(name)`; record their results in the spawn registry. | `clawteam/spawn/__init__.py`, `clawteam/spawn/tmux_backend.py`, `clawteam/spawn/subprocess_backend.py`, `clawteam/spawn/wsh_backend.py` |
+| Spawn registry | JSON file `teams/{team}/spawn_registry.json` mapping agent name → `{backend, tmux_target, pid, command, spawned_at}` for liveness / shutdown. | `clawteam/spawn/registry.py` |
+| Native CLI adapter | Per-CLI command shaping (claude, codex, gemini, kimi, qwen, opencode, openclaw, pi, nanobot): permission flags, workspace flags, prompt placement, post-launch injection. | `clawteam/spawn/adapters.py` |
+| Transport (file) | Inbox directory per recipient with msg-{ts}-{uuid}.json files; advisory locks for atomic claim. | `clawteam/transport/file.py`, `clawteam/transport/claimed.py` |
+| Transport (p2p) | Optional ZeroMQ PUSH/PULL transport with file-transport fallback when peers are offline (requires `pip install clawteam[p2p]`). | `clawteam/transport/p2p.py` |
+| Workspace manager | Provisions per-agent git worktrees, tracks them in a registry, supports checkpoint / merge / cleanup. | `clawteam/workspace/manager.py`, `clawteam/workspace/git.py`, `clawteam/workspace/conflicts.py`, `clawteam/workspace/context.py` |
+| Harness orchestrator | Persisted phase state machine (`discuss → plan → execute → verify → ship`) with pluggable `PhaseGate`s and a default `HarnessConductor` polling loop. | `clawteam/harness/orchestrator.py`, `clawteam/harness/phases.py`, `clawteam/harness/conductor.py`, `clawteam/harness/spawner.py` |
+| Event bus + hooks | In-process pub/sub (sync `emit` + `emit_async` via small thread pool) with shell- or Python-callable hooks loaded from config. | `clawteam/events/bus.py`, `clawteam/events/global_bus.py`, `clawteam/events/hooks.py`, `clawteam/events/types.py` |
+| Plugin manager | Discovers / loads `HarnessPlugin` subclasses from entry points, config, or `{data_dir}/plugins/`; passes a `HarnessContext` capability bundle. | `clawteam/plugins/manager.py`, `clawteam/plugins/base.py`, `clawteam/harness/context.py`, `clawteam/plugins/ralph_loop_plugin.py` |
+| Templates | Bundled team blueprints (`harness-default.toml`, `software-dev.toml`, etc.) consumed by `clawteam launch`. | `clawteam/templates/` |
+| File util | Atomic writes (`atomic_write_text`) and cross-platform advisory file locks (`file_locked`) used by every persistent store. | `clawteam/fileutil.py` |
 
 ## Pattern Overview
 
-**Overall:** Filesystem-as-database, layered service modules around a Typer CLI,
-with an event-driven seam (`EventBus`) that lets HTTP / Plane / plugins observe
-state mutations.
+**Overall:** Local-first, filesystem-backed multi-agent control plane with pluggable spawn / transport / store backends and an in-process event bus. There is no daemon — the CLI is the orchestrator, and every command operates against shared on-disk state.
 
 **Key Characteristics:**
-- Single source of truth is the data dir (`./.clawteam/` or `~/.clawteam/`); all
-  three surfaces (CLI, React board, Plane sync) read/write the same files.
-- Concurrency is handled per-file: `atomic_write_text` (mkstemp + replace) +
-  `file_locked` advisory locks. There is no daemon, no DB, no socket — every
-  process re-reads disk on demand.
-- Identifiers funnelled through `validate_identifier` and `ensure_within_root`
-  before any path join — so user input never escapes the data dir.
-- Liveness is layered: SSE liveness (HTTP connection alive) ≠ tmux liveness
-  (window exists for member name) ≠ process liveness (`is_agent_alive` checks
-  pid / tmux pane / wsh block from spawn registry).
+- A single Python package (`clawteam`) exposes both the CLI (`clawteam` script) and the FastMCP server (`clawteam-mcp` script) defined in `pyproject.toml`.
+- Every persistent operation routes through `clawteam.team.models.get_data_dir()`, which prefers `CLAWTEAM_DATA_DIR`, then `config.data_dir`, then walks up from the current working directory looking for `.clawteam/`, then falls back to `~/.clawteam/`. This is what makes data project-local.
+- Strict layering: CLI / MCP / board never talk to spawn or transport directly without going through the team / store façade (see `MailboxManager.send` → `Transport.deliver`, `BoardCollector` → `TaskStore` + `MailboxManager`).
+- Backend selection is by name through factory functions (`spawn.get_backend`, `transport.get_transport`, `store.get_task_store`); plugins can register additional implementations via `register_backend` / `register_transport`.
+- Tmux is treated as a first-class runtime: each agent gets a window in `clawteam-{team}`, lifecycle is wired through `tmux set-hook pane-exited|pane-died` to `clawteam lifecycle on-exit|on-crash`, and runtime injection uses a hardened `load-buffer`/`paste-buffer`/`send-keys` flow with a foreground-command allowlist.
+- Three-tier liveness:
+  1. **SSE liveness** — `useTeamStream` toggles `isConnected` from `EventSource.onopen / onerror`; rendered as the topbar "Stream live/offline" pill (`clawteam/board/frontend/src/components/topbar.tsx`).
+  2. **Tmux window liveness** — `board.liveness.agents_online` checks whether a window with the agent's name still exists in `clawteam-{team}`; rendered per-agent in `agent-registry.tsx` and aggregated as `membersOnline` in the team header.
+  3. **Pane process liveness** — `spawn.registry.is_agent_alive` consults the registry, then `_tmux_pane_alive` (checks `#{pane_dead}` and rejects bare shells) with a PID fallback for subprocess agents.
 
 ## Layers
 
-**CLI surface (`clawteam/cli/`)**
-- Purpose: User-facing entry point. One Typer `app` plus sub-apps registered
-  via `app.add_typer` for `config`, `preset`, `profile`, `team`, `inbox`,
-  `runtime`, `task`, `cost`, `session`, `plan`, `lifecycle`, `identity`,
-  `board`, `workspace`, `context`, `template`, `hook`, `plugin`, `harness`,
-  `plane`.
-- Location: `clawteam/cli/commands.py` (single 4800-line file).
-- Depends on: every coordination/spawn/workspace/store module via deferred
-  imports inside command handlers.
-- Used by: humans (`clawteam ...`) and spawned agents (re-invoke
-  `python -m clawteam` for `runtime watch`, `lifecycle on-exit`, etc.).
+**Entry surface (CLI / MCP / Board HTTP):**
+- Purpose: Translate external input into coordination-core calls.
+- Location: `clawteam/cli/commands.py`, `clawteam/mcp/server.py`, `clawteam/board/server.py`, `clawteam/__main__.py`, `clawteam/mcp/__main__.py`.
+- Contains: Typer apps, FastMCP wiring, HTTP request handler, SSE loop.
+- Depends on: Coordination core (team / store / spawn / harness), config, identity.
+- Used by: Humans (CLI / browser) and AI clients (MCP).
 
-**Coordination layer (`clawteam/team/`)**
-- Purpose: Team CRUD + messaging + tasks + plans + lifecycle + routing.
-- Location: `clawteam/team/`.
-- Contains: managers, models, file-backed mailbox/task/snapshot/cost code,
-  runtime routing.
-- Depends on: `transport/`, `store/`, `events/`, `workspace/`, `paths.py`.
-- Used by: CLI commands, MCP tools, the board collector, and the Plane sync
-  engine and webhook receiver.
+**Coordination core (team + store + workspace + harness):**
+- Purpose: Express the domain model: teams, members, tasks, plans, mailboxes, harness phases, costs, workspaces.
+- Location: `clawteam/team/`, `clawteam/store/`, `clawteam/workspace/`, `clawteam/harness/`, `clawteam/identity.py`.
+- Contains: Pydantic models, managers, gates, lifecycle helpers, conductor.
+- Depends on: Spawn (to run agents), transport (to deliver messages), events (to notify), file util (to persist).
+- Used by: CLI, MCP, board.
 
-**Storage layer (`clawteam/store/`, `clawteam/transport/`)**
-- Purpose: Pluggable backends behind narrow ABCs (`BaseTaskStore`, `Transport`).
-- Location: `clawteam/store/`, `clawteam/transport/`.
-- Contains: file-based defaults (`FileTaskStore`, `FileTransport`) plus a
-  registry pattern (`get_task_store`, `get_transport`) so plugins can register
-  alternatives.
-- Depends on: `paths.py`, `team/models.py` for `get_data_dir`.
-- Used by: `MailboxManager`, `TaskStore`, `Plane*`, board collector.
+**Runtime layer (spawn + transport + events + plugins):**
+- Purpose: Concrete process / message / extension mechanisms.
+- Location: `clawteam/spawn/`, `clawteam/transport/`, `clawteam/events/`, `clawteam/plugins/`.
+- Contains: Backend implementations, registry, `EventBus`, `HookManager`, `PluginManager`.
+- Depends on: file util, paths, config; nothing from CLI/MCP/board.
+- Used by: Coordination core.
 
-**Spawn layer (`clawteam/spawn/`)**
-- Purpose: Launch agent CLIs (claude / codex / gemini / etc.) inside tmux
-  windows, subprocess pipes, or wsh blocks; persist liveness info.
-- Location: `clawteam/spawn/`.
-- Contains: backend ABC, tmux/subprocess/wsh implementations, prompt builder,
-  CLI environment helpers, spawn registry, command validation, presets and
-  profiles for various coding CLIs.
-- Depends on: `paths.py`, `team/models.py`, `fileutil.py`.
-- Used by: CLI `team start`, `harness/spawner.py`, `harness/conductor.py`.
-
-**Event layer (`clawteam/events/`)**
-- Purpose: In-process pub/sub with shell/python hook execution.
-- Location: `clawteam/events/`.
-- Contains: `EventBus`, dataclass event types, `HookManager`, global singleton.
-- Depends on: nothing structural; emitters import `get_event_bus()` lazily.
-- Used by: mailbox send/receive, task store updates, workspace cleanup/merge,
-  team launch/shutdown, conductor phase transitions, Plane sync hooks.
-
-**Workspace layer (`clawteam/workspace/`)**
-- Purpose: Per-agent git worktrees, conflict detection across agents.
-- Location: `clawteam/workspace/`.
-- Depends on: `git` CLI through `clawteam/workspace/git.py`.
-- Used by: CLI `team start --workspace`, `clawteam workspace ...`, board
-  collector for conflict overlay.
-
-**Harness layer (`clawteam/harness/`)**
-- Purpose: Plan-then-execute orchestration (DISCUSS → PLAN → EXECUTE → VERIFY →
-  SHIP) with per-phase gates, role assignment, contracts, exit journal.
-- Location: `clawteam/harness/`.
-- Depends on: `team/`, `spawn/`, `events/`.
-- Used by: `clawteam launch`, `clawteam harness ...`, `clawteam run`.
-
-**Board surface (`clawteam/board/`)**
-- Purpose: Read-mostly aggregator. Two render targets: Rich-based TUI and a
-  React SPA served behind a stdlib HTTP server.
-- Location: `clawteam/board/` (Python) + `clawteam/board/frontend/` (React) +
-  `clawteam/board/static/` (build output).
-- Depends on: `team/`, `workspace/conflicts.py`, `spawn/tmux_backend.py`.
-- Used by: humans, and indirectly by MCP tools in `clawteam/mcp/tools/board.py`.
-
-**Plane integration (`clawteam/plane/`)**
-- Purpose: Treat Plane as the human-in-the-loop board: tasks sync as work
-  items; comments containing "approve" / "reject" / "lgtm" become HITL inbox
-  messages routed via `MailboxManager` to the team leader.
-- Location: `clawteam/plane/`.
-- Depends on: `httpx` (optional install: `pip install clawteam[plane]`),
-  `store/file.py`, `team/manager.py`, `team/mailbox.py`, `events/`.
-
-**MCP surface (`clawteam/mcp/`)**
-- Purpose: Expose the same coordination operations to LLM clients via FastMCP.
-- Location: `clawteam/mcp/`.
-- Console script: `clawteam-mcp` → `clawteam.mcp.server:main`.
+**Persistence (filesystem):**
+- Purpose: All durable state.
+- Location: data dir resolved by `get_data_dir()`. Directory layout (relative to data dir):
+  ```
+  teams/{team}/config.json
+  teams/{team}/inboxes/{inbox}/msg-*.json
+  teams/{team}/events/evt-*.json
+  teams/{team}/spawn_registry.json
+  teams/{team}/runtime_state.json
+  teams/{team}/peers/{agent}.json   (p2p only)
+  tasks/{team}/task-{id}.json + .tasks.lock
+  costs/{team}/...
+  sessions/{team}/...
+  workspaces/{team}/{agent}/        (git worktree path)
+  workspaces/{team}/workspace-registry.json
+  harness/{team}/{harness_id}/state.json
+  plugins/{name}/plugin.json
+  ```
+- Used by: Every store-aware module.
 
 ## Data Flow
 
-### Primary task flow (CLI / agent → file store → board)
+### `clawteam team start <team>` (the live coordination loop)
 
-1. Caller invokes `clawteam task create ...` or any agent calls
-   `MailboxManager.send` / `TaskStore.create` (`clawteam/store/file.py:77`).
-2. `FileTaskStore.create` builds a `TaskItem` (`clawteam/team/models.py:149`),
-   takes the team-wide `_write_lock` (`clawteam/store/file.py:54`), writes
-   `task-{id}.json` atomically, and emits `BeforeTaskCreate` /
-   `AfterTaskUpdate` events through the global bus.
-2a. If a Plane sync hook is registered (via `register_sync_hooks` in
-   `clawteam/plane/__init__.py`), `AfterTaskUpdate` triggers
-   `PlaneSyncEngine.push_task` (`clawteam/plane/sync.py:43`) which calls the
-   Plane REST API and stores `metadata.plane_issue_id` on the task.
-3. `BoardCollector.collect_team` (`clawteam/board/collector.py:68`) re-reads
-   all `task-*.json` and `evt-*.json` files for the team plus tmux liveness
-   and merges them into a single dict.
-4. `BoardHandler._serve_sse` (`clawteam/board/server.py:324`) pushes that dict
-   every `interval` seconds; `useTeamStream`
-   (`clawteam/board/frontend/src/hooks/use-team-stream.ts`) deduplicates via
-   `lastPayload` and updates React state.
+1. `team_start` (`clawteam/cli/commands.py:1199`) loads `TeamConfig` via `TeamManager.get_team` and resolves the spawn backend (`clawteam/spawn/__init__.py:get_backend`).
+2. For each `TeamMember`, builds the prompt with `clawteam/spawn/prompt.py:build_agent_prompt` and calls `TmuxBackend.spawn` (`clawteam/spawn/tmux_backend.py:45`).
+3. `TmuxBackend.spawn` sets `CLAWTEAM_*` env vars, invokes `NativeCliAdapter.prepare_command` (`clawteam/spawn/adapters.py`), exports shell-safe env into the tmux command line, creates / extends the `clawteam-{team}` session with one window per agent, attaches `pane-exited` / `pane-died` hooks, waits for the pane and TUI to be ready, and either (a) injects the prompt via the hardened `load-buffer`/`paste-buffer`/`send-keys` path or (b) uses `tmux send-keys` directly for non-claude TUIs.
+4. Pane id (`#{pane_id}`) and pane PID are captured and persisted by `clawteam/spawn/registry.py:register_agent`.
+5. `AfterWorkerSpawn` is emitted async on the global `EventBus` (`clawteam/events/global_bus.py`).
+6. When `--watcher` is set (default), a detached `python -m clawteam runtime watch <team> --agent <leader>` process is started; it runs `InboxWatcher` (`clawteam/team/watcher.py`) bound to a `RuntimeRouter` (`clawteam/team/router.py`), which normalizes each new mailbox message into a `RuntimeEnvelope`, asks `DefaultRoutingPolicy` (`clawteam/team/routing_policy.py`) whether to dispatch, and if so calls `TmuxBackend.inject_runtime_message`.
 
-### Inbox / runtime injection flow
+### Runtime injection into a live pane (post-spawn)
 
-1. Sender calls `MailboxManager.send`
-   (`clawteam/team/mailbox.py:72`); message bytes go through
-   `Transport.deliver` and a copy is appended to `events/evt-*.json`.
-2. `InboxWatcher` (`clawteam/team/watcher.py`) polls the leader's inbox.
-3. For each new message, `RuntimeRouter.route_message`
-   (`clawteam/team/router.py:69`) builds a `RuntimeEnvelope` and asks
-   `DefaultRoutingPolicy` (`clawteam/team/routing_policy.py`) whether to
-   inject, suppress, or defer.
-4. On `inject`, `TmuxBackend.inject_runtime_message`
-   (`clawteam/spawn/tmux_backend.py:272`) writes the rendered notification
-   through `_inject_prompt_via_buffer` (`clawteam/spawn/tmux_backend.py:621`),
-   which uses tmux `load-buffer` + `paste-buffer` to avoid shell-escaping
-   pitfalls and submits with two `Enter` keystrokes.
+1. `TmuxBackend.inject_runtime_message` (`clawteam/spawn/tmux_backend.py:293`) resolves the recorded `pane_id` (falling back to `clawteam-{team}:{agent}`).
+2. `_pane_safe_to_inject` (`clawteam/spawn/tmux_backend.py:672`) reads `#{pane_current_command}` and refuses unless it matches the allowlist `{claude, codex, gemini, kimi, qwen, opencode, nanobot, openclaw, pi, node, python, python3}` — preventing shell or sub-TUI execution of pasted content.
+3. `_inject_prompt_via_buffer` (`clawteam/spawn/tmux_backend.py:701`) writes the rendered notification to a temp file, calls `_run_tmux(["load-buffer", "-b", "prompt-{agent}-{uuid8}", tmp])`, then `paste-buffer`, then two `Enter` send-keys, then `delete-buffer`. Every call goes through `_run_tmux` (`tmux_backend.py:685`), which raises on non-zero exit so failures aren't silently masked.
 
-### Plane → ClawTeam HITL flow
+### Mailbox send
 
-1. Plane fires a webhook to `serve_webhook`
-   (`clawteam/plane/webhook.py:205`); `_verify_signature` rejects bad HMACs.
-2. For `event=="issue_comment"`, `_handle_comment_event` checks for "approve"
-   / "lgtm" / "reject" keywords (`clawteam/plane/webhook.py:97`), updates the
-   matching ClawTeam task via `FileTaskStore.update`, and calls
-   `_send_hitl_message` to drop a `plan_approved` or `plan_rejected` message
-   into the leader's mailbox.
-3. The mailbox watcher then injects that message into the leader's tmux pane
-   exactly like any other team message.
+1. `MailboxManager.send` (`clawteam/team/mailbox.py:72`) resolves the recipient inbox via `TeamManager.resolve_inbox` (handles `user_name` namespacing).
+2. Builds a `TeamMessage`, calls `Transport.deliver` (file transport writes `{data_dir}/teams/{team}/inboxes/{inbox}/msg-*.json` atomically; p2p attempts ZMQ PUSH and falls back to file).
+3. Mirrors the message into the per-team event log (`teams/{team}/events/evt-*.json`).
+4. Emits `BeforeInboxSend` async on the bus.
 
-### Liveness tiers (used by the board)
+### Board snapshot fetch (SSE)
 
-- **SSE liveness** (`useTeamStream`, `EventSource.onopen` / `onerror`):
-  whether the SPA's connection to `/api/events/{team}` is alive. Drives the
-  topbar "Stream live / offline" badge in `topbar.tsx`.
-- **Tmux window liveness** (`agents_online` in `clawteam/board/liveness.py`):
-  enumerates `tmux list-windows -t clawteam-{team}` once per snapshot. Drives
-  per-member `isRunning` and the swarm `online/total` badge in `App.tsx`.
-- **Process liveness** (`is_agent_alive` in `clawteam/spawn/registry.py`):
-  pid / tmux pane / wsh block check from the spawn registry. Drives the
-  conductor's `RegistryHealthCheck`, exit detection, and `team status`.
+1. Browser opens `EventSource('/api/events/{team}')` (`clawteam/board/frontend/src/hooks/use-team-stream.ts`).
+2. `BoardHandler._serve_sse` (`clawteam/board/server.py:324`) loops every `interval` seconds, asks `TeamSnapshotCache.get` for a fresh snapshot (TTL = `interval`), and writes `data: {json}\n\n`.
+3. The cache loader runs `BoardCollector.collect_team` (`clawteam/board/collector.py:68`), which gathers `TeamConfig`, per-member inbox counts, tasks grouped by status, last 200 event-log messages, cost summary, and workspace overlap data, plus a tmux-window-derived `isRunning` flag per member.
 
-These three signals are deliberately distinct — a swarm can have a healthy SSE
-stream with zero tmux liveness (no agents running), or live tmux windows with
-dead agent processes (shell still attached after the agent exited; the
-`_tmux_pane_alive` check explicitly looks for `pane_dead` and bare-shell
-fallback).
+### Harness conductor loop
+
+1. `HarnessConductor.run` (`clawteam/harness/conductor.py:83`) spawns the role agents for the current phase via `PhaseRoleSpawner` (`clawteam/harness/spawner.py`).
+2. Each iteration: drains the `FileExitJournal`, calls `HarnessOrchestrator.advance` (which checks `PhaseGate`s and emits `PhaseTransition`), and on `execute` runs `ContractExecutor` to materialize tasks from sprint contracts.
+3. Periodic `RegistryHealthCheck.check` calls `clawteam/spawn/registry.py:list_dead_agents` and prints health issues.
+
+**State Management:**
+- All durable state is JSON on disk. The only in-process state is the `EventBus` singleton (`events/global_bus.py`) and per-process spawn-backend instance dictionaries (e.g. `TmuxBackend._agents`).
+- The board uses a tiny per-handler `TeamSnapshotCache` (TTL = SSE poll interval) so concurrent SSE clients share one collector pass.
 
 ## Key Abstractions
 
-**`ClawTeamConfig` / `PlaneConfig`** — pydantic models in `clawteam/config.py`
-and `clawteam/plane/config.py`. Persisted as JSON; loaded with
-`extra="ignore"`-style tolerance. Env vars override file values via
-`get_effective`.
+**`SpawnBackend` (`clawteam/spawn/base.py`):**
+- Purpose: Polymorphic interface for "launch an agent process and report a status string."
+- Implementations: `TmuxBackend`, `SubprocessBackend`, `WshBackend`. Plugins can register more via `register_backend(name, cls)`.
+- Pattern: Abstract base class + `get_backend(name)` factory.
 
-**`TeamConfig` / `TeamMember` / `TaskItem` / `TeamMessage`** — pydantic models
-in `clawteam/team/models.py`. Use `populate_by_name = True` and `alias=` to
-serialize camelCase on disk/API while staying snake_case in Python.
+**`Transport` (`clawteam/transport/base.py`):**
+- Purpose: Move opaque message bytes between agents; higher layers (`MailboxManager`) own JSON parsing and quarantine decisions.
+- Implementations: `FileTransport` (default, supports claimed reads), `P2PTransport` (ZMQ PUSH/PULL with file fallback).
+- Pattern: ABC + `get_transport(name, team_name, **kwargs)` factory; transports may optionally expose `claim_messages` for at-least-once semantics.
 
-**`MessageType` / `TaskStatus` / `TaskPriority`** — `str` Enums shared between
-mailbox, store, plane mapping, and the React `TaskStatus` union.
+**`BaseTaskStore` (`clawteam/store/base.py`):**
+- Purpose: Pluggable task persistence with concurrency guarantees owned by the implementation.
+- Implementations: `FileTaskStore` (one JSON per task, fcntl/msvcrt locks). `clawteam/team/tasks.py` re-exports it as `TaskStore` for back-compat.
+- Pattern: ABC + `get_task_store(team_name, backend)` factory keyed by `CLAWTEAM_TASK_STORE` / config.
 
-**`RuntimeEnvelope` / `RouteDecision`** — dataclasses in
-`clawteam/team/routing_policy.py` that decouple "what arrived" from "what to do
-about it" so future transports / surfaces can reuse the policy.
+**`PhaseGate` (`clawteam/harness/phases.py`):**
+- Purpose: Open extension point for "is this phase allowed to advance?"
+- Implementations: `ArtifactRequiredGate`, `AllTasksCompleteGate`, `HumanApprovalGate`. Plugins contribute extra gates via `HarnessPlugin.contribute_gates`.
+- Pattern: ABC; gates are appended per phase on a `PhaseRunner`.
 
-**`HarnessEvent`** — base dataclass in `clawteam/events/types.py`. All bus
-events derive from it; `register_event_type` lets plugins extend the registry.
+**`HarnessPlugin` + `HarnessContext` (`clawteam/plugins/base.py`, `clawteam/harness/context.py`):**
+- Purpose: Capability-bundle for extensions — plugins receive an `EventBus`, `team_name`, lazy `TaskStore` / `SessionStore` / `ArtifactStore`, and `ClawTeamConfig` instead of being limited to event listening.
+- Examples: `clawteam/plugins/ralph_loop_plugin.py`.
 
-**`SpawnBackend` / `Transport` / `BaseTaskStore`** — narrow ABCs in
-`clawteam/spawn/base.py`, `clawteam/transport/base.py`,
-`clawteam/store/base.py`. Each has a `register_*` + `get_*` factory pair so
-plugins can swap implementations.
+**`AgentIdentity` (`clawteam/identity.py`):**
+- Purpose: Single source of truth for "who am I" inside a spawned agent. Reads `CLAWTEAM_*` then falls back to `CLAUDE_CODE_*` for compatibility, and round-trips itself into child env via `to_env()`.
 
-**`HarnessPlugin`** — base class in `clawteam/plugins/base.py`; lifecycle is
-`on_register(ctx) → on_unregister()`; reference impl is
-`clawteam/plugins/ralph_loop_plugin.py`.
+**`RuntimeEnvelope` / `RouteDecision` (`clawteam/team/routing_policy.py`):**
+- Purpose: Decouple "what arrived in an inbox" from "should we paste it into someone's tmux pane and how." Carries source / target / channel / priority / summary / evidence and a dedupe key.
 
 ## Entry Points
 
-**Console scripts (declared in `pyproject.toml`):**
-- `clawteam` → `clawteam.cli.commands:app`
-- `clawteam-mcp` → `clawteam.mcp.server:main`
+**`clawteam` console script (`pyproject.toml` → `clawteam.cli.commands:app`):**
+- Location: `clawteam/cli/commands.py`.
+- Triggers: `clawteam ...` shell invocation, also `python -m clawteam` (`clawteam/__main__.py`).
+- Responsibilities: Parses CLI options, normalizes `--data-dir` into `CLAWTEAM_DATA_DIR`, dispatches to ~20 Typer sub-apps and a handful of top-level commands (`spawn`, `launch`, `run`).
 
-**Python module entry:**
-- `python -m clawteam` → `clawteam/__main__.py` re-exports the Typer app.
-- `python -m clawteam.mcp` → `clawteam/mcp/__main__.py` runs the MCP server.
+**`clawteam-mcp` console script (`pyproject.toml` → `clawteam.mcp.server:main`):**
+- Location: `clawteam/mcp/server.py`, also `python -m clawteam.mcp` (`clawteam/mcp/__main__.py`).
+- Triggers: An MCP host launches the server over stdio.
+- Responsibilities: Wraps each `TOOL_FUNCTIONS` callable with `translate_error` and registers it through `FastMCP("clawteam").tool()`.
 
-**HTTP entry points:**
-- `clawteam board serve` → `clawteam/board/server.py:354` (`serve()`),
-  default bind `127.0.0.1:8080`, ThreadingHTTPServer, SSE via blocking write
-  loop in `_serve_sse`.
-- `clawteam plane webhook <team>` → `clawteam/plane/webhook.py:205`
-  (`serve_webhook`), default port `9091`, binds `0.0.0.0`.
+**`clawteam board serve` (`clawteam/cli/commands.py:3510` → `clawteam/board/server.py:serve`):**
+- Triggers: User runs `clawteam board serve [--host ... --port ... --interval ...]`.
+- Responsibilities: Starts a stdlib `ThreadingHTTPServer` on `127.0.0.1:8080` by default, serves the React build from `clawteam/board/static/`, plus REST + SSE APIs.
 
-**Frontend dev server:**
-- `cd clawteam/board/frontend && npm run dev` → Vite dev server with
-  `/api` proxy → `http://localhost:8080` (`vite.config.ts`).
-- `npm run build` writes the SPA to `clawteam/board/static/` (consumed by the
-  Python board server).
+**Tmux pane hooks (`clawteam/spawn/tmux_backend.py:158`–`167`):**
+- Triggers: tmux fires `pane-exited` / `pane-died` for each spawned pane.
+- Responsibilities: Invoke `clawteam lifecycle on-exit|on-crash --team --agent`, which in turn updates the spawn registry, releases task locks, and notifies the leader.
+
+**Inbox watcher (`clawteam runtime watch`, `clawteam/cli/commands.py:2084` → `clawteam/team/watcher.py`):**
+- Triggers: Detached child started by `team start --watcher` (default), or run manually.
+- Responsibilities: Polls leader inbox, prints / forwards messages, optionally injects them into the tmux leader pane via `RuntimeRouter`.
 
 ## Architectural Constraints
 
-- **Threading:** Mostly single-threaded. The board uses
-  `ThreadingHTTPServer` so each SSE/JSON request gets its own thread. The
-  `EventBus` has a 2-worker `ThreadPoolExecutor` for `emit_async`. Tests
-  reset the bus via `reset_event_bus()`.
-- **Global state:** `EventBus` singleton (`clawteam/events/global_bus.py`)
-  with one-shot lazy hook loading; `BoardHandler.collector` /
-  `default_team` / `interval` / `team_cache` are class attributes set by
-  `serve()` before binding (`clawteam/board/server.py:354`). Tests must
-  not start two board servers in the same process.
-- **No process-wide DB connection.** Every coordination call re-opens the
-  relevant JSON file under an advisory lock. Concurrency is correct because
-  every read-modify-write goes through `_write_lock` /
-  `file_locked` / `os.replace`.
-- **Path safety contract:** Any string that becomes part of a path MUST go
-  through `validate_identifier` (regex `[A-Za-z0-9._-]+`) and any join MUST
-  go through `ensure_within_root`. Violations are bugs — these are the only
-  defenses against `team_name="../etc"` style escapes.
-- **Plane sync is opt-in.** It only runs when `PlaneConfig.sync_enabled`
-  AND `httpx` is importable AND `register_sync_hooks` was called (currently
-  on demand, not from `__init__`). Push-side reads `task.metadata` for
-  idempotency; pull-side scans by `metadata.plane_issue_id`.
-- **Tmux injection is best-effort.** `RuntimeRouter.dispatch` returns
-  `False` and records the failure on the policy when the backend lacks
-  `inject_runtime_message` or the tmux target is missing — the message
-  still lives in the on-disk inbox and event log.
-- **Frontend output dir is checked in.** `vite.config.ts` writes to
-  `../static`, so `clawteam/board/static/index.html` and
-  `clawteam/board/static/assets/` are committed and shipped in the wheel.
-  Editing `frontend/src/...` without rebuilding will not reach end users.
+- **Threading:** Predominantly single-threaded. The board uses `ThreadingHTTPServer` (one thread per HTTP request, including long-lived SSE connections). The event bus owns a 2-worker `ThreadPoolExecutor` for `emit_async` only (`clawteam/events/bus.py:106`). Spawn backends, store, and transport are synchronous.
+- **Global state:** Only one durable singleton: the `EventBus` from `clawteam/events/global_bus.py`. Spawn backends keep per-instance dictionaries (`TmuxBackend._agents`) but the CLI creates one per command invocation, so cross-command state always goes through the on-disk spawn registry. `BoardHandler` carries class-level `collector` / `team_cache` set at server startup.
+- **Concurrency model:** Coordination across processes happens through the filesystem. `clawteam/store/file.py` and `clawteam/transport/file.py` use OS advisory locks (`fcntl.flock` on POSIX, `msvcrt.locking` on Windows) and `clawteam/fileutil.py:atomic_write_text` for tmp+rename writes.
+- **Path safety:** Every directory derived from user input must go through `paths.ensure_within_root(root, *parts)` — refusing to escape the data dir — and through `paths.validate_identifier(value, kind)` with the regex `[A-Za-z0-9._-]+`.
+- **Data-dir resolution:** All on-disk reads/writes go through `clawteam/team/models.py:get_data_dir`. Anything that hardcodes `~/.clawteam` or builds a path without it breaks the project-local walk-up.
+- **Config location:** `clawteam/config.py:config_path` is hardwired to `~/.clawteam/config.json` and is intentionally NOT affected by `data_dir` overrides — config is global, data is per-project.
+- **Backend availability:** `TmuxBackend` returns `"Error: tmux not installed"` instead of raising when `tmux` is missing. `WshBackend` requires `wsh` to be on PATH or in known TideTerm/WaveTerm locations. `P2PTransport` needs the `[p2p]` extra (`pyzmq`).
+- **MCP errors:** All MCP tool exceptions must surface as `MCPToolError`; that's enforced by the `_tool` decorator wrapping every callable in `clawteam/mcp/server.py:16` with `translate_error`.
 
 ## Anti-Patterns
 
-### Bypassing `ensure_within_root` / `validate_identifier`
-**What happens:** Code occasionally calls `get_data_dir() / team_name` directly
-(see `_plans_root_path()` style helpers).
-**Why it's wrong:** Any unchecked `team_name` allows path traversal — e.g.
-`team_name="../../../etc"` resolves outside the data dir.
-**Do this instead:** Always pass through
-`ensure_within_root(get_data_dir() / "<bucket>", validate_identifier(name, "team name"))`
-as `clawteam/team/manager.py:_team_dir` does.
+### Bypassing `get_data_dir()` for filesystem paths
 
-### Hand-writing JSON instead of pydantic dump
-**What happens:** A handler builds a dict manually and `json.dumps` it.
-**Why it's wrong:** The on-disk format is the API contract for the React app
-(camelCase via `by_alias=True`) and Plane sync. Drift between writers and
-readers is silent.
-**Do this instead:** Use `model.model_dump_json(by_alias=True, exclude_none=True)`
-+ `atomic_write_text`, mirroring `MailboxManager._log_event`
-(`clawteam/team/mailbox.py:48`).
+**What happens:** Code constructs `Path.home() / ".clawteam"` directly instead of calling `get_data_dir()`.
+**Why it's wrong:** Breaks the project-local data dir feature — the user runs `clawteam team start ...` inside a repo that has `.clawteam/`, but the new code reads/writes `~/.clawteam/` instead. Also breaks every test that overrides `CLAWTEAM_DATA_DIR`.
+**Do this instead:** `from clawteam.team.models import get_data_dir; data = get_data_dir() / "teams" / team_name` — and route through `paths.ensure_within_root` if any segment came from user input. Reference: `clawteam/team/manager.py:_team_dir` and `clawteam/store/file.py:_tasks_root`.
 
-### Forgetting `start_new_session=True` when fork-spawning helpers
-**What happens:** `clawteam team start --watcher` spawns a sidecar
-`python -m clawteam runtime watch` (`clawteam/cli/commands.py:1306`).
-Without `start_new_session=True`, Ctrl-C in the parent kills the watcher.
-**Do this instead:** Always pass `start_new_session=True` and redirect
-`stdout`/`stderr` to `DEVNULL` for fire-and-forget sidecars.
+### Calling `subprocess.run(["tmux", ...])` without checking the return code
 
-### Conflating SSE liveness with agent liveness
-**What happens:** UI badges showing the SSE stream as "online" while no
-tmux windows exist for any member, leading users to believe agents are
-running.
-**Why it's wrong:** SSE only proves the HTTP connection is alive; it says
-nothing about tmux or process state.
-**Do this instead:** Surface both signals separately. The current `App.tsx`
-shows the SSE indicator in the topbar (`topbar.tsx`) and a separate
-`X/Y online` badge derived from `data.team.membersOnline`
-(`clawteam/board/frontend/src/App.tsx:94`).
+**What happens:** Code pastes prompt content via tmux but ignores `result.returncode` (or never reads `stderr`), so a failed `load-buffer` looks like success and the pane silently never gets the message.
+**Why it's wrong:** Silently masks paste-buffer / load-buffer / send-keys failures and leaves orphan paste buffers behind. This is the bug class fixed by commits `efc5f9c` (unique paste buffers + return-code checks) and `1c9a422` (pane_id targeting).
+**Do this instead:** Use `_run_tmux` from `clawteam/spawn/tmux_backend.py:685` for any tmux mutation. For injection, go through `_inject_prompt_via_buffer` (`tmux_backend.py:701`) which uses a unique `prompt-{agent}-{uuid8}` buffer name and cleans up.
 
-### Reading the post-build static dir from frontend dev mode
-**What happens:** Editing a component and refreshing the Python-served
-`http://localhost:8080` instead of the Vite dev server.
-**Why it's wrong:** The Python server reads `clawteam/board/static/` (the
-built bundle), not `frontend/src/`.
-**Do this instead:** Use `npm run dev` and the Vite proxy during iteration;
-run `npm run build` before committing.
+### Injecting into a tmux pane without checking the foreground command
+
+**What happens:** Code pastes a prompt directly into a pane that is currently running `bash` / `vim` / `less` / `fzf` / a sub-TUI.
+**Why it's wrong:** Shells will execute the pasted content (including `$()` and backticks) and TUIs will misinterpret it. This is exactly the bug class fixed by commit `00a094d`.
+**Do this instead:** Always gate injection on `_pane_safe_to_inject(target)` (`clawteam/spawn/tmux_backend.py:672`), which reads `#{pane_current_command}` and only allows the agent-CLI allowlist `_INJECT_SAFE_COMMANDS`.
+
+### Targeting a tmux pane by `session:window_name` instead of `pane_id`
+
+**What happens:** Code re-resolves the target as `clawteam-{team}:{agent_name}` every time it wants to inject.
+**Why it's wrong:** Window names can be renamed by the user or shifted by `tile_panes` operations; pane ids (`%42`) are stable for the life of the pane. Fixed in commit `1c9a422`.
+**Do this instead:** `TmuxBackend.spawn` captures `#{pane_id}` after the pane appears (`tmux_backend.py:230`) and `inject_runtime_message` reads it back from `self._agents` first, only falling back to the window-name target if no pane id is recorded.
+
+### Letting an MCP tool raise a non-`MCPToolError`
+
+**What happens:** A new MCP tool raises `RuntimeError` / a domain exception directly.
+**Why it's wrong:** MCP clients see an opaque "Unexpected error" instead of the structured message; the error envelope contract breaks.
+**Do this instead:** Either raise `MCPToolError("...")` (or call `mcp.helpers.fail(...)`), or rely on the `_tool` wrapper plus `translate_error` in `clawteam/mcp/server.py:16` and `clawteam/mcp/helpers.py:25` — but only if the underlying exception is `ValueError` / `RuntimeError` / `TaskLockError`.
+
+### Reading inbox JSON and silently dropping malformed messages without acking
+
+**What happens:** A new transport's `fetch` returns parsed dicts (or skips bytes that don't validate) and never tells the mailbox.
+**Why it's wrong:** `MailboxManager` owns parsing and quarantine policy; transports should only return raw bytes (or `ClaimedMessage`s). Without that split, malformed messages either get silently lost or stay in the inbox forever.
+**Do this instead:** Implement `Transport.fetch` to return `list[bytes]` (and optionally `claim_messages` for at-least-once). `MailboxManager._parse_claimed_messages` (`clawteam/team/mailbox.py:174`) handles `ack()` vs `quarantine(reason)`.
 
 ## Error Handling
 
-**Strategy:** Defensive — never crash a user-facing operation because a
-secondary feature failed.
+**Strategy:** Domain-specific exceptions raised low and translated at the boundary.
 
 **Patterns:**
-- Storage operations raise normal Python exceptions; CLI handlers translate
-  to `console.print("[red]...[/red]"); raise typer.Exit(1)`.
-- Event handlers are wrapped in `try/except: pass` inside `EventBus.emit`
-  (`clawteam/events/bus.py:96`) so a buggy hook cannot break the bus.
-- Plane push from the `AfterTaskUpdate` hook catches `Exception` and logs
-  with `log.warning(...)` (`clawteam/plane/__init__.py:28`).
-- Board collector wraps cost / conflict / message-history augmentation in
-  `try/except: pass` blocks so a partially-installed environment still
-  returns the core team payload (`clawteam/board/collector.py:128-183`).
-- Webhook handler emits 401 on bad HMAC, 400 on bad JSON, 200 with a JSON
-  result body otherwise (`clawteam/plane/webhook.py:170`).
-- File store concurrency uses a typed `TaskLockError` raised when the caller
-  doesn't own the lock and `force=False`.
+- `paths.validate_identifier` raises `ValueError` for any unsafe identifier; `paths.ensure_within_root` raises `ValueError("Resolved path escapes the configured data directory")`.
+- `store.base.TaskLockError` is raised when an update would conflict with another agent's lock; CLI surfaces it as a non-zero exit, MCP surfaces it through `MCPToolError`.
+- Spawn backends return `"Error: ..."` strings from `spawn(...)` instead of raising, so the CLI can pipe them straight to the user without a stack trace.
+- The board server returns proper HTTP status codes (`400` for malformed requests, `403` for denied proxy targets, `404` for unknown teams, `500` only for unexpected proxy failures).
+- `EventBus.emit` swallows handler exceptions (`events/bus.py:99`) so a buggy hook can't crash the orchestrator; failures are silent — instrument the hook itself if you need observability.
+- `_load_hooks_from_config` and most plugin discovery sites wrap import / parse failures in bare `except Exception: pass` — the system stays usable when config is missing or malformed.
 
 ## Cross-Cutting Concerns
 
-**Logging:** Stdlib `logging` (e.g. `log = logging.getLogger(__name__)` in
-`clawteam/plane/*`). User-facing CLI uses `rich.console.Console` for stylised
-output. Board HTTP handler suppresses `/api/events/` access logs explicitly
-(`clawteam/board/server.py:347`).
+**Logging:** Almost all user-facing output goes through `rich.console.Console` in the CLI; the board server uses stdlib `BaseHTTPRequestHandler.log_message` (suppressed for SSE). The harness conductor prints to `sys.stderr`. Only `clawteam/workspace/manager.py` uses `logging.getLogger`. There is no structured/JSON logging framework.
 
-**Validation:** Pydantic v2 models everywhere persistent state lives.
-`validate_identifier` for any string that becomes a path component.
-`ensure_within_root` immediately after.
+**Validation:** Pydantic v2 models (`TeamConfig`, `TeamMember`, `TeamMessage`, `TaskItem`, `WorkspaceInfo`, `PhaseState`, `ClawTeamConfig`, `AgentProfile`, `AgentPreset`, `HookDef`) own field validation. Identifier validation uses the `_IDENTIFIER_RE` from `paths.py`.
 
-**Authentication:**
-- ClawTeam itself has no auth; the board server binds to `127.0.0.1` by
-  default. Treat the data dir as the trust boundary.
-- Plane uses `X-API-Key` header (`PlaneClient._headers` in
-  `clawteam/plane/client.py:50`).
-- Plane webhooks verify HMAC-SHA256 against `PlaneConfig.webhook_secret`
-  (`clawteam/plane/webhook.py:19`).
-- The board server's `/api/proxy` endpoint is hard-allow-listed to
-  `api.github.com`, `github.com`, `raw.githubusercontent.com`, rejects
-  redirects, and refuses non-https or private/loopback hosts
-  (`clawteam/board/server.py:33-93`).
+**Authentication / authorization:** None internally — this is a local developer tool. The board server only binds `127.0.0.1` by default and the `/api/proxy` endpoint enforces an HTTPS-only allowlist (`api.github.com`, `github.com`, `raw.githubusercontent.com`) plus rejection of loopback / private / link-local hostnames (`board/server.py:33`).
 
-**Identity:** `AgentIdentity.from_env` (`clawteam/identity.py:37`) builds an
-identity from `CLAWTEAM_*` env vars, falling back to legacy `CLAUDE_CODE_*`
-ones, so older agents keep working.
+**Concurrency / atomicity:** `clawteam/fileutil.py:atomic_write_text` (mkstemp + replace) for every persisted JSON; `file_locked` advisory locks for spawn registry and task store; per-team `.tasks.lock` guards multi-task batch operations.
 
-**Timezone:** Timestamps are ISO-8601 UTC at write time; display is humanised
-through `clawteam/timefmt.py` using the configured `timezone`.
+**Eventing:** The bus is the single observable spine. Events emitted today: `BeforeWorkerSpawn`, `AfterWorkerSpawn`, `WorkerExit`, `WorkerCrash`, `BeforeTaskCreate`, `AfterTaskUpdate`, `TaskCompleted`, `BeforeInboxSend`, `AfterInboxReceive`, `BeforeWorkspaceMerge`, `AfterWorkspaceCleanup`, `TeamLaunch`, `TeamShutdown`, `AgentIdle`, `HeartbeatTimeout`, `PhaseTransition`, `TransportFallback`, `BoardAttach` (`clawteam/events/types.py`).
+
+**Identity propagation:** Spawn backends export `CLAWTEAM_AGENT_ID` / `CLAWTEAM_AGENT_NAME` / `CLAWTEAM_AGENT_TYPE` / `CLAWTEAM_TEAM_NAME` / `CLAWTEAM_AGENT_LEADER` (and `CLAWTEAM_USER` / `CLAWTEAM_WORKSPACE_DIR` when set) into every child process so the spawned agent can rebuild its identity via `AgentIdentity.from_env`.
 
 ---
 
