@@ -283,6 +283,12 @@ class TmuxBackend(SpawnBackend):
         if probe.returncode != 0 or not probe.stdout.strip():
             return False, f"tmux target '{target}' not found"
 
+        if not _pane_safe_to_inject(target):
+            return False, (
+                f"refusing to inject into '{target}': pane is not running an "
+                "agent CLI (likely a shell or sub-TUI)"
+            )
+
         try:
             _inject_prompt_via_buffer(
                 target,
@@ -616,6 +622,39 @@ def _wait_for_tui_ready(
         time.sleep(poll_interval)
 
     time.sleep(fallback_delay)
+
+
+# Foreground commands a pane may be running where it is *safe* to paste a
+# notification block. Anything not on this list — bash, zsh, fish, less,
+# vim, fzf, tmux itself, etc. — would interpret the paste as terminal input
+# (potentially executing $() / backticks). Refuse injection in those cases.
+_INJECT_SAFE_COMMANDS = frozenset({
+    "claude",
+    "codex",
+    "gemini",
+    "kimi",
+    "qwen",
+    "opencode",
+    "nanobot",
+    "openclaw",
+    "pi",
+    "node",      # claude-cli runs as node when not symlinked
+    "python",
+    "python3",
+})
+
+
+def _pane_safe_to_inject(target: str) -> bool:
+    """Return True only when the pane's foreground command looks like an agent CLI."""
+    probe = subprocess.run(
+        ["tmux", "display-message", "-p", "-t", target, "#{pane_current_command}"],
+        capture_output=True,
+        text=True,
+    )
+    if probe.returncode != 0:
+        return False
+    cmd = probe.stdout.strip().lower()
+    return cmd in _INJECT_SAFE_COMMANDS
 
 
 def _inject_prompt_via_buffer(
