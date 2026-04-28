@@ -36,6 +36,10 @@ def build_resume_command(command: list[str]) -> list[str]:
         # Hermes doesn't have a --continue flag; re-run the full command.
         # The agent picks up state from its ClawTeam mailbox/task list.
         return list(normalized)
+    if executable == "openclaw":
+        # OpenClaw resumes via --session-id (injected by NativeCliAdapter),
+        # so the resume command is just the base `openclaw agent` invocation.
+        return [normalized[0], "agent"]
     return []
 
 
