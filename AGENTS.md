@@ -225,8 +225,8 @@ helm-ai-swarm-orchestrator/
 │   ├── service/                       ← FastAPI REST wrapper
 │   └── k8s/                           ← K8s Job template
 ├── submodules/ice/                    ← Reference Linux driver source
-├── docs/ai-agent-orchestration--porting-guide.md  ← Comprehensive porting guide
-└── ai-agent-orchestration--system-prompt.md       ← Runtime system prompt
+├── docs/ai-agent-orchestration-porting-guide.md  ← Comprehensive porting guide
+└── ai-agent-orchestration-system-prompt.md       ← Runtime system prompt
 ```
 
 ### Execution Modes

@@ -44,9 +44,8 @@ helm-ai-swarm-orchestrator/
 ### How It Connects
 
 1. **Helm chart** deploys VMs and creates ConfigMap `ai-orchestrator-context` with:
-   - `ai--system-prompt.txt` — Agent system prompt from `values.yaml`
-   - `ai--porting-guide.md` — Comprehensive porting guide from `values.yaml`
-   - `ai--connection-info.yaml` — SSH endpoints for all deployed VMs
+   - `ai-system-prompt.txt` — Agent system prompt from `values.yaml`
+   - `ai-porting-guide.md` — Comprehensive porting guide from `values.yaml`
 2. **Orchestrator** reads `connection-info.yaml` to SSH into target VMs for build & test
 3. **Source code** comes from `submodules/ice/` (or any Linux NIC driver)
 
@@ -57,8 +56,7 @@ python3 -m agent.analyze_build \
     -d ice -t freebsd \
     -s ../submodules/ice/src \
     -o ./artifacts/ice_port \
-    -c /path/to/ai--connection-info.yaml \
-    -g /path/to/ai--porting-guide.md
+    -g /path/to/ai-porting-guide.md
 ```
 
 ## Related Agent
