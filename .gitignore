@@ -12,3 +12,12 @@ venv/
 uv.lock
 .claude/*.local.md
 node_modules/
+
+# Local runtime data and scratch artifacts
+.clawteam/costs/
+.clawteam/tasks/
+.clawteam/teams/
+.clawteam/workspaces/
+.playwright-mcp/
+/board-*.png
+/verify-*.png
