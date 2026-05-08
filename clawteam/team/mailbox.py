@@ -117,6 +117,19 @@ class MailboxManager:
         self._transport.deliver(delivery_target, data)
         self._log_event(msg)
         try:
+            from clawteam.team.redis_wakeup import agent_channel, publish_wakeup, team_channel
+            payload = {
+                "from": from_agent,
+                "to": to,
+                "deliveryTarget": delivery_target,
+                "type": msg_type.value,
+                "requestId": msg.request_id,
+            }
+            publish_wakeup(self.team_name, agent_channel(self.team_name, delivery_target), "inbox", payload)
+            publish_wakeup(self.team_name, team_channel(self.team_name, "events"), "inbox", payload)
+        except Exception:
+            pass
+        try:
             from clawteam.events.global_bus import get_event_bus
             from clawteam.events.types import BeforeInboxSend
             get_event_bus().emit_async(BeforeInboxSend(
@@ -158,6 +171,23 @@ class MailboxManager:
                 ).encode("utf-8")
                 self._transport.deliver(recipient, data)
                 self._log_event(msg)
+                try:
+                    from clawteam.team.redis_wakeup import (
+                        agent_channel,
+                        publish_wakeup,
+                        team_channel,
+                    )
+                    payload = {
+                        "from": from_agent,
+                        "to": recipient,
+                        "deliveryTarget": recipient,
+                        "type": msg_type.value,
+                        "requestId": msg.request_id,
+                    }
+                    publish_wakeup(self.team_name, agent_channel(self.team_name, recipient), "inbox", payload)
+                    publish_wakeup(self.team_name, team_channel(self.team_name, "events"), "inbox", payload)
+                except Exception:
+                    pass
                 messages.append(msg)
         return messages
 
