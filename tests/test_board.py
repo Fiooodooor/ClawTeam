@@ -33,6 +33,7 @@ def test_collect_overview_does_not_call_collect_team(monkeypatch, tmp_path: Path
             "description": "demo team",
             "leader": "leader",
             "members": 1,
+            "membersOnline": 0,
             "tasks": 0,
             "pendingMessages": 0,
         }
@@ -63,6 +64,7 @@ def test_collect_overview_sums_inbox_counts_for_all_members(monkeypatch, tmp_pat
             "description": "demo team",
             "leader": "leader",
             "members": 2,
+            "membersOnline": 0,
             "tasks": 0,
             "pendingMessages": 1,
         }
@@ -198,6 +200,7 @@ def test_collect_overview_preserves_broken_team_fallback(monkeypatch):
             "description": "good team",
             "leader": "lead",
             "members": 1,
+            "membersOnline": 0,
             "tasks": 3,
             "pendingMessages": 2,
         }
@@ -213,6 +216,7 @@ def test_collect_overview_preserves_broken_team_fallback(monkeypatch):
             "description": "good team",
             "leader": "lead",
             "members": 1,
+            "membersOnline": 0,
             "tasks": 3,
             "pendingMessages": 2,
         },
@@ -221,6 +225,7 @@ def test_collect_overview_preserves_broken_team_fallback(monkeypatch):
             "description": "broken team",
             "leader": "",
             "members": 7,
+            "membersOnline": 0,
             "tasks": 0,
             "pendingMessages": 0,
         },
@@ -365,9 +370,106 @@ def test_proxy_fetches_allowed_github_content(monkeypatch):
     assert seen["url"] == "https://raw.githubusercontent.com/org/repo/main/README.md"
 
 
-def test_board_ui_escapes_attacker_controlled_fields():
-    html = Path("clawteam/board/static/index.html").read_text(encoding="utf-8")
+def test_board_ui_is_react_spa_shell():
+    """The dashboard is now a React SPA; escaping is handled by React at render time.
 
+    This test just guards the served index.html shape: a minimal root mount
+    point plus a hashed bundle reference, with no inline user-data interpolation.
+    """
+    html = Path("clawteam/board/static/index.html").read_text(encoding="utf-8")
+    assert '<div id="root"></div>' in html
+    assert "/assets/index-" in html
+
+
+def test_post_member_endpoint_adds_agent_without_explicit_id(monkeypatch, tmp_path: Path):
+    import json as _json
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    TeamManager.create_team(
+        name="addtest", leader_name="leader", leader_id="l001", description="test",
+    )
+
+    from unittest.mock import MagicMock
+    handler = MagicMock(spec=BoardHandler)
+    handler.path = "/api/team/addtest/member"
+
+    body = _json.dumps({"name": "newbie", "agentType": "claude"}).encode()
+    handler.headers = {"Content-Length": str(len(body))}
+    handler.rfile = io.BytesIO(body)
+
+    responses = []
+    handler._serve_json = lambda data: responses.append(data)
+    handler.send_error = MagicMock()
+
+    BoardHandler.do_POST(handler)
+
+    handler.send_error.assert_not_called()
+    assert responses == [{"status": "ok", "name": "newbie"}]
+    config = TeamManager.get_team("addtest")
+    member = next(m for m in config.members if m.name == "newbie")
+    assert member.agent_type == "claude"
+    assert member.agent_id  # auto-generated
+
+
+def test_patch_task_updates_status(monkeypatch, tmp_path: Path):
+    import json as _json
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    from clawteam.team.models import TaskStatus
+    TeamManager.create_team(
+        name="ptest", leader_name="leader", leader_id="l001", description="test",
+    )
+    from clawteam.team.tasks import TaskStore
+    store = TaskStore("ptest")
+    task = store.create(subject="Drag me")
+
+    from clawteam.board.server import BoardHandler
+    from unittest.mock import MagicMock
+    handler = MagicMock(spec=BoardHandler)
+    handler.path = f"/api/team/ptest/task/{task.id}"
+
+    body = _json.dumps({"status": "in_progress"}).encode()
+    handler.headers = {"Content-Length": str(len(body))}
+    handler.rfile = io.BytesIO(body)
+
+    responses = []
+    def mock_serve_json(data):
+        responses.append(data)
+    handler._serve_json = mock_serve_json
+    handler.send_error = MagicMock()
+
+    BoardHandler.do_PATCH(handler)
+
+    assert len(responses) == 1
+    assert responses[0]["status"] == "ok"
+    assert responses[0]["task_id"] == task.id
+
+    updated = store.get(task.id)
+    assert updated.status == TaskStatus.in_progress
+
+
+def test_collect_team_groups_all_six_statuses(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("CLAWTEAM_DATA_DIR", str(tmp_path))
+    from clawteam.team.models import TaskStatus
+    TeamManager.create_team(
+        name="six", leader_name="leader", leader_id="l001", description="test",
+    )
+    from clawteam.team.tasks import TaskStore
+    store = TaskStore("six")
+    store.create(subject="t1")
+    store.create(subject="t2")
+    t3 = store.create(subject="t3")
+    store.update(t3.id, status=TaskStatus.awaiting_approval, force=True)
+    t4 = store.create(subject="t4")
+    store.update(t4.id, status=TaskStatus.completed, force=True)
+    t5 = store.create(subject="t5")
+    store.update(t5.id, status=TaskStatus.verified, force=True)
+
+    data = BoardCollector().collect_team("six")
+    assert "awaiting_approval" in data["tasks"]
+    assert "verified" in data["tasks"]
+    assert len(data["tasks"]["awaiting_approval"]) == 1
+    assert len(data["tasks"]["verified"]) == 1
+    assert "awaiting_approval" in data["taskSummary"]
+    assert "verified" in data["taskSummary"]
     assert "escapeHtml(m.name)" in html
     assert "escapeHtml(m.agentType || 'Agent')" in html
     assert "escapeHtml(m.fromLabel || m.from || 'SYS')" in html

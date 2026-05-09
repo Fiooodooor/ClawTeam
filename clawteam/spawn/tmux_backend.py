@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import tempfile
 import time
+import uuid
+from xml.sax.saxutils import escape
 
 from clawteam.spawn.adapters import (
     NativeCliAdapter,
@@ -40,7 +42,8 @@ class TmuxBackend(SpawnBackend):
     """
 
     def __init__(self):
-        self._agents: dict[str, str] = {}  # agent_name -> tmux target
+        # (team_name, agent_name) -> {"target": "...", "pane_id": "%N"}
+        self._agents: dict[tuple[str, str], dict[str, str]] = {}
         self._adapter = NativeCliAdapter()
 
     def spawn(
@@ -282,7 +285,20 @@ class TmuxBackend(SpawnBackend):
                 stderr=subprocess.PIPE,
             )
 
-        self._agents[agent_name] = target
+        # Capture pane id (e.g. %42) so future runtime injections target by
+        # stable pane id rather than the user-renamable window name.
+        pane_id = ""
+        pane_id_result = subprocess.run(
+            ["tmux", "display-message", "-p", "-t", target, "#{pane_id}"],
+            capture_output=True, text=True,
+        )
+        if pane_id_result.returncode == 0:
+            pane_id = pane_id_result.stdout.strip()
+
+        self._agents[(team_name, agent_name)] = {
+            "target": target,
+            "pane_id": pane_id,
+        }
 
         # Capture pane PID for robust liveness checking (survives tile operations)
         pane_pid = 0
@@ -331,8 +347,14 @@ class TmuxBackend(SpawnBackend):
 
     def list_running(self) -> list[dict[str, str]]:
         return [
-            {"name": name, "target": target, "backend": "tmux"}
-            for name, target in self._agents.items()
+            {
+                "name": agent,
+                "team": team,
+                "target": rec.get("target", ""),
+                "pane_id": rec.get("pane_id", ""),
+                "backend": "tmux",
+            }
+            for (team, agent), rec in self._agents.items()
         ]
 
     def inject_runtime_message(self, team: str, agent_name: str, envelope) -> tuple[bool, str]:
@@ -340,7 +362,11 @@ class TmuxBackend(SpawnBackend):
         if not shutil.which("tmux"):
             return False, "tmux not installed"
 
-        target = f"{self.session_name(team)}:{agent_name}"
+        record = self._agents.get((team, agent_name)) or {}
+        recorded_pane = (record.get("pane_id") or "").strip()
+        fallback_target = f"{self.session_name(team)}:{agent_name}"
+        target = recorded_pane or fallback_target
+
         probe = subprocess.run(
             ["tmux", "list-panes", "-t", target, "-F", "#{pane_id}"],
             capture_output=True,
@@ -348,6 +374,12 @@ class TmuxBackend(SpawnBackend):
         )
         if probe.returncode != 0 or not probe.stdout.strip():
             return False, f"tmux target '{target}' not found"
+
+        if not _pane_safe_to_inject(target):
+            return False, (
+                f"refusing to inject into '{target}': pane is not running an "
+                "agent CLI (likely a shell or sub-TUI)"
+            )
 
         try:
             _inject_prompt_via_buffer(
@@ -684,6 +716,55 @@ def _wait_for_tui_ready(
     time.sleep(fallback_delay)
 
 
+# Foreground commands a pane may be running where it is *safe* to paste a
+# notification block. Anything not on this list — bash, zsh, fish, less,
+# vim, fzf, tmux itself, etc. — would interpret the paste as terminal input
+# (potentially executing $() / backticks). Refuse injection in those cases.
+_INJECT_SAFE_COMMANDS = frozenset({
+    "claude",
+    "codex",
+    "gemini",
+    "kimi",
+    "qwen",
+    "opencode",
+    "nanobot",
+    "openclaw",
+    "pi",
+    "node",      # claude-cli runs as node when not symlinked
+    "python",
+    "python3",
+})
+
+
+def _pane_safe_to_inject(target: str) -> bool:
+    """Return True only when the pane's foreground command looks like an agent CLI."""
+    probe = subprocess.run(
+        ["tmux", "display-message", "-p", "-t", target, "#{pane_current_command}"],
+        capture_output=True,
+        text=True,
+    )
+    if probe.returncode != 0:
+        return False
+    cmd = probe.stdout.strip().lower()
+    return cmd in _INJECT_SAFE_COMMANDS
+
+
+def _run_tmux(args: list[str]) -> None:
+    """Run a tmux subcommand and raise RuntimeError on non-zero exit.
+
+    Replaces the unchecked ``subprocess.run`` calls that previously masked
+    paste-buffer / load-buffer failures as success.
+    """
+    result = subprocess.run(
+        ["tmux", *args],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip() or "(no stderr)"
+        raise RuntimeError(f"tmux {args[0]} failed (exit {result.returncode}): {stderr}")
+
+
 def _inject_prompt_via_buffer(
     target: str,
     agent_name: str,
@@ -691,11 +772,11 @@ def _inject_prompt_via_buffer(
 ) -> None:
     """Inject a prompt into a tmux pane via ``load-buffer`` / ``paste-buffer``.
 
-    Using a temp file avoids the shell-escaping pitfalls of ``send-keys`` for
-    multi-line or special-character prompts. Two Enter keystrokes are sent
-    after the paste to confirm and submit.
+    Uses a per-call unique buffer name so concurrent injections can't clobber
+    each other. Every tmux subcommand return code is checked; failures raise
+    RuntimeError instead of silently reporting success.
     """
-    buf_name = f"prompt-{agent_name}"
+    buf_name = f"prompt-{agent_name}-{uuid.uuid4().hex[:8]}"
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".txt", delete=False, prefix="clawteam-prompt-"
     ) as f:
@@ -703,32 +784,15 @@ def _inject_prompt_via_buffer(
         tmp_path = f.name
 
     try:
-        subprocess.run(
-            ["tmux", "load-buffer", "-b", buf_name, tmp_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        subprocess.run(
-            ["tmux", "paste-buffer", "-b", buf_name, "-t", target],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        _run_tmux(["load-buffer", "-b", buf_name, tmp_path])
+        _run_tmux(["paste-buffer", "-b", buf_name, "-t", target])
         time.sleep(0.5)
-        subprocess.run(
-            ["tmux", "send-keys", "-t", target, "Enter"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        _run_tmux(["send-keys", "-t", target, "Enter"])
         time.sleep(0.3)
-        subprocess.run(
-            ["tmux", "send-keys", "-t", target, "Enter"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        subprocess.run(
-            ["tmux", "delete-buffer", "-b", buf_name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        _run_tmux(["send-keys", "-t", target, "Enter"])
+        try:
+            _run_tmux(["delete-buffer", "-b", buf_name])
+        except RuntimeError:
+            pass
     finally:
         os.unlink(tmp_path)
