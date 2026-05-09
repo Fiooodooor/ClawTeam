@@ -10,8 +10,13 @@ from clawteam.spawn.adapters import NativeCliAdapter, is_claude_command, is_open
 from clawteam.spawn.base import SpawnBackend
 from clawteam.spawn.cli_env import build_spawn_path, resolve_clawteam_executable
 from clawteam.spawn.command_validation import validate_spawn_command
-from clawteam.spawn.keepalive import build_keepalive_shell_command, build_resume_command
+from clawteam.spawn.keepalive import (
+    build_keepalive_resume_prompt,
+    build_keepalive_shell_command,
+    build_resume_command,
+)
 from clawteam.spawn.runtime_notification import render_runtime_notification
+from clawteam.spawn.session_capture import persist_spawned_session, prepare_session_capture
 from clawteam.team.mailbox import MailboxManager
 from clawteam.team.models import MessageType, get_data_dir
 from clawteam.team.models import get_data_dir
@@ -67,8 +72,15 @@ class SubprocessBackend(SpawnBackend):
         if os.path.isabs(clawteam_bin):
             spawn_env.setdefault("CLAWTEAM_BIN", clawteam_bin)
 
-        prepared = self._adapter.prepare_command(
+        session_capture = prepare_session_capture(
             command,
+            team_name=team_name,
+            agent_name=agent_name,
+            cwd=cwd,
+            prompt=prompt,
+        )
+        prepared = self._adapter.prepare_command(
+            session_capture.command,
             prompt=prompt,
             cwd=cwd,
             skip_permissions=skip_permissions,
@@ -91,8 +103,12 @@ class SubprocessBackend(SpawnBackend):
         resume_base = build_resume_command(normalized_command)
         resume_command: list[str] = []
         if resume_base:
+            resume_prompt = None
+            if keepalive and is_claude_command(normalized_command):
+                resume_prompt = build_keepalive_resume_prompt(team_name, agent_name)
             resume_prepared = self._adapter.prepare_command(
                 resume_base,
+                prompt=resume_prompt,
                 cwd=cwd,
                 skip_permissions=skip_permissions,
                 agent_name=agent_name,
@@ -155,6 +171,12 @@ class SubprocessBackend(SpawnBackend):
             pid=process.pid,
             command=list(final_command),
             log_path=str(log_path),
+        )
+        persist_spawned_session(
+            session_capture,
+            team_name=team_name,
+            agent_name=agent_name,
+            command=list(final_command),
         )
 
         return f"Agent '{agent_name}' spawned as subprocess (pid={process.pid})"

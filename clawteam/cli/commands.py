@@ -1162,6 +1162,7 @@ def team_spawn_team(
 ):
     """Create a new team and register the leader (spawnTeam)."""
     from clawteam.identity import AgentIdentity
+    from clawteam.spawn.session_capture import save_current_agent_session
     from clawteam.team.manager import TeamManager
 
     identity = AgentIdentity.from_env()
@@ -1182,11 +1183,15 @@ def team_spawn_team(
             "leadAgentId": leader_id,
             "leaderName": leader_name,
         }
+        session_id = save_current_agent_session(name, leader_name)
+        if session_id:
+            result["sessionId"] = session_id
         if identity.user:
             result["user"] = identity.user
         _output(result, lambda d: (
             console.print(f"[green]OK[/green] Team '{name}' created"),
             console.print(f"  Leader: {leader_name} (id: {leader_id})"),
+            console.print(f"  Session: {d['sessionId']}") if d.get("sessionId") else None,
         ))
     except ValueError as e:
         if _json_output:
@@ -1571,6 +1576,53 @@ def team_status(
         console.print(table)
 
     _output(data, _human)
+
+
+@team_app.command("watch")
+def team_watch(
+    team: str = typer.Argument(..., help="Team name"),
+    leader: Optional[str] = typer.Option(None, "--leader", "-l", help="Leader agent name (default: from team config)"),
+    interval: float = typer.Option(60.0, "--interval", "-i", help="Polling fallback interval in seconds"),
+    heartbeat_interval: float = typer.Option(
+        300.0,
+        "--heartbeat-interval",
+        help="Periodic reminder interval in seconds even when state is unchanged",
+    ),
+    redis_mode: str = typer.Option(
+        "auto",
+        "--redis",
+        help="Redis wakeup mode: auto, off, or redis://host:port/db",
+    ),
+):
+    """Watch team state and periodically wake the leader agent."""
+    from clawteam.team.leader_watcher import LeaderWatcher
+    from clawteam.team.manager import TeamManager
+
+    config = TeamManager.get_team(team)
+    if not config:
+        _output({"error": f"Team '{team}' not found"}, lambda d: console.print(f"[red]{d['error']}[/red]"))
+        raise typer.Exit(1)
+
+    leader_name = leader or TeamManager.get_leader_name(team)
+    if not leader_name:
+        _output({"error": f"No leader found for team '{team}'"}, lambda d: console.print(f"[red]{d['error']}[/red]"))
+        raise typer.Exit(1)
+
+    watcher = LeaderWatcher(
+        team_name=team,
+        leader_name=leader_name,
+        interval=interval,
+        heartbeat_interval=heartbeat_interval,
+        redis_mode=redis_mode,
+        json_output=_json_output,
+        verbose=not _json_output,
+    )
+    if not _json_output:
+        console.print(
+            f"Watching team '[cyan]{team}[/cyan]' for leader '[cyan]{leader_name}[/cyan]' "
+            f"(interval: {interval}s, heartbeat: {heartbeat_interval}s, redis: {redis_mode})."
+        )
+    watcher.run()
 
 
 @team_app.command("snapshot")
@@ -2572,9 +2624,11 @@ app.add_typer(session_app, name="session")
 @session_app.command("save")
 def session_save(
     team: str = typer.Argument(..., help="Team name"),
-    session_id: str = typer.Option("", "--session-id", "-s", help="Claude Code session ID"),
+    session_id: str = typer.Option("", "--session-id", "-s", help="Native client session ID"),
     last_task: str = typer.Option("", "--last-task", help="Last task ID worked on"),
     agent: Optional[str] = typer.Option(None, "--agent", "-a", help="Agent name (default: from env)"),
+    client: str = typer.Option("", "--client", help="Client name such as claude, codex, gemini"),
+    cwd: str = typer.Option("", "--cwd", help="Workspace directory for this session"),
 ):
     """Save agent session for later resume."""
     from clawteam.identity import AgentIdentity
@@ -2586,6 +2640,12 @@ def session_save(
         agent_name=agent_name,
         session_id=session_id,
         last_task_id=last_task,
+        state={
+            "client": client,
+            "source": "manual",
+            "cwd": cwd,
+            "confidence": "exact" if session_id else "",
+        },
     )
     data = _dump(session)
     _output(data, lambda d: console.print(f"[green]OK[/green] Session saved for '{agent_name}'"))
@@ -2606,9 +2666,13 @@ def session_show(
             _output({"error": f"No session for '{agent}'"}, lambda d: console.print(f"[dim]{d['error']}[/dim]"))
             return
         data = _dump(session)
+        state = data.get("state") or {}
         _output(data, lambda d: (
             console.print(f"Session: [cyan]{d.get('agentName', '')}[/cyan]"),
             console.print(f"  Session ID: {d.get('sessionId', '')}"),
+            console.print(f"  Client:     {state.get('client', '')}"),
+            console.print(f"  Source:     {state.get('source', '')} ({state.get('confidence', '')})"),
+            console.print(f"  CWD:        {state.get('cwd', '')}"),
             console.print(f"  Last task:  {d.get('lastTaskId', '')}"),
             console.print(f"  Saved at:   {format_timestamp(d.get('savedAt', ''))}"),
         ))
@@ -2622,12 +2686,17 @@ def session_show(
                 return
             table = Table(title=f"Sessions — {team}")
             table.add_column("Agent", style="cyan")
+            table.add_column("Client")
+            table.add_column("Confidence")
             table.add_column("Session ID")
             table.add_column("Last Task", style="dim")
             table.add_column("Saved At", style="dim")
             for s in items:
+                state = s.get("state") or {}
                 table.add_row(
                     s.get("agentName", ""),
+                    state.get("client", ""),
+                    state.get("confidence", ""),
                     s.get("sessionId", ""),
                     s.get("lastTaskId", ""),
                     format_timestamp(s.get("savedAt")),
@@ -3197,15 +3266,17 @@ def spawn_agent(
             repo_path=repo,
         )
 
-    # Session resume: inject --resume flag for claude commands
+    # Session resume: inject the native client resume flag.
     if resume:
+        from clawteam.spawn.session_capture import build_resume_command as build_cli_resume_command
         from clawteam.spawn.sessions import SessionStore
         session_store = SessionStore(_team)
         session = session_store.load(_name)
         if session and session.session_id:
-            # Add --resume to claude command
-            if command and Path(command[0]).name in ("claude", "claude-code"):
-                command = list(command) + ["--resume", session.session_id]
+            client = str((getattr(session, "state", None) or {}).get("client") or "")
+            resumed_command = build_cli_resume_command(command, session.session_id, client=client)
+            if resumed_command != list(command):
+                command = resumed_command
                 console.print(f"[dim]Resuming session: {session.session_id}[/dim]")
             if prompt:
                 prompt += "\nYou are resuming a previous session."
@@ -4495,7 +4566,7 @@ def run_command(
 
     from clawteam.harness.prompts import build_harness_system_prompt, build_wrapped_prompt
     from clawteam.spawn import get_backend
-    from clawteam.spawn.adapters import is_claude_command
+    from clawteam.spawn.session_capture import build_resume_command as build_cli_resume_command
     from clawteam.team.manager import TeamManager
 
     mgr = TeamManager
@@ -4566,8 +4637,11 @@ def run_command(
         from clawteam.spawn.sessions import SessionStore
 
         session = SessionStore(team).load(agent_name)
-        if session and session.session_id and is_claude_command(command_list):
-            command_list = [*command_list, "--resume", session.session_id]
+        if session and session.session_id:
+            client = str((getattr(session, "state", None) or {}).get("client") or "")
+            resumed_command = build_cli_resume_command(command_list, session.session_id, client=client)
+            if resumed_command != command_list:
+                command_list = resumed_command
             console.print(f"[dim]Resuming session: {session.session_id}[/dim]")
             if prompt:
                 prompt += "\nYou are resuming a previous session."

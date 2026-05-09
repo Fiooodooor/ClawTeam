@@ -39,6 +39,21 @@ def build_resume_command(command: list[str]) -> list[str]:
     return []
 
 
+def build_keepalive_resume_prompt(team_name: str, agent_name: str) -> str:
+    """Return a generic resume instruction for long-running worker keepalive."""
+    return (
+        "ClawTeam resumed you after a clean exit because keepalive is enabled.\n"
+        "Before you exit again, re-check your assigned tasks and inbox.\n"
+        f"- Run `clawteam task list {team_name} --owner {agent_name}`.\n"
+        f"- Run `clawteam inbox receive {team_name} --agent {agent_name}`.\n"
+        "- If you previously started a daemon, watcher, or background loop for an ongoing job, "
+        "verify it is healthy and keep acting as its watchdog/reporter instead of treating the "
+        "first turn as the end of the job.\n"
+        f"- If you are truly idle, notify the leader with `clawteam lifecycle idle {team_name}` "
+        "and keep polling for new work until shutdown is explicitly approved."
+    )
+
+
 def build_keepalive_shell_command(
     initial_command: list[str],
     *,

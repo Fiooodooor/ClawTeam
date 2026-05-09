@@ -99,6 +99,8 @@ class TestBuildAgentPrompt:
         )
         assert "Worker Loop Protocol" in prompt
         assert "Do not exit after the first task" in prompt
+        assert "do not start a detached daemon/watch loop" in prompt
+        assert "Keep the monitoring/reporting loop in the foreground" in prompt
         assert "scan `clawteam task list my-team`" in prompt
         assert "clawteam inbox receive my-team --agent dev" in prompt
         assert "clawteam lifecycle idle my-team" in prompt

@@ -99,6 +99,18 @@ class FileTaskStore(BaseTaskStore):
         with self._write_lock():
             self._save_unlocked(task)
         try:
+            from clawteam.team.redis_wakeup import publish_wakeup, team_channel
+            payload = {
+                "taskId": task.id,
+                "owner": task.owner,
+                "status": task.status.value,
+                "subject": task.subject,
+            }
+            publish_wakeup(self.team_name, team_channel(self.team_name, "tasks"), "task_created", payload)
+            publish_wakeup(self.team_name, team_channel(self.team_name, "events"), "task_created", payload)
+        except Exception:
+            pass
+        try:
             from clawteam.events.global_bus import get_event_bus
             from clawteam.events.types import BeforeTaskCreate
             get_event_bus().emit_async(BeforeTaskCreate(
@@ -209,6 +221,19 @@ class FileTaskStore(BaseTaskStore):
                     owner=task.owner,
                     duration_seconds=task.metadata.get("duration_seconds", 0.0),
                 ))
+        except Exception:
+            pass
+        try:
+            from clawteam.team.redis_wakeup import publish_wakeup, team_channel
+            payload = {
+                "taskId": task.id,
+                "owner": task.owner,
+                "oldStatus": _old_status,
+                "newStatus": task.status.value,
+                "subject": task.subject,
+            }
+            publish_wakeup(self.team_name, team_channel(self.team_name, "tasks"), "task_updated", payload)
+            publish_wakeup(self.team_name, team_channel(self.team_name, "events"), "task_updated", payload)
         except Exception:
             pass
         return task

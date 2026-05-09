@@ -14,6 +14,7 @@ from clawteam.spawn.cli_env import (
     build_spawn_path,
     resolve_clawteam_executable,
 )
+from clawteam.spawn.keepalive import build_keepalive_resume_prompt
 from clawteam.spawn.subprocess_backend import SubprocessBackend
 from clawteam.spawn.tmux_backend import (
     TmuxBackend,
@@ -1201,6 +1202,43 @@ def test_subprocess_backend_injects_system_prompt_for_claude(monkeypatch, tmp_pa
     assert "--append-system-prompt" in cmd
     assert "You are an expert coder." in cmd
     assert cmd.index("--append-system-prompt") < cmd.index(" -p ")
+
+
+def test_subprocess_backend_claude_keepalive_resumes_with_watchdog_prompt(monkeypatch, tmp_path):
+    clawteam_bin = tmp_path / "bin" / "clawteam"
+    clawteam_bin.parent.mkdir(parents=True)
+    clawteam_bin.write_text("#!/bin/sh\n")
+    monkeypatch.setattr(sys, "argv", [str(clawteam_bin)])
+
+    captured: dict[str, object] = {}
+
+    def fake_popen(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return DummyProcess()
+
+    monkeypatch.setattr(
+        "clawteam.spawn.command_validation.shutil.which",
+        lambda name, path=None: "/usr/bin/claude" if name == "claude" else None,
+    )
+    monkeypatch.setattr("clawteam.spawn.subprocess_backend.subprocess.Popen", fake_popen)
+    monkeypatch.setattr("clawteam.spawn.registry.register_agent", lambda **_: None)
+
+    backend = SubprocessBackend()
+    backend.spawn(
+        command=["claude"],
+        agent_name="worker1",
+        agent_id="agent-1",
+        agent_type="general-purpose",
+        team_name="demo-team",
+        prompt="do work",
+        keepalive=True,
+    )
+
+    cmd = str(captured["cmd"])
+    expected = build_keepalive_resume_prompt("demo-team", "worker1")
+    assert "__ct_resume=" in cmd
+    assert "claude --continue -p" in cmd
+    assert expected in cmd
 
 
 def test_subprocess_backend_skips_system_prompt_for_non_claude(monkeypatch, tmp_path):

@@ -96,6 +96,8 @@ def build_agent_prompt(
         "- Do not exit after the first task unless the leader explicitly tells you to stop.",
         "",
         "## Worker Loop Protocol\n",
+        "- For ongoing jobs, do not start a detached daemon/watch loop and then immediately exit.",
+        "- Keep the monitoring/reporting loop in the foreground, or keep a foreground watchdog alive that continues checking health and sending updates.",
         f"- After finishing your current task batch, re-check `clawteam task list {team_name} --owner {agent_name}`.",
         f"- If that still shows no tasks, scan `clawteam task list {team_name}` for pending work that matches your assignment before you go idle.",
         f"- Then check for new instructions with `clawteam inbox receive {team_name} --agent {agent_name}`.",
