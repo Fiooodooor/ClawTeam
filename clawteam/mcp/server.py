@@ -22,6 +22,7 @@ def _tool(fn):
             raise translate_error(exc) from exc
 
     wrapped.__signature__ = inspect.signature(fn)
+    wrapped.__doc__ = inspect.getdoc(fn)
     return mcp.tool()(wrapped)
 
 

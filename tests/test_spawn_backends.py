@@ -129,7 +129,7 @@ def test_subprocess_backend_captures_output_and_preserves_exit_hook_and_registry
         "agent_name": "worker1",
         "backend": "subprocess",
         "pid": 9876,
-        "command": ["codex", "--dangerously-bypass-approvals-and-sandbox", "do work"],
+        "command": ["codex", "--dangerously-auto-approve-everything", "do work"],
         "log_path": str(tmp_path / ".clawteam" / "teams" / "demo-team" / "agent-logs" / "worker1.log"),
     }
 
