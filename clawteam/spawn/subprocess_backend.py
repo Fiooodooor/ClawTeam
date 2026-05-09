@@ -6,7 +6,12 @@ import os
 import subprocess
 
 from clawteam.paths import ensure_within_root, validate_identifier
-from clawteam.spawn.adapters import NativeCliAdapter, is_claude_command, is_openclaw_command, is_pi_command
+from clawteam.spawn.adapters import (
+    NativeCliAdapter,
+    is_claude_command,
+    is_openclaw_command,
+    is_pi_command,
+)
 from clawteam.spawn.base import SpawnBackend
 from clawteam.spawn.cli_env import build_spawn_path, resolve_clawteam_executable
 from clawteam.spawn.command_validation import validate_spawn_command
@@ -19,7 +24,6 @@ from clawteam.spawn.runtime_notification import render_runtime_notification
 from clawteam.spawn.session_capture import persist_spawned_session, prepare_session_capture
 from clawteam.team.mailbox import MailboxManager
 from clawteam.team.models import MessageType, get_data_dir
-from clawteam.team.models import get_data_dir
 
 
 class SubprocessBackend(SpawnBackend):

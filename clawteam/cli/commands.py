@@ -1048,30 +1048,49 @@ def profile_doctor(
     before_exists = claude_state_path.exists()
     data: dict[str, object] = {}
     corrupted = False
+    raw = ""
     if before_exists:
-        raw = claude_state_path.read_text(encoding="utf-8")
         try:
+            raw = claude_state_path.read_text(encoding="utf-8")
             parsed = json.loads(raw)
             if isinstance(parsed, dict):
                 data = parsed
             else:
                 corrupted = True
-        except (json.JSONDecodeError, ValueError):
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             corrupted = True
 
         if corrupted:
             backup_path = claude_state_path.with_suffix(".json.bak")
-            backup_path.write_text(raw, encoding="utf-8")
-            console.print(
-                f"[yellow]Warning:[/yellow] {claude_state_path} contained invalid data; "
-                f"backed up to {backup_path}"
-            )
+            from clawteam.fileutil import atomic_write_text
+            try:
+                # Use atomic write for backup and preserve permissions
+                atomic_write_text(backup_path, raw)
+                if before_exists:
+                    try:
+                        mode = claude_state_path.stat().st_mode
+                        backup_path.chmod(mode & 0o777)
+                    except OSError:
+                        # Fallback to secure default if we can't copy permissions
+                        backup_path.chmod(0o600)
+            except Exception:
+                # If backup fails, continue anyway - better to fix the file
+                pass
+
+            # Only print warning if not in JSON mode
+            if not _json_output:
+                console.print(
+                    f"[yellow]Warning:[/yellow] {claude_state_path} contained invalid data; "
+                    f"backed up to {backup_path}"
+                )
 
     data["hasCompletedOnboarding"] = True
 
     from clawteam.fileutil import atomic_write_text
 
     atomic_write_text(claude_state_path, json.dumps(data, indent=2))
+    # Ensure .claude.json has secure permissions
+    claude_state_path.chmod(0o600)
 
     result = {
         "client": "claude",
