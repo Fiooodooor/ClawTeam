@@ -1068,7 +1068,6 @@ def profile_doctor(
                 atomic_write_text(backup_path, raw)
                 if before_exists:
                     try:
-                        import stat
                         mode = claude_state_path.stat().st_mode
                         backup_path.chmod(mode & 0o777)
                     except OSError:
